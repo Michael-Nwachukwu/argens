@@ -1,4 +1,5 @@
-import { Router } from 'express'
+import { type Router } from 'express'
+import { Router as ExpressRouter } from 'express'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
@@ -13,7 +14,7 @@ import { createApiKey } from '../services/apikey.js'
 import { logger } from '../lib/logger.js'
 import { AppError } from '../lib/errors.js'
 
-export const authRouter = Router()
+export const authRouter: Router = ExpressRouter()
 
 // ─── Schemas ───────────────────────────────────────────────────────────────────
 const signupSchema = z.object({
