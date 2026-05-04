@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String        @id @default(cuid())
+  email                   String        @unique
+  passwordHash            String
+  emailVerified           Boolean       @default(false)
+  emailVerificationToken  String?       @unique
+  emailVerificationExpiry DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  wallet                  Wallet?
+  apiKeys                 ApiKey[]
+  policies                Policy?
+  transactions            Transaction[]
+  auditLogs               AuditLog[]
+}
+
+model Wallet {
+  id                  String        @id @default(cuid())
+  userId              String        @unique
+  user                User          @relation(fields: [userId], references: [id])
+  stellarPublicKey    String        @unique
+  stellarSecretKeyEnc String
+  status              WalletStatus  @default(INITIALISING)
+  balanceCache        Decimal       @default(0) @db.Decimal(18, 7)
+  balanceCachedAt     DateTime?
+  createdAt           DateTime      @default(now())
+  transactions        Transaction[]
+}
+
+enum WalletStatus {
+  INITIALISING
+  TRUSTLINE_PENDING
+  READY
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  keyHash    String    @unique
+  keyPrefix  String
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Policy {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  allowanceLimit      Decimal? @db.Decimal(18, 7)
+  maxTransactionLimit Decimal? @db.Decimal(18, 7)
+  approvalThreshold   Decimal? @db.Decimal(18, 7)
+  totalSpent          Decimal  @default(0) @db.Decimal(18, 7)
+  sorobanContractId   String?
+  updatedAt           DateTime @updatedAt
+}
+
+model Transaction {
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id])
+  walletId         String
+  wallet           Wallet            @relation(fields: [walletId], references: [id])
+  stellarTxHash    String?
+  recipientAddress String
+  amount           Decimal           @db.Decimal(18, 7)
+  fee              Decimal           @db.Decimal(18, 7)
+  currency         String            @default("USDC")
+  status           TransactionStatus
+  memo             String?
+  metadata         Json?
+  policyResult     Json?
+  blockedReason    String?
+  destinationChain  String?
+  destinationTxHash String?
+  crossChain        Boolean          @default(false)
+  createdAt        DateTime          @default(now())
+  approvalQueue    ApprovalQueue?
+}
+
+enum TransactionStatus {
+  SUCCESS
+  BLOCKED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  FAILED
+}
+
+model ApprovalQueue {
+  id            String         @id @default(cuid())
+  transactionId String         @unique
+  transaction   Transaction    @relation(fields: [transactionId], references: [id])
+  userId        String
+  status        ApprovalStatus @default(PENDING)
+  token         String         @unique
+  expiresAt     DateTime
+  actedAt       DateTime?
+  createdAt     DateTime       @default(now())
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  eventType String
+  eventData Json
+  createdAt DateTime @default(now())
+}
