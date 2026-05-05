@@ -7,3 +7,4 @@ dist
 .turbo
 .next
 prisma/migrations/*.sql
+.claude

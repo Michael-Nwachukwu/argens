@@ -8,6 +8,7 @@ import { walletRouter } from './routes/wallet.js'
 import { agentRouter } from './routes/agent.js'
 import { policiesRouter } from './routes/policies.js'
 import { approveRouter } from './routes/approve.js'
+import { x402Router } from './routes/x402.js'
 import { apiLimiter } from './middleware/ratelimit.js'
 import { sendError } from './lib/response.js'
 import { AppError } from './lib/errors.js'
@@ -39,6 +40,7 @@ app.use('/v1', walletRouter)
 app.use('/v1', agentRouter)
 app.use('/v1', policiesRouter)
 app.use('/v1', approveRouter)
+app.use('/v1', x402Router)
 
 // ─── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
