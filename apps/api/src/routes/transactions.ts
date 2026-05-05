@@ -11,7 +11,7 @@
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { z } from 'zod'
-import { requireApiKey } from '../middleware/auth.js'
+import { requireApiKey, requireJwtOrApiKey } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError, sendPaginated } from '../lib/response.js'
 import { NotFoundError } from '../lib/errors.js'
@@ -456,7 +456,7 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
 
 // ─── GET /transactions ────────────────────────────────────────────────────────
 
-transactionsRouter.get('/transactions', requireApiKey, async (req, res, next) => {
+transactionsRouter.get('/transactions', requireJwtOrApiKey, async (req, res, next) => {
   const userId = req.userId!
   try {
     const parsed = TransactionListSchema.safeParse(req.query)
@@ -510,7 +510,7 @@ transactionsRouter.get('/transactions', requireApiKey, async (req, res, next) =>
 
 // ─── GET /transactions/:id ────────────────────────────────────────────────────
 
-transactionsRouter.get('/transactions/:id', requireApiKey, async (req, res, next) => {
+transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res, next) => {
   const userId = req.userId!
   const idParam = req.params.id
   const id = Array.isArray(idParam) ? idParam[0] : idParam

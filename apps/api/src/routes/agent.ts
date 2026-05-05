@@ -8,7 +8,7 @@
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { z } from 'zod'
-import { requireApiKey } from '../middleware/auth.js'
+import { requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { getUsdcBalance } from '../services/stellar.js'
@@ -18,7 +18,7 @@ export const agentRouter: Router = ExpressRouter()
 
 // ─── GET /agent/status ────────────────────────────────────────────────────────
 
-agentRouter.get('/agent/status', requireApiKey, async (req, res, next) => {
+agentRouter.get('/agent/status', requireJwtOrApiKey, async (req, res, next) => {
   const userId = req.userId!
 
   try {
@@ -112,7 +112,7 @@ const SpendSummarySchema = z.object({
   period: z.enum(['daily', 'weekly', 'monthly']).default('daily'),
 })
 
-agentRouter.get('/spend/summary', requireApiKey, async (req, res, next) => {
+agentRouter.get('/spend/summary', requireJwtOrApiKey, async (req, res, next) => {
   const userId = req.userId!
 
   try {

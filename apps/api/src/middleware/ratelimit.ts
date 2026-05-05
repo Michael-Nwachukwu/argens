@@ -32,3 +32,38 @@ export const emailResendLimiter = rateLimit({
   legacyHeaders: false,
   handler,
 })
+
+// ─── PIN Rate Limiting ──────────────────────────────────────────────────────
+// In-memory tracker for transfer PIN attempts (per userId).
+// In production, replace with Redis for multi-instance deployments.
+
+interface PinAttempt {
+  count: number
+  resetAt: number
+}
+
+const pinAttemptMap = new Map<string, PinAttempt>()
+const PIN_MAX_ATTEMPTS = 5
+const PIN_WINDOW_MS = 10 * 60 * 1000 // 10 minutes
+
+export function checkPinAttempt(userId: string): { allowed: boolean; remaining: number } {
+  const now = Date.now()
+  const entry = pinAttemptMap.get(userId)
+
+  if (!entry || now > entry.resetAt) {
+    // Fresh window
+    pinAttemptMap.set(userId, { count: 1, resetAt: now + PIN_WINDOW_MS })
+    return { allowed: true, remaining: PIN_MAX_ATTEMPTS - 1 }
+  }
+
+  if (entry.count >= PIN_MAX_ATTEMPTS) {
+    return { allowed: false, remaining: 0 }
+  }
+
+  entry.count++
+  return { allowed: true, remaining: PIN_MAX_ATTEMPTS - entry.count }
+}
+
+export function resetPinAttempts(userId: string): void {
+  pinAttemptMap.delete(userId)
+}

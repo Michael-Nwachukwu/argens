@@ -31,6 +31,15 @@ const resendSchema = z.object({
   email: z.string().email(),
 })
 
+const pinSetSchema = z.object({
+  pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
+  password: z.string().min(1, 'Password is required'),
+})
+
+const pinRemoveSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+})
+
 // ─── POST /auth/signup ─────────────────────────────────────────────────────────
 authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res) => {
   const { email, password } = req.body as z.infer<typeof signupSchema>
@@ -170,7 +179,12 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res) =
     logger.info('User logged in', { userId: user.id })
     sendSuccess(res, {
       token,
-      email_verified: user.emailVerified,
+      user: {
+        id: user.id,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        transferPinSet: !!user.transferPinHash,
+      },
       message: user.emailVerified
         ? 'Logged in.'
         : 'Logged in. Please verify your email to access agent features.',
@@ -227,6 +241,7 @@ authRouter.get('/me', requireJwt, async (req, res) => {
       id: user.id,
       email: user.email,
       email_verified: user.emailVerified,
+      transfer_pin_set: !!user.transferPinHash,
       wallet: user.wallet
         ? { address: user.wallet.stellarPublicKey, status: user.wallet.status }
         : null,
@@ -234,5 +249,68 @@ authRouter.get('/me', requireJwt, async (req, res) => {
   } catch (e) {
     logger.error('Get me error', { userId: req.userId, error: (e as Error).message })
     sendError(res, 'Failed to fetch user.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// ─── POST /auth/transfer-pin ───────────────────────────────────────────────────
+authRouter.post('/transfer-pin', requireJwt, validate(pinSetSchema), async (req, res) => {
+  const userId = req.userId!
+  const { pin, password } = req.body as z.infer<typeof pinSetSchema>
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      sendError(res, 'User not found.', 'NOT_FOUND', 404)
+      return
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash)
+    if (!valid) {
+      sendError(res, 'Incorrect password.', 'INVALID_CREDENTIALS', 401)
+      return
+    }
+
+    const pinHash = await bcrypt.hash(pin, 10)
+    await prisma.user.update({
+      where: { id: userId },
+      data: { transferPinHash: pinHash },
+    })
+
+    logger.info('Transfer PIN set', { userId })
+    sendSuccess(res, { message: 'Transfer PIN set successfully.' })
+  } catch (e) {
+    logger.error('Set transfer PIN error', { userId, error: (e as Error).message })
+    sendError(res, 'Failed to set transfer PIN.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// ─── DELETE /auth/transfer-pin ──────────────────────────────────────────────────
+authRouter.delete('/transfer-pin', requireJwt, validate(pinRemoveSchema), async (req, res) => {
+  const userId = req.userId!
+  const { password } = req.body as z.infer<typeof pinRemoveSchema>
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      sendError(res, 'User not found.', 'NOT_FOUND', 404)
+      return
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash)
+    if (!valid) {
+      sendError(res, 'Incorrect password.', 'INVALID_CREDENTIALS', 401)
+      return
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { transferPinHash: null },
+    })
+
+    logger.info('Transfer PIN removed', { userId })
+    sendSuccess(res, { message: 'Transfer PIN removed.' })
+  } catch (e) {
+    logger.error('Remove transfer PIN error', { userId, error: (e as Error).message })
+    sendError(res, 'Failed to remove transfer PIN.', 'INTERNAL_ERROR', 500)
   }
 })
