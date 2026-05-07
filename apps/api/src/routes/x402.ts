@@ -31,7 +31,7 @@ import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment, computeTotalDebited } from '../services/payment.js'
+import { submitPayment } from '../services/payment.js'
 import { isStellarAddress, isEvmAddress } from '../services/stellar.js'
 import {
   sendBlockedEmail,
@@ -169,8 +169,7 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
           walletId: wallet.id,
           recipientAddress: payTo,
           amount: amountUsdc,
-          fee: '0.0000000',
-          currency: 'USDC',
+              currency: 'USDC',
           status: 'BLOCKED',
           memo: effectiveMemo,
           metadata: { ...(metadata ?? {}), x402: true, resource: normalized.resource } as object,
@@ -202,7 +201,6 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
           walletId: wallet.id,
           recipientAddress: payTo,
           amount: amountUsdc,
-          fee: '0.0000000',
           currency: 'USDC',
           status: 'PENDING_APPROVAL',
           memo: effectiveMemo,
@@ -227,15 +225,12 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
     }
 
     // ── 5. Execute Stellar payment ────────────────────────────────────────────
-    const { fee, totalDebited } = computeTotalDebited(amountUsdc)
-
     const tx = await prisma.transaction.create({
       data: {
         userId,
         walletId: wallet.id,
         recipientAddress: payTo,
         amount: amountUsdc,
-        fee,
         currency: 'USDC',
         status: 'APPROVED',
         memo: effectiveMemo,
@@ -255,7 +250,7 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
 
       await prisma.transaction.update({
         where: { id: tx.id },
-        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash, fee: stellarResult.fee },
+        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
       })
 
       await incrementTotalSpent(userId, amountUsdc)
@@ -283,8 +278,6 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
         transaction_id: tx.id,
         stellar_tx_hash: stellarResult.hash,
         amount: amountUsdc,
-        fee: stellarResult.fee,
-        total_debited: stellarResult.totalDebited,
         recipient: payTo,
         network: normalizeNetworkName(network),
         resource: normalized.resource,

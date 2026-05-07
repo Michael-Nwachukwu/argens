@@ -36,9 +36,40 @@ const SYN = {
 
 const SKILL_PROMPT = 'Hi, read https://argens.xyz/SKILL.md and continue with the onboarding steps.'
 
+// ─── Tally (waitlist) ─────────────────────────────────────────────────────────
+const TALLY_FORM_ID = 'TODO_REPLACE_ME'
+
+function useTally() {
+  useEffect(() => {
+    if (document.querySelector('script[src*="tally.so"]')) return
+    const s = document.createElement('script')
+    s.src = 'https://tally.so/widgets/embed.js'
+    s.async = true
+    document.head.appendChild(s)
+  }, [])
+}
+
+function WaitlistButton({ size = 'sm', label = 'Join the waitlist' }: { size?: 'sm' | 'lg'; label?: string }) {
+  const pad  = size === 'lg' ? '13px 26px' : '7px 14px'
+  const font = size === 'lg' ? 15 : 13
+  return (
+    <button
+      data-tally-open={TALLY_FORM_ID}
+      data-tally-layout="modal"
+      data-tally-width="480"
+      data-tally-emoji-text="👋"
+      data-tally-emoji-animation="wave"
+      style={{ padding: pad, borderRadius: 7, fontSize: font, fontWeight: 600, background: t.accent, color: t.bg, border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif', display: 'inline-flex', alignItems: 'center' }}
+    >
+      {label}
+    </button>
+  )
+}
+
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  useTally()
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10)
     window.addEventListener('scroll', fn, { passive: true })
@@ -56,13 +87,13 @@ function Nav() {
     }}>
       <Logo />
       <ul style={{ display: 'flex', alignItems: 'center', gap: 28, listStyle: 'none' }}>
-        {[['#how','How it works'],['#twoways','Integration'],['#policies','Policies'],['#pricing','Pricing']].map(([href, label]) => (
+        {[['#how','How it works'],['#marketplace','Marketplace'],['#policies','Policies'],['#pricing','Pricing']].map(([href, label]) => (
           <li key={href}><a href={href} style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{label}</a></li>
         ))}
       </ul>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Link href="/login" style={{ padding: '7px 14px', borderRadius: 6, fontSize: 13, color: t.muted, textDecoration: 'none' }}>Log in</Link>
-        <Link href="/signup" style={{ padding: '7px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, background: t.accent, color: t.bg, textDecoration: 'none' }}>Start building</Link>
+        <WaitlistButton />
       </div>
     </nav>
   )
@@ -227,20 +258,24 @@ function Hero() {
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.accent, background: t.accentLow, border: `1px solid ${t.accentMid}`, padding: '5px 12px', borderRadius: 20, marginBottom: 28, letterSpacing: '0.04em' }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block' }}/>
-              Now on Stellar mainnet
+              Now on Stellar testnet
             </div>
             <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(44px,5.5vw,72px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 20 }}>
               Give your AI agent the ability to pay.
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.7, color: t.text2, marginBottom: 32, maxWidth: 400 }}>
-              An API key that authorizes autonomous USDC spending on Stellar — within policies you define, enforced on-chain.
+              An API key that authorizes autonomous USDC spending on Stellar — within policies you define.
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <Link href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 26px', borderRadius: 7, fontSize: 15, fontWeight: 600, background: t.accent, color: t.bg, textDecoration: 'none' }}>Start building</Link>
-              <a href="#twoways" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 26px', borderRadius: 7, fontSize: 15, color: t.text2, border: `1px solid ${t.border2}`, textDecoration: 'none' }}>Read the docs →</a>
+              <WaitlistButton size="lg" label="Join the waitlist" />
+              <a href="#how" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 26px', borderRadius: 7, fontSize: 15, color: t.text2, border: `1px solid ${t.border2}`, textDecoration: 'none' }}>See how it works →</a>
             </div>
             <div style={{ marginTop: 36, display: 'flex', alignItems: 'center', gap: 28 }}>
-              {[{v:'~$0.000001',l:'tx fee on Stellar'},{v:'<50ms',l:'policy check latency'},{v:'0.5%',l:'per payment, nothing else'}].map((s, i) => (
+              {[
+                { v: '$0',          l: 'on direct USDC transfers' },
+                { v: '<50ms',       l: 'policy check latency' },
+                { v: '~$0.000001', l: 'Stellar network fee' },
+              ].map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
                   {i > 0 && <div style={{ width: 1, height: 30, background: t.border }}/>}
                   <div>
@@ -310,9 +345,27 @@ function Problem() {
 // ─── How It Works ─────────────────────────────────────────────────────────────
 function HowItWorks() {
   const steps = [
-    { num: '01', title: 'Create a smart wallet', desc: 'One API call spins up an agent-custodial wallet on Stellar. Keys are yours — exportable anytime. No forms, no KYC for testing.', snippet: "await argens.wallet.create()", result: "// { address: 'GXXX...', balance: '0.00' }" },
-    { num: '02', title: 'Set spending policies', desc: 'Define max per transaction, monthly allowance, and approval thresholds. Enforced by Soroban smart contracts — not application logic you can forget to ship.', snippet: '{ maxTx: 50, monthly: 500, threshold: 100 }', result: '// Policy deployed on-chain' },
-    { num: '03', title: 'Drop in the API key', desc: 'One environment variable. Your agent can now pay for APIs, compute, services, or other agents — autonomously, within your rules, with a full audit trail.', snippet: 'ARGENS_KEY=argns_live_…', result: '// Agent payments unlocked' },
+    {
+      num: '01',
+      title: 'Spin up a smart wallet',
+      desc: 'One API call creates an agent-custodial USDC wallet on Stellar. Keys are yours — exportable anytime. Argens funds the initial XLM reserve so your agent is ready to transact immediately.',
+      snippet: "GET /v1/wallet/balance",
+      result: '// { balance: "0.0000000", address: "GXXX..." }',
+    },
+    {
+      num: '02',
+      title: 'Set spending policies',
+      desc: 'Define a monthly cap, a per-transaction max, and an approval threshold. Payments that exceed your rules are blocked or paused — automatically, before any USDC moves.',
+      snippet: '{ max_tx: 50, allowance: 500, threshold: 100 }',
+      result: '// Policy active — agent constrained',
+    },
+    {
+      num: '03',
+      title: 'Drop in the API key',
+      desc: 'One environment variable. Your agent can now pay for APIs, compute, services, or other agents — autonomously, within your rules, with a full audit trail and your approval inbox in the loop.',
+      snippet: 'ARGENS_KEY=argns_live_…',
+      result: '// Agent payments unlocked',
+    },
   ]
   return (
     <section style={{ padding: '96px 0' }} id="how">
@@ -343,6 +396,133 @@ function HowItWorks() {
   )
 }
 
+// ─── Marketplace ──────────────────────────────────────────────────────────────
+function Marketplace() {
+  const [activeService, setActiveService] = useState(0)
+
+  const services = [
+    {
+      name: 'Image generation',
+      provider: 'flux-schnell',
+      cost: '0.0030000',
+      tag: 'compute',
+      tagColor: t.pending,
+      tagBg: t.pendingLow,
+      snippet: `POST /v1/marketplace/call\n{ service: "flux-schnell",\n  payload: { prompt: "..." } }`,
+    },
+    {
+      name: 'Web search',
+      provider: 'exa-search',
+      cost: '0.0010000',
+      tag: 'data',
+      tagColor: t.success,
+      tagBg: t.successLow,
+      snippet: `POST /v1/marketplace/call\n{ service: "exa-search",\n  payload: { query: "..." } }`,
+    },
+    {
+      name: 'Code execution',
+      provider: 'e2b-sandbox',
+      cost: '0.0050000',
+      tag: 'compute',
+      tagColor: t.pending,
+      tagBg: t.pendingLow,
+      snippet: `POST /v1/marketplace/call\n{ service: "e2b-sandbox",\n  payload: { code: "..." } }`,
+    },
+  ]
+
+  return (
+    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="marketplace">
+      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'start' }}>
+
+          {/* Left — copy */}
+          <div>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Marketplace</span>
+            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 20 }}>
+              One key.<br/>Every AI service.
+            </h2>
+            <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, marginBottom: 28, maxWidth: 420 }}>
+              Your agent shouldn&apos;t need a separate API key for every tool it uses. Argens provides a curated marketplace of AI services — image generation, web search, code execution, embeddings — all accessible with a single Argens key and a single API call.
+            </p>
+            <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, marginBottom: 36, maxWidth: 420 }}>
+              Each call is an autonomous micropayment. Your policy engine guards the spend. Your wallet settles on Stellar in seconds. No billing relationships, no rate limit negotiations, no keys to rotate.
+            </p>
+
+            {/* How it works — compact */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[
+                { step: '→', label: 'Agent discovers services', desc: 'GET /v1/marketplace/services returns a live catalogue with pricing.' },
+                { step: '→', label: 'Agent calls a service', desc: 'POST /v1/marketplace/call — one request, one payment, one response.' },
+                { step: '→', label: 'Policy engine guards spend', desc: 'Marketplace calls go through the same allowance and approval rules as any payment.' },
+              ].map((row, i) => (
+                <div key={i} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingTop: i > 0 ? 16 : 0, borderTop: i > 0 ? `1px solid ${t.border}` : 'none' }}>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: t.accent, flexShrink: 0, marginTop: 2 }}>{row.step}</span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: t.text, marginBottom: 3, fontFamily: 'Space Grotesk, sans-serif' }}>{row.label}</div>
+                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{row.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right — interactive service picker */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Service catalogue */}
+            <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint, letterSpacing: '0.04em' }}>GET /v1/marketplace/services</span>
+                <span style={{ marginLeft: 'auto', background: t.successLow, color: t.success, fontFamily: 'monospace', fontSize: 9, padding: '1px 6px', borderRadius: 3 }}>200 OK</span>
+              </div>
+              {services.map((svc, i) => (
+                <div
+                  key={i}
+                  onClick={() => setActiveService(i)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                    borderBottom: i < services.length - 1 ? `1px solid ${t.border}` : 'none',
+                    cursor: 'pointer',
+                    background: activeService === i ? t.bg2 : 'transparent',
+                    transition: 'background 0.12s',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: t.text, fontWeight: 500 }}>{svc.name}</div>
+                    <div style={{ fontSize: 11, color: t.muted, fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{svc.provider}</div>
+                  </div>
+                  <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: svc.tagBg, color: svc.tagColor, fontFamily: 'monospace', flexShrink: 0 }}>{svc.tag}</span>
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.text2, flexShrink: 0, textAlign: 'right' as const }}>
+                    <div>{svc.cost}</div>
+                    <div style={{ fontSize: 10, color: t.faint }}>USDC / call</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Call snippet */}
+            <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden', transition: 'all 0.2s' }}>
+              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint }}>agent call</span>
+              </div>
+              <div style={{ padding: '14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.text2, lineHeight: 1.7, whiteSpace: 'pre', animation: 'fadeInUp 0.18s ease-out' }}>
+                {services[activeService].snippet}
+              </div>
+              <div style={{ padding: '10px 14px', borderTop: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ background: t.successLow, color: t.success, fontSize: 10, padding: '2px 7px', borderRadius: 3, fontFamily: 'monospace' }}>● paid</span>
+                <span style={{ color: t.faint, fontSize: 11, fontFamily: 'monospace' }}>−{services[activeService].cost} USDC · policy: passed</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace', padding: '0 4px' }}>
+              ← click a service to see the call
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ─── Two Ways ────────────────────────────────────────────────────────────────
 function TwoWays() {
   const [copied, setCopied] = useState(false)
@@ -351,7 +531,7 @@ function TwoWays() {
     setCopied(true); setTimeout(() => setCopied(false), 1800)
   }
   return (
-    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="twoways">
+    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="integration">
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <div style={{ marginBottom: 56 }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Integration</span>
@@ -373,9 +553,9 @@ function TwoWays() {
             <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.65 }}>Call <code style={{ fontFamily: 'monospace', fontSize: 12, color: t.text2, background: t.bg3, padding: '1px 5px', borderRadius: 3 }}>POST /v1/pay</code> directly from your code. TypeScript, Python, cURL — anything that can make an HTTP request.</p>
             <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 7, padding: '14px 16px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
               <div style={{ color: t.faint, marginBottom: 6, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>Quick start</div>
-              <div><span style={{ color: t.accent }}>const</span> result = <span style={{ color: t.accent }}>await</span> <span style={{ color: '#A08BC8' }}>fetch</span>(<span style={{ color: '#7DB88A' }}>'https://api.argens.io/v1/pay'</span>, …)</div>
+              <div><span style={{ color: t.accent }}>const</span> result = <span style={{ color: t.accent }}>await</span> <span style={{ color: '#A08BC8' }}>fetch</span>(<span style={{ color: '#7DB88A' }}>&apos;https://api.argens.io/v1/pay&apos;</span>, …)</div>
             </div>
-            <a href="#integration" style={{ fontSize: 13, color: t.accent, textDecoration: 'none', marginTop: 'auto' }}>View integration docs →</a>
+            <a href="#" style={{ fontSize: 13, color: t.accent, textDecoration: 'none', marginTop: 'auto' }}>View API docs →</a>
           </div>
           {/* Prompt card */}
           <div style={{ background: t.bg2, border: `1px solid ${t.accentMid}`, borderRadius: 12, padding: 28, display: 'flex', flexDirection: 'column', gap: 20, position: 'relative', overflow: 'hidden' }}>
@@ -405,18 +585,32 @@ function TwoWays() {
 // ─── Policies ─────────────────────────────────────────────────────────────────
 function Policies() {
   const cards = [
-    { icon: '◈', title: 'Allowance', rule: 'monthly_cap: $500', desc: 'Cap total spend for a given period. The smart contract rejects any payment that would exceed the limit — automatically.',
+    {
+      icon: '◈',
+      title: 'Allowance',
+      rule: 'monthly_cap: $500',
+      desc: 'Cap total spend for a given period. Any payment that would exceed the limit is rejected before it reaches the Stellar network.',
       demo: <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ color: t.muted }}>spent this month</span><span style={{ color: t.text2 }}>$312.40</span></div>
         <div style={{ height: 4, background: t.bg3, borderRadius: 2, overflow: 'hidden' }}><div style={{ width: '62%', height: '100%', background: t.accent, borderRadius: 2 }}/></div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}><span style={{ color: t.faint }}>$0</span><span style={{ color: t.faint }}>$500 cap</span></div>
-      </div> },
-    { icon: '◇', title: 'Max Transaction', rule: 'max_tx: $50', desc: "No single payment can exceed this amount. Prevents a runaway agent from draining your wallet in one call.",
+      </div>,
+    },
+    {
+      icon: '◇',
+      title: 'Max Transaction',
+      rule: 'max_tx: $50',
+      desc: 'No single payment can exceed this amount. Prevents a runaway agent from draining your wallet in one call — no matter what the agent decides.',
       demo: <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: t.muted }}>allowed</span><span style={{ background: t.successLow, color: t.success, padding: '2px 7px', borderRadius: 4, fontSize: 10 }}>● $12.50</span></div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: t.muted }}>blocked</span><span style={{ background: t.errorLow, color: t.error, padding: '2px 7px', borderRadius: 4, fontSize: 10 }}>● $75.00</span></div>
-      </div> },
-    { icon: '◉', title: 'Approval Threshold', rule: 'approval_above: $100', desc: 'Payments over a certain amount pause and request human approval via email before executing.',
+      </div>,
+    },
+    {
+      icon: '◉',
+      title: 'Approval Threshold',
+      rule: 'approval_above: $100',
+      desc: 'Payments over a threshold pause and send you an email before executing. You approve or reject — the agent waits.',
       demo: <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
         <span style={{ background: t.pendingLow, color: t.pending, padding: '2px 7px', borderRadius: 4, fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor' }}/>PENDING_APPROVAL</span>
         <div style={{ color: t.muted, fontSize: 11 }}>$250.00 — awaiting your approval</div>
@@ -424,14 +618,15 @@ function Policies() {
           <button style={{ flex: 1, padding: 5, background: t.successLow, border: `1px solid rgba(77,158,106,0.3)`, borderRadius: 4, color: t.success, cursor: 'pointer', fontSize: 11 }}>Approve</button>
           <button style={{ flex: 1, padding: 5, background: t.errorLow, border: `1px solid rgba(160,72,72,0.3)`, borderRadius: 4, color: t.error, cursor: 'pointer', fontSize: 11 }}>Reject</button>
         </div>
-      </div> },
+      </div>,
+    },
   ]
   return (
-    <section style={{ padding: '96px 0' }} id="policies">
+    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="policies">
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <div style={{ marginBottom: 56 }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Policies</span>
-          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 520 }}>Guardrails that run on-chain, not in your head.</h2>
+          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 520 }}>Guardrails that run automatically, not on good intentions.</h2>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
           {cards.map(card => (
@@ -454,45 +649,92 @@ function Policies() {
 // ─── Pricing ─────────────────────────────────────────────────────────────────
 function Pricing() {
   return (
-    <section style={{ padding: '96px 0' }} id="pricing">
+    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="pricing">
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
-        <div style={{ textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
+        <div style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Pricing</span>
-          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(72px,12vw,120px)', fontWeight: 700, letterSpacing: '-0.04em', color: t.accent, lineHeight: 1, margin: '24px 0 8px' }}>0.5%</div>
-          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 22, fontWeight: 500, color: t.text, marginBottom: 12, letterSpacing: '-0.01em' }}>per transaction. Nothing else.</p>
-          <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.7, marginBottom: 36 }}>No monthly fees. No seat charges. No setup costs. Free to start — you pay when your agent pays.</p>
-          <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: 24, marginBottom: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {[['$1,000 in payments','$5.00'],['$10,000 in payments','$50.00'],['$100,000 in payments','$500.00']].map(([vol,fee]) => (
-              <div key={vol} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, padding: '4px 0' }}>
-                <span style={{ color: t.muted }}>{vol}</span>
-                <span style={{ color: t.text2 }}>{fee} <span style={{ color: t.faint }}>to Argens</span></span>
+          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(72px,12vw,120px)', fontWeight: 700, letterSpacing: '-0.04em', color: t.accent, lineHeight: 1, margin: '24px 0 8px' }}>$0</div>
+          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 22, fontWeight: 500, color: t.text, marginBottom: 12, letterSpacing: '-0.01em' }}>on direct USDC transfers.</p>
+          <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.7, marginBottom: 36 }}>Send USDC from your agent to any Stellar address and keep every cent. No percentage cut. No flat fee. Nothing hidden.</p>
+          <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, padding: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { send: '$0.50', recv: '$0.50' },
+              { send: '$25.00', recv: '$25.00' },
+              { send: '$1,000.00', recv: '$1,000.00' },
+            ].map((row, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, padding: '6px 0', borderBottom: i < 2 ? `1px solid ${t.border}` : 'none' }}>
+                <span style={{ color: t.muted }}>agent sends {row.send}</span>
+                <span style={{ color: t.success }}>→ recipient gets {row.recv}</span>
               </div>
             ))}
+            <div style={{ marginTop: 4, fontSize: 11, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>
+              Only Stellar network fee applies (~$0.000001 per tx)
+            </div>
           </div>
-          <Link href="/signup" style={{ display: 'block', padding: '13px 26px', borderRadius: 7, fontSize: 15, fontWeight: 600, background: t.accent, color: t.bg, textDecoration: 'none', textAlign: 'center' }}>Start building for free</Link>
-          <p style={{ marginTop: 16, fontSize: 13, color: t.faint }}>No credit card required to start.</p>
         </div>
       </div>
     </section>
   )
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-function Footer() {
+// ─── CTA + Footer ─────────────────────────────────────────────────────────────
+function CtaFooter() {
   return (
-    <footer style={{ borderTop: `1px solid ${t.border}`, padding: '48px 0' }}>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 24 }}>
-          <Logo />
-          <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
-            {['Docs','GitHub','Twitter / X','Privacy','Terms'].map(l => (
-              <a key={l} href="#" style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{l}</a>
-            ))}
-          </div>
-          <div style={{ fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>© 2026 Argens Inc.</div>
-        </div>
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Background mesh / radial field */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+        {/* Primary glow — top centre */}
+        <div style={{ position: 'absolute', top: '-10%', left: '50%', transform: 'translateX(-50%)', width: 900, height: 520, background: 'radial-gradient(ellipse at 50% 0%, rgba(197,162,83,0.13) 0%, transparent 70%)', borderRadius: '50%' }}/>
+        {/* Secondary — bottom left bleed */}
+        <div style={{ position: 'absolute', bottom: 0, left: '-5%', width: 500, height: 300, background: 'radial-gradient(ellipse at 0% 100%, rgba(77,155,106,0.07) 0%, transparent 70%)' }}/>
+        {/* Dot grid overlay */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `radial-gradient(circle, ${t.border2} 1px, transparent 1px)`,
+          backgroundSize: '32px 32px',
+          opacity: 0.55,
+          maskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 100%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 100%)',
+        }}/>
       </div>
-    </footer>
+
+      {/* CTA content */}
+      <section style={{ position: 'relative', zIndex: 1, padding: '112px 40px 80px', textAlign: 'center' }}>
+        <div style={{ maxWidth: 560, margin: '0 auto' }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.accent, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block' }}/>
+            Early access
+          </div>
+          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(36px,5vw,60px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 20, color: t.text }}>
+            Your agent is waiting<br/>to pay its first bill.
+          </h2>
+          <p style={{ fontSize: 17, color: t.muted, lineHeight: 1.75, marginBottom: 40, maxWidth: 420, margin: '0 auto 40px' }}>
+            Get early access to Argens — a wallet, a policy engine, and a marketplace, all through a single API key.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+            <WaitlistButton size="lg" label="Join the waitlist" />
+            <Link href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 26px', borderRadius: 7, fontSize: 15, color: t.text2, border: `1px solid ${t.border2}`, textDecoration: 'none' }}>
+              Start building →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer — blends in, no hard border */}
+      <footer style={{ position: 'relative', zIndex: 1, padding: '0 40px 48px' }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+          <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 24 }}>
+            <Logo />
+            <div style={{ display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' as const }}>
+              {['Docs','GitHub','Twitter / X','Privacy','Terms'].map(l => (
+                <a key={l} href="#" style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{l}</a>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>© 2026 Argens Inc.</div>
+          </div>
+        </div>
+      </footer>
+    </div>
   )
 }
 
@@ -512,10 +754,11 @@ export function LandingPage() {
         <Hero />
         <Problem />
         <HowItWorks />
+        <Marketplace />
         <TwoWays />
         <Policies />
         <Pricing />
-        <Footer />
+        <CtaFooter />
       </main>
     </>
   )

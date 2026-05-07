@@ -103,8 +103,6 @@ export interface SendResult {
   transaction_id: string
   stellar_tx_hash?: string
   amount: string
-  fee: string
-  total_debited: string
   recipient: string
   timestamp: string
   message?: string
@@ -127,7 +125,6 @@ export interface Policy {
   max_transaction_limit: string | null
   approval_threshold: string | null
   total_spent: string
-  soroban_contract_id: string | null
 }
 
 export const policies = {
@@ -144,7 +141,6 @@ export interface Transaction {
   id: string
   recipientAddress: string
   amount: string
-  fee: string
   currency: string
   status: TxStatus
   memo: string | null

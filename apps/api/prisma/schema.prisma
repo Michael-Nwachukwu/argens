@@ -67,26 +67,29 @@ model Policy {
 }
 
 model Transaction {
-  id               String            @id @default(cuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id])
-  walletId         String
-  wallet           Wallet            @relation(fields: [walletId], references: [id])
-  stellarTxHash    String?
-  recipientAddress String
-  amount           Decimal           @db.Decimal(18, 7)
-  fee              Decimal           @db.Decimal(18, 7)
-  currency         String            @default("USDC")
-  status           TransactionStatus
-  memo             String?
-  metadata         Json?
-  policyResult     Json?
-  blockedReason    String?
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id])
+  walletId          String
+  wallet            Wallet            @relation(fields: [walletId], references: [id])
+  stellarTxHash     String?
+  recipientAddress  String
+  amount            Decimal           @db.Decimal(18, 7)
+  currency          String            @default("USDC")
+  status            TransactionStatus
+  type              String            @default("payment")  // "payment" | "marketplace"
+  serviceId         String?           // null for direct payments
+  serviceEndpoint   String?           // null for direct payments
+  costPaid          Decimal?          @db.Decimal(18, 7)   // marketplace: marked-up amount charged to user
+  memo              String?
+  metadata          Json?
+  policyResult      Json?
+  blockedReason     String?
   destinationChain  String?
   destinationTxHash String?
-  crossChain        Boolean          @default(false)
-  createdAt        DateTime          @default(now())
-  approvalQueue    ApprovalQueue?
+  crossChain        Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  approvalQueue     ApprovalQueue?
 }
 
 enum TransactionStatus {

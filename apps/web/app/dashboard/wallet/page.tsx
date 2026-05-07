@@ -74,17 +74,6 @@ export default function WalletPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Helper: compute fee (0.5%)
-  const computeFee = (amount: string): string => {
-    try {
-      const num = parseFloat(amount)
-      const fee = num * 0.005
-      return fee.toFixed(7)
-    } catch {
-      return '0.0000000'
-    }
-  }
-
   const handleSend = async () => {
     if (!sendForm.recipient || !sendForm.amount) {
       setSendError('Recipient and amount are required')
@@ -134,8 +123,6 @@ export default function WalletPage() {
   const address = walletData?.wallet_address ?? ''
   const balance = walletData?.balance ?? '0.0000000'
   const balanceNum = parseFloat(balance)
-  const fee = computeFee(sendForm.amount)
-  const totalDebited = (parseFloat(sendForm.amount) + parseFloat(fee)).toFixed(7)
 
   const copy = () => {
     if (!address) return
@@ -393,18 +380,11 @@ export default function WalletPage() {
                 </div>
                 {sendForm.amount && (
                   <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', marginBottom: 20, fontSize: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ color: 'var(--muted)' }}>Amount:</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{sendForm.amount} USDC</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--muted)' }}>You send:</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 500 }}>{parseFloat(sendForm.amount).toFixed(7)} USDC</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ color: 'var(--muted)' }}>Fee (0.5%):</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{fee} USDC</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text)', fontWeight: 500 }}>Total debited:</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 500 }}>{totalDebited} USDC</span>
-                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>No Argens fee — direct transfer</div>
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 10 }}>

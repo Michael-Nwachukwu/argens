@@ -14,7 +14,7 @@ import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { getUsdcBalance, isStellarAddress, validateMemo } from '../services/stellar.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment, computeTotalDebited } from '../services/payment.js'
+import { submitPayment } from '../services/payment.js'
 import { decryptSecretKey } from '../lib/crypto.js'
 import { validate } from '../middleware/validate.js'
 import { authLimiter, checkPinAttempt, resetPinAttempts } from '../middleware/ratelimit.js'
@@ -199,7 +199,6 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
           walletId: wallet.id,
           recipientAddress: recipient,
           amount,
-          fee: '0.0000000',
           currency: 'USDC',
           status: 'BLOCKED',
           memo,
@@ -231,7 +230,6 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
           walletId: wallet.id,
           recipientAddress: recipient,
           amount,
-          fee: '0.0000000',
           currency: 'USDC',
           status: 'PENDING_APPROVAL',
           memo,
@@ -264,15 +262,12 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
     }
 
     // ── APPROVED — submit Stellar tx ─────────────────────────────────────────
-    const { fee, totalDebited } = computeTotalDebited(amount)
-
     const tx = await prisma.transaction.create({
       data: {
         userId,
         walletId: wallet.id,
         recipientAddress: recipient,
         amount,
-        fee,
         currency: 'USDC',
         status: 'APPROVED',
         memo,
@@ -296,7 +291,6 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         data: {
           status: 'SUCCESS',
           stellarTxHash: stellarResult.hash,
-          fee: stellarResult.fee,
         },
       })
 
@@ -320,8 +314,6 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         transaction_id: tx.id,
         stellar_tx_hash: stellarResult.hash,
         amount,
-        fee: stellarResult.fee,
-        total_debited: stellarResult.totalDebited,
         recipient,
         timestamp: new Date().toISOString(),
         policy_check: {

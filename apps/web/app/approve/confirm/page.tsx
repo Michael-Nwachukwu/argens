@@ -85,8 +85,6 @@ function ApproveConfirmContent() {
                 {([
                   ['Recipient', tx.recipientAddress],
                   ['Amount', `${tx.amount} USDC`],
-                  ['Fee', `${tx.fee} USDC`],
-                  ['Total debited', `${(parseFloat(tx.amount) + parseFloat(tx.fee)).toFixed(7)} USDC`],
                   ['Memo', tx.memo ?? '—'],
                   ['Status', null],
                   ['Requested', new Date(tx.createdAt).toLocaleString()],
@@ -96,7 +94,7 @@ function ApproveConfirmContent() {
                     {k === 'Status' ? (
                       <StatusBadge status={tx.status} />
                     ) : (
-                      <span style={{ color: 'var(--text2)', fontFamily: ['Recipient', 'Amount', 'Fee', 'Total debited'].includes(k as string) ? 'var(--font-mono)' : 'inherit', fontSize: k === 'Recipient' ? 11 : 13 }}>
+                      <span style={{ color: 'var(--text2)', fontFamily: ['Recipient', 'Amount'].includes(k as string) ? 'var(--font-mono)' : 'inherit', fontSize: k === 'Recipient' ? 11 : 13 }}>
                         {v as string}
                       </span>
                     )}

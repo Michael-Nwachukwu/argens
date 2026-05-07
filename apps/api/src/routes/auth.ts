@@ -7,7 +7,7 @@ import { generateSecureToken } from '../lib/crypto.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { signJwt, requireJwt } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
-import { authLimiter, emailResendLimiter } from '../middleware/ratelimit.js'
+import { authLimiter, emailResendLimiter, resetPinAttempts } from '../middleware/ratelimit.js'
 import { bootstrapWallet } from '../services/wallet.js'
 import { sendVerificationEmail, sendWalletReadyEmail } from '../services/email.js'
 import { createApiKey } from '../services/apikey.js'
@@ -64,8 +64,14 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
       logger.error('Failed to send verification email', { userId: user.id, error: (e as Error).message }),
     )
 
+    const isDev = process.env['NODE_ENV'] !== 'production'
+    const frontendUrl = process.env['FRONTEND_URL'] ?? 'http://localhost:3000'
+
     logger.info('User signed up', { userId: user.id })
-    sendSuccess(res, { message: 'Account created. Check your email to verify and activate your wallet.' }, 201)
+    sendSuccess(res, {
+      message: 'Account created. Check your email to verify and activate your wallet.',
+      ...(isDev && { dev_verify_url: `${frontendUrl}/auth/verify?token=${emailVerificationToken}` }),
+    }, 201)
   } catch (e) {
     logger.error('Signup error', { error: (e as Error).message })
     sendError(res, 'Signup failed. Please try again.', 'INTERNAL_ERROR', 500)

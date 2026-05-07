@@ -171,22 +171,22 @@ export async function savePolicy(
     approvalThreshold?: string | null
   },
 ) {
+  const toDecimal = (v: string | null | undefined) =>
+    v === undefined ? undefined : v !== null ? new Decimal(v) : null
+
   return prisma.policy.upsert({
     where: { userId },
     create: {
       userId,
-      allowanceLimit: data.allowanceLimit != null ? new Decimal(data.allowanceLimit) : null,
-      maxTransactionLimit:
-        data.maxTransactionLimit != null ? new Decimal(data.maxTransactionLimit) : null,
-      approvalThreshold:
-        data.approvalThreshold != null ? new Decimal(data.approvalThreshold) : null,
+      allowanceLimit: toDecimal(data.allowanceLimit) ?? null,
+      maxTransactionLimit: toDecimal(data.maxTransactionLimit) ?? null,
+      approvalThreshold: toDecimal(data.approvalThreshold) ?? null,
     },
     update: {
-      allowanceLimit: data.allowanceLimit != null ? new Decimal(data.allowanceLimit) : null,
-      maxTransactionLimit:
-        data.maxTransactionLimit != null ? new Decimal(data.maxTransactionLimit) : null,
-      approvalThreshold:
-        data.approvalThreshold != null ? new Decimal(data.approvalThreshold) : null,
+      // Only update fields that were explicitly passed — undefined means "leave as-is"
+      ...(data.allowanceLimit !== undefined && { allowanceLimit: toDecimal(data.allowanceLimit) }),
+      ...(data.maxTransactionLimit !== undefined && { maxTransactionLimit: toDecimal(data.maxTransactionLimit) }),
+      ...(data.approvalThreshold !== undefined && { approvalThreshold: toDecimal(data.approvalThreshold) }),
     },
   })
 }

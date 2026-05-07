@@ -192,15 +192,6 @@ export default function PoliciesPage() {
               onSave={saveThreshold}
             />
 
-            {policy?.soroban_contract_id && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-                <span style={{ color: 'var(--success)' }}>◈</span>
-                Contract: {policy.soroban_contract_id.slice(0, 12)}…{policy.soroban_contract_id.slice(-8)}
-                <a href={`https://stellar.expert/explorer/public/contract/${policy.soroban_contract_id}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', marginLeft: 4 }}>
-                  ↗
-                </a>
-              </div>
-            )}
           </>
         )}
       </div>

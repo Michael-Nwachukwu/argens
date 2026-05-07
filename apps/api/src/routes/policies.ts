@@ -77,9 +77,9 @@ policiesRouter.post('/policies', requireJwt, validate(PolicyUpdateSchema), async
   try {
     // Save to Postgres (Phase 2 stand-in — Phase 4 adds Soroban write first)
     const updated = await savePolicy(userId, {
-      allowanceLimit: body.allowance_limit ?? null,
-      maxTransactionLimit: body.max_transaction_limit ?? null,
-      approvalThreshold: body.approval_threshold ?? null,
+      allowanceLimit: body.allowance_limit,
+      maxTransactionLimit: body.max_transaction_limit,
+      approvalThreshold: body.approval_threshold,
     })
 
     // Audit log

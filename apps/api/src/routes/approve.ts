@@ -17,7 +17,7 @@ import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey } from '../lib/crypto.js'
-import { submitPayment, computeTotalDebited } from '../services/payment.js'
+import { submitPayment } from '../services/payment.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { sendApprovalActedEmail } from '../services/email.js'
 
@@ -84,8 +84,6 @@ approveRouter.post('/approve/:token', requireJwt, async (req, res, next) => {
     }
 
     // Execute Stellar payment
-    const { fee } = computeTotalDebited(amount)
-
     try {
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
       const stellarResult = await submitPayment({
@@ -97,11 +95,7 @@ approveRouter.post('/approve/:token', requireJwt, async (req, res, next) => {
 
       await prisma.transaction.update({
         where: { id: transaction.id },
-        data: {
-          status: 'SUCCESS',
-          stellarTxHash: stellarResult.hash,
-          fee: stellarResult.fee,
-        },
+        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
       })
 
       await incrementTotalSpent(userId, amount)
@@ -119,8 +113,6 @@ approveRouter.post('/approve/:token', requireJwt, async (req, res, next) => {
         transaction_id: transaction.id,
         stellar_tx_hash: stellarResult.hash,
         amount,
-        fee: stellarResult.fee,
-        total_debited: stellarResult.totalDebited,
       })
     } catch (stellarErr) {
       logger.error('Stellar payment failed on approval', {

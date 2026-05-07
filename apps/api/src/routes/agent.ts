@@ -150,7 +150,6 @@ agentRouter.get('/spend/summary', requireJwtOrApiKey, async (req, res, next) => 
       select: {
         id: true,
         amount: true,
-        fee: true,
         recipientAddress: true,
         createdAt: true,
         memo: true,
@@ -162,21 +161,15 @@ agentRouter.get('/spend/summary', requireJwtOrApiKey, async (req, res, next) => 
       .reduce((sum, tx) => sum + parseFloat(tx.amount.toFixed(7)), 0)
       .toFixed(7)
 
-    const totalFees = transactions
-      .reduce((sum, tx) => sum + parseFloat(tx.fee.toFixed(7)), 0)
-      .toFixed(7)
-
     sendSuccess(res, {
       period,
       period_start: periodStart.toISOString(),
       period_end: now.toISOString(),
       total_spend: totalSpend,
-      total_fees: totalFees,
       transaction_count: transactions.length,
       transactions: transactions.map((tx) => ({
         id: tx.id,
         amount: tx.amount.toFixed(7),
-        fee: tx.fee.toFixed(7),
         recipient: tx.recipientAddress,
         memo: tx.memo,
         timestamp: tx.createdAt,

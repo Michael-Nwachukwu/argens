@@ -42,9 +42,10 @@ Argens is a programmable payment infrastructure platform for autonomous AI agent
 **One-line pitch:** Argens gives your AI agent the ability to pay — an API key that authorizes autonomous USDC spending on Stellar, within rules you define.
 
 **Three components:**
-1. **Smart Wallet** — **agent-custodial** USDC wallet on Stellar. Argens holds an encrypted signing key so agents can transact autonomously within policy. Developer funds the wallet with USDC, and can export the private key at any time. Fully user-custodial (Soroban-held funds) is a V2 goal — see [Key Decisions](#key-decisions-already-made).
-2. **Policy Engine** — on-chain spending rules via Soroban. Three rules in V1: Allowance, Max Transaction, Approval Threshold. The Soroban contract **validates** payments and returns a result; the API server executes the Stellar payment after an approved result (it does not hold or move funds in V1).
+1. **Smart Wallet** — **agent-custodial** USDC wallet on Stellar. Argens holds an encrypted signing key so agents can transact autonomously within policy. Developer funds the wallet with USDC, and can export the private key at any time. Manual dashboard transfers are also supported (with optional 4-digit transfer PIN).
+2. **Policy Engine** — TypeScript-enforced spending rules. Three rules in V1: Allowance, Max Transaction, Approval Threshold. This is the permanent V1 policy engine — Soroban was dropped (see Key Decisions).
 3. **REST API** — any AI agent can call with just an API key. No blockchain knowledge required.
+4. **MPP Marketplace** — a curated catalog of AI services (LLMs, data, tooling) that agents can call and pay for in a single step. Argens applies a ~20% markup — this is the primary revenue model. Direct USDC transfers carry no Argens fee.
 
 > **Custody terminology.** Do not write "non-custodial" in code, comments, user-facing strings, or docs. Use **agent-custodial** and explain the trade-off when asked. This language must stay consistent with the PRD.
 
@@ -313,13 +314,14 @@ A compressed mental model of how wallets and policies actually work in Argens V1
 - The public key (`G...`, 56 chars) is the wallet address. Stored in the clear in Postgres.
 - The secret key (`S...`, 56 chars) is encrypted with AES-256-GCM using `ENCRYPTION_KEY` env var, then stored in `Wallet.stellarSecretKeyEnc`. Decrypted only in memory, only for signing, then wiped.
 - This is the **agent-custodial** model: Argens signs on behalf of the user so the agent can transact autonomously.
-- The system uses **three** wallet roles. All three are just keypairs — the distinction is operational:
+- The system uses **two** wallet roles. All are just keypairs — the distinction is operational:
 
 | Role | Generated | Holds | Used for |
 |---|---|---|---|
-| User wallet | By API server on signup | USDC | Signs outgoing payments (agent-driven) |
+| User wallet | By API server on signup | USDC | Signs outgoing payments (agent-driven and dashboard transfers) |
 | Ops wallet (`ARGENS_OPS_WALLET`) | Manually, once per env | XLM | Funds 1.5 XLM account reserve + trustline reserve for each new user wallet |
-| Fee wallet (`ARGENS_FEE_WALLET`) | Manually, once per env | USDC | Receives 0.5% fees from every payment (via second op in same tx) |
+
+> There is no fee wallet — direct USDC transfers carry $0 Argens fee. Revenue comes from marketplace markup only.
 
 ### Policies — stored on-chain, enforced in two places, executed off-chain
 
@@ -330,14 +332,9 @@ Policies go through three separate concerns. Do not conflate them.
    - If Postgres and the contract ever disagree, the contract wins. Postgres is a cache.
    - One contract instance per user, deployed lazily on first policy save. Contract ID stored in `Policy.sorobanContractId`.
 
-**2. Enforcement — validated by Soroban (eventually), executed by backend (always in V1).**
+**2. Enforcement — TypeScript policy engine is permanent in V1. Soroban was dropped.**
 
-   | Phase | What runs the policy check |
-   |---|---|
-   | Phase 2 (Days 4–8) | TypeScript function `checkPolicy(amount, userId)` reads Postgres and returns `APPROVED / BLOCKED / PENDING_APPROVAL` |
-   | Phase 4+ (Days 17+) | Soroban call `PolicyContract.validate_payment(amount, total_spent)` returns the same result. TS stand-in is deleted. |
-
-   The *enforcement logic is identical in both*. The contract version is just the tamper-evident, on-chain version. Phase 2 → Phase 4 is a swap-out of the check function, not a rewrite of downstream logic.
+   The TypeScript function `checkPolicy(amount, userId)` in `services/policy.ts` reads Postgres and returns `APPROVED / BLOCKED / PENDING_APPROVAL`. This is the final implementation — there is no Phase 4 Soroban swap-out. See Key Decisions.
 
 **3. Execution — always the backend, never the contract (in V1).**
 
@@ -437,7 +434,7 @@ argens/
 ## Database Schema
 
 ```prisma
-// prisma/schema.prisma
+// prisma/schema.prisma — authoritative as of 2026-05-07
 
 generator client {
   provider = "prisma-client-js"
@@ -453,8 +450,9 @@ model User {
   email                   String        @unique
   passwordHash            String
   emailVerified           Boolean       @default(false)
-  emailVerificationToken  String?       @unique  // crypto.randomBytes(32) — nullable after verification
+  emailVerificationToken  String?       @unique
   emailVerificationExpiry DateTime?
+  transferPinHash         String?       // bcrypt hash of 4-digit PIN; null = no PIN
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
   wallet                  Wallet?
@@ -502,32 +500,35 @@ model Policy {
   maxTransactionLimit Decimal? @db.Decimal(18, 7)  // null = unlimited
   approvalThreshold   Decimal? @db.Decimal(18, 7)  // null = no threshold
   totalSpent          Decimal  @default(0) @db.Decimal(18, 7)
-  sorobanContractId   String?  // deployed Soroban contract address
+  sorobanContractId   String?  // reserved for future use; null in V1
   updatedAt           DateTime @updatedAt
 }
 
 model Transaction {
-  id               String            @id @default(cuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id])
-  walletId         String
-  wallet           Wallet            @relation(fields: [walletId], references: [id])
-  stellarTxHash    String?           // null if blocked before Stellar submission
-  recipientAddress String
-  amount           Decimal           @db.Decimal(18, 7)
-  fee              Decimal           @db.Decimal(18, 7)  // 0.5% Argens fee
-  currency         String            @default("USDC")
-  status           TransactionStatus
-  memo             String?
-  metadata         Json?
-  policyResult     Json?             // snapshot of policy checks at tx time
-  blockedReason    String?
-  // V2 cross-chain fields — nullable in V1, DO NOT REMOVE
-  destinationChain  String?          // 'stellar' | 'base' | 'ethereum' etc.
-  destinationTxHash String?          // mint tx hash on destination chain
-  crossChain        Boolean          @default(false)
-  createdAt        DateTime          @default(now())
-  approvalQueue    ApprovalQueue?
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id])
+  walletId          String
+  wallet            Wallet            @relation(fields: [walletId], references: [id])
+  stellarTxHash     String?           // null if blocked before Stellar submission
+  recipientAddress  String
+  amount            Decimal           @db.Decimal(18, 7)
+  // NOTE: no fee field — direct transfers carry $0 Argens fee
+  currency          String            @default("USDC")
+  status            TransactionStatus
+  type              String            @default("payment")  // "payment" | "marketplace"
+  serviceId         String?           // marketplace only
+  serviceEndpoint   String?           // marketplace only
+  costPaid          Decimal?          @db.Decimal(18, 7)   // marketplace: marked-up amount charged to user
+  memo              String?
+  metadata          Json?
+  policyResult      Json?
+  blockedReason     String?
+  destinationChain  String?           // V2 cross-chain: 'stellar' | 'base' etc.
+  destinationTxHash String?           // V2 cross-chain: mint tx hash on destination
+  crossChain        Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  approvalQueue     ApprovalQueue?
 }
 
 enum TransactionStatus {
@@ -625,7 +626,7 @@ Every response — success or error — must use this exact shape. No exceptions
 }
 ```
 
-The 0.5% Argens fee is **added on top** of `amount`. For a request with `"amount": "25.0000000"`, the wallet is debited `"25.1250000"` in a single atomic Stellar transaction (two payment operations — recipient + fee wallet). See [Fee Mechanics](#fee-mechanics).
+No Argens fee on direct payments. The wallet is debited exactly `amount` — single-operation Stellar transaction.
 
 **Success (200):**
 ```json
@@ -635,8 +636,6 @@ The 0.5% Argens fee is **added on top** of `amount`. For a request with `"amount
     "transaction_id": "txn_abc123",
     "stellar_tx_hash": "abc...xyz",
     "amount": "25.0000000",
-    "fee": "0.1250000",
-    "total_debited": "25.1250000",
     "recipient": "GXXX...",
     "timestamp": "2026-04-19T12:00:00Z",
     "policy_check": {
@@ -677,7 +676,7 @@ The 0.5% Argens fee is **added on top** of `amount`. For a request with `"amount
 #### POST /quote — Dry run, no execution
 
 Request: identical to POST /pay.
-No Stellar transaction, no DB write, no fee charged.
+No Stellar transaction, no DB write, no fee.
 
 **Response:**
 ```json
@@ -685,8 +684,6 @@ No Stellar transaction, no DB write, no fee charged.
   "data": {
     "status": "would_succeed",
     "amount": "25.0000000",
-    "estimated_fee": "0.1250000",
-    "total_debited": "25.1250000",
     "policy_check": {
       "allowance": "would_pass",
       "max_transaction": "would_pass",
@@ -695,6 +692,25 @@ No Stellar transaction, no DB write, no fee charged.
   }
 }
 ```
+
+---
+
+#### POST /wallet/send — Manual dashboard transfer (JWT only)
+
+**Auth:** JWT only (`requireJwt`). Not callable with API key. This keeps agent spend and manual transfers on separate auth paths.
+
+**Request:**
+```json
+{
+  "recipient": "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "amount": "10.0000000",
+  "memo": "optional memo",
+  "pin": "1234"
+}
+```
+`pin` required only if user has set a transfer PIN (`transferPinHash != null`). Policy check runs the same as `/pay`.
+
+**Success (200):** same envelope as POST /pay (no fee fields).
 
 ---
 
@@ -758,11 +774,22 @@ Full detail including Stellar explorer link.
 
 ---
 
+#### POST /auth/transfer-pin — Set transfer PIN (JWT)
+```json
+{ "pin": "1234", "password": "current-account-password" }
+```
+Requires current account password to confirm. PIN is bcrypt-hashed and stored in `User.transferPinHash`.
+
+#### DELETE /auth/transfer-pin — Remove transfer PIN (JWT)
+```json
+{ "password": "current-account-password" }
+```
+
 #### POST /refund
 ```json
 { "transaction_id": "txn_abc123", "reason": "Service not delivered" }
 ```
-⚠️ Refunds are new outgoing transactions, not reversals. Log both transaction IDs. The refund is charged the 0.5% fee like any other payment. The original fee is not returned to the user.
+⚠️ Refunds are new outgoing transactions, not reversals. Log both transaction IDs. No Argens fee on refunds.
 
 ---
 
@@ -863,7 +890,7 @@ First failure stops processing immediately. Checks run in this order:
 
 `policy.totalSpent` increments ONLY when a transaction reaches `SUCCESS` status. Never for `PENDING_APPROVAL`, `BLOCKED`, or `FAILED`. If a `PENDING_APPROVAL` transaction is later `APPROVED` and executes, increment `totalSpent` at execution time.
 
-`policy.totalSpent` tracks the **requested amount only**, not the fee. Fees are logged per transaction but not counted against the user's allowance.
+`policy.totalSpent` tracks the **requested amount only**. There is no Argens fee on direct payments — nothing else to exclude.
 
 ---
 
@@ -955,30 +982,17 @@ async function createUsdcTrustline(secretKey: string): Promise<void> {
 }
 ```
 
-### Payment Submission (with fee)
+### Payment Submission (fee-free, single operation)
 
-**A payment is always a two-operation atomic transaction.** The first op pays the recipient, the second pays the Argens fee wallet. Both succeed or both fail — users cannot be charged a fee without the recipient being paid, and Argens cannot receive a fee for a tx that didn't execute.
+Direct payments are a **single-operation Stellar transaction** — one payment op to the recipient. No fee wallet, no second op.
 
 ```typescript
-import { Decimal } from '@prisma/client/runtime/library'
-
-const FEE_PERCENT = process.env.ARGENS_FEE_PERCENT ?? '0.005'
-const FEE_WALLET  = process.env.ARGENS_FEE_WALLET!     // G... — must hold USDC trustline
-
-function computeFee(amount: string): string {
-  // 7 decimals, always rounded DOWN (favour the user by a sub-cent)
-  return new Decimal(amount).mul(FEE_PERCENT).toDecimalPlaces(7, Decimal.ROUND_DOWN).toFixed(7)
-}
-
 async function submitPayment(params: {
   senderSecretKey: string
   recipientPublicKey: string
-  amount: string          // STRING — "25.0000000"
-  memo?: string           // max 28 bytes
-}): Promise<{ hash: string; fee: string; totalDebited: string }> {
-  const fee = computeFee(params.amount)
-  const totalDebited = new Decimal(params.amount).plus(fee).toFixed(7)
-
+  amount: string    // STRING — "25.0000000"
+  memo?: string     // max 28 bytes
+}): Promise<{ hash: string; ledger: number }> {
   const keypair = Keypair.fromSecret(params.senderSecretKey)
   const server = new Horizon.Server(HORIZON_URL)
   const account = await server.loadAccount(keypair.publicKey())
@@ -987,17 +1001,10 @@ async function submitPayment(params: {
     fee: BASE_FEE,
     networkPassphrase: NETWORK_PASSPHRASE
   })
-    // Op 1 — pay recipient
     .addOperation(Operation.payment({
       destination: params.recipientPublicKey,
       asset: USDC_ASSET,
       amount: params.amount
-    }))
-    // Op 2 — pay Argens fee wallet (same tx — atomic)
-    .addOperation(Operation.payment({
-      destination: FEE_WALLET,
-      asset: USDC_ASSET,
-      amount: fee
     }))
     .setTimeout(30)
 
@@ -1006,18 +1013,11 @@ async function submitPayment(params: {
   const tx = builder.build()
   tx.sign(keypair)
   const result = await server.submitTransaction(tx)
-  return { hash: result.hash, fee, totalDebited }
+  return { hash: result.hash, ledger: result.ledger ?? 0 }
 }
 ```
 
-### Fee Mechanics
-
-- Fee is **added on top** of the requested amount. User requests to send 25 USDC → wallet debited 25.125 USDC.
-- Fee is collected via a **second payment operation in the same Stellar transaction** (see `submitPayment` above) — never as a separate transaction.
-- `ARGENS_FEE_WALLET` must be a Stellar account with a USDC trustline already established before any payment is processed. Bootstrap this once, manually, during initial deployment.
-- Refunds are charged the fee like any other payment. The original fee is **not** refunded to the user.
-- Fee math uses `Decimal`, rounded down to 7 decimals. Never use floating point.
-- In `/quote`, return `estimated_fee` and `total_debited` so agents can check their own balance before committing.
+**Retry policy:** retry once on failure before marking FAILED (already implemented in `services/payment.ts`).
 
 ### Wallet Bootstrap Flow
 
@@ -1048,14 +1048,13 @@ A new Stellar account cannot hold USDC until two conditions are met: (1) the acc
 
 ### Argens-Operated Wallets
 
-Argens runs two platform-level Stellar wallets — these are NOT user wallets and must be managed by the team outside the normal user flow:
+Argens runs one platform-level Stellar wallet — NOT a user wallet:
 
 | Wallet | Purpose | Holds | Must Have Trustline? |
 |---|---|---|---|
 | **Ops Wallet** (`ARGENS_OPS_WALLET`) | Funds new user account reserves + trustline reserves on signup | XLM | No |
-| **Fee Wallet** (`ARGENS_FEE_WALLET`) | Receives 0.5% USDC fee from every transaction | USDC | **Yes — establish before launch** |
 
-Rotate, monitor, and alarm on balance for both. A depleted ops wallet breaks new signups; a fee wallet without a trustline breaks every payment.
+Monitor and alarm on XLM balance. A depleted ops wallet silently breaks new signups.
 
 ### Private Key Encryption
 
@@ -1236,7 +1235,7 @@ pub enum BlockReason {
 DATABASE_URL="postgresql://user:pass@localhost:5432/argens"
 
 JWT_SECRET="minimum-32-character-random-string"
-JWT_EXPIRES_IN="7d"
+JWT_EXPIRES_IN="1h"   # 1 hour — client-side tab-idle logout (5 min) is primary defense
 
 STELLAR_NETWORK="testnet"
 HORIZON_URL="https://horizon-testnet.stellar.org"
@@ -1250,16 +1249,15 @@ RESEND_FROM_EMAIL="noreply@argens.io"
 API_PORT=3001
 FRONTEND_URL="http://localhost:3000"
 
-# --- Argens-operated Stellar wallets (see Argens-Operated Wallets section) ---
+# --- Argens-operated Stellar wallets ---
 # Ops wallet — funds XLM reserves for new user wallets on signup.
-# On testnet, leave empty and the bootstrap uses friendbot.
+# On testnet, leave empty and bootstrap uses friendbot instead.
 # On mainnet, MUST be set and funded before deployment.
 ARGENS_OPS_WALLET_SECRET="S..."     # 56-char Stellar secret key
 ARGENS_OPS_WALLET_PUBLIC="G..."     # 56-char Stellar public key (for monitoring)
 
-# Fee wallet — receives the 0.5% USDC fee. MUST have a USDC trustline before launch.
-ARGENS_FEE_PERCENT="0.005"
-ARGENS_FEE_WALLET="GXXX..."         # public key only — we never sign from this wallet in the API
+# NOTE: No fee wallet. Direct USDC transfers carry $0 Argens fee.
+# Revenue comes from marketplace markup only (handled in marketplace service, not payment.ts).
 ```
 
 ---
@@ -1314,14 +1312,15 @@ Build in this exact order. Do not skip phases.
 - [ ] API Keys page — masked key, copy, regenerate
 - [ ] Settings page — notifications, password, danger zone
 
-### Phase 4 — Soroban (Days 17–20)
-- [ ] Write Soroban policy contract in Rust
-- [ ] Deploy to Stellar testnet
-- [ ] Replace TypeScript policy engine with Soroban contract calls
-- [ ] Store contract ID in `policies.sorobanContractId`
-- [ ] End-to-end test: dashboard policy → agent API → Soroban validates → Stellar tx executes
+### Phase 4 — MPP Marketplace (Tranche 1)
+- [ ] Read MPP docs: `mpp.dev/overview`, `mpp.dev/payment-methods/stellar/charge`, `mpp.dev/api/services` before writing any code
+- [ ] `POST /marketplace/call` — agent calls a service by ID, Argens proxies + adds markup, policy check runs, payment logs as type=marketplace
+- [ ] Marketplace service registry (curated list of services with base cost + marked-up price)
+- [ ] `GET /marketplace/services` — list available services
+- [ ] Dashboard marketplace page
+- [ ] End-to-end test: agent calls service → policy check → payment logged → balance updated
 
-### Phase 5 — Polish & Demo (Days 21–22)
+### Phase 5 — Polish & Demo
 - [ ] Error handling audit — every endpoint handles error cases
 - [ ] Consistent error response format across all endpoints verified
 - [ ] Demo script: signup → fund → set policies → agent pays → agent blocked → developer approves → analytics
@@ -1346,11 +1345,11 @@ Build in this exact order. Do not skip phases.
 
 | Before starting | You must have |
 |---|---|
-| Phase 2 | Phase 1 checklist complete + every auth/bootstrap flow exercised on testnet |
-| Phase 3 | Phase 2 complete + all 10 test scenarios (see Testing) passing on testnet |
-| Phase 4 | Phase 3 complete + dashboard end-to-end demo runs cleanly |
-| Phase 5 | Phase 4 complete + Soroban contract deployed on testnet, TS stand-in retired |
-| Phase 6 | Phase 5 complete + Loom demo recorded + all open bugs triaged to mainnet-blocker vs post-launch |
+| Phase 2 | Phase 1 complete + every auth/bootstrap flow exercised on testnet |
+| Phase 3 | Phase 2 complete + all 10 test scenarios passing on testnet |
+| Phase 4 (Marketplace) | Phase 3 complete + MPP docs read + dashboard end-to-end demo runs cleanly |
+| Phase 5 (Polish) | Phase 4 complete + at least one marketplace service callable end-to-end |
+| Phase 6 (Mainnet) | Phase 5 complete + Loom demo recorded + all open bugs triaged |
 
 If a phase gate fails, **stop and fix it** — do not paper over with Phase N+1 work. Violations of this rule are the single largest source of shipping regressions in payment infra.
 
@@ -1443,10 +1442,10 @@ Do not re-litigate these. They are settled.
 | Core product | Dashboard + REST API + public `SKILL.md` in V1. SDK is V2. | SKILL.md is the primary agent-onboarding primitive — one prompt, any agent, no install |
 | Agent onboarding | Public `SKILL.md` at `https://argens.xyz/SKILL.md`; agents fetch it on demand | Faster than any SDK; language-agnostic; no client version drift |
 | Asset | USDC on Stellar only in V1 | Simplest, most stable |
-| Revenue | 0.5% transaction fee, **added on top** of amount | Aligns incentives, transparent for users |
-| Fee collection | Second payment op in the same Stellar tx (atomic) | Recipient + fee always settle together |
-| Custody model | **Agent-custodial** — Argens holds encrypted signing key; user can export | True non-custodial impossible for autonomous agents in V1; V2 moves to Soroban-held funds |
-| Soroban role | Validates only — returns Approved/Blocked/PendingApproval | API server executes payment; contract never holds funds in V1 |
+| Revenue | ~20% markup on MPP marketplace service calls; **$0 on direct transfers** | Aligns revenue with value-added services, not tax on transfers |
+| Fee model | No Argens fee on direct USDC payments — single-op Stellar tx | Removes friction; developers and agents pay nothing to move money |
+| Custody model | **Agent-custodial** — Argens holds encrypted signing key; user can export | True non-custodial impossible for autonomous agents in V1 |
+| Soroban | **Dropped for V1** — TypeScript policy engine in `services/policy.ts` is permanent | Soroban complexity not justified vs. marketplace priority; TS engine covers all V1 needs |
 | Wallet bootstrap | Argens funds 1.5 XLM per new wallet (1 XLM reserve + 0.5 XLM trustline reserve) | Zero-friction onboarding; sub-$0.20 CAC |
 | Auth | Custom JWT + required email verification before API access | No external dep; prevents spam-signup XLM burn |
 | Rate limiting | 100 req/min per API key (V1). Per-IP limiting deferred to V2. | Simple, effective for V1 load |
@@ -1464,6 +1463,10 @@ Do not re-litigate these. They are settled.
 | Decimal handling | Strings for Stellar + API request/response, Prisma Decimal for DB | No floating point errors |
 | Policy check order | Max Tx → Allowance → Threshold | Fail-fast on most common violations |
 | Approval email UX | Email links to confirmation page; state change via `POST` from that page | Prevents email scanners from auto-actioning approvals |
+| Transfer PIN | Optional 4-digit PIN (bcrypt-hashed) on `POST /wallet/send` | Protects manual dashboard transfers even if session is compromised; agents use API key path, unaffected |
+| Session security | JWT expires 1h; client-side tab-idle logout after 5 min hidden | Short-lived tokens + idle logout reduce exposure without degrading UX |
+| Separate send endpoint | `POST /wallet/send` is JWT-only; agent payments via `POST /pay` (API key only) | Keeps agent and human-initiated spend on separate auth paths — no mixing |
+| Policy applies to marketplace | Same policy check (`checkPolicy`) runs for marketplace calls as for direct payments | Agents cannot bypass policy limits by routing through marketplace |
 
 ---
 

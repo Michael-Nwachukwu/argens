@@ -20,7 +20,7 @@ function TxRow({ tx, expanded, onToggle }: { tx: Transaction; expanded: boolean;
       <div
         onClick={onToggle}
         style={{
-          display: 'grid', gridTemplateColumns: '130px 1fr 150px 90px 120px 90px',
+          display: 'grid', gridTemplateColumns: '130px 1fr 150px 90px 120px',
           padding: '10px 16px', borderBottom: '1px solid var(--border)',
           cursor: 'pointer', background: expanded ? 'var(--bg3)' : 'transparent',
           transition: 'background 0.1s',
@@ -38,9 +38,6 @@ function TxRow({ tx, expanded, onToggle }: { tx: Transaction; expanded: boolean;
         </div>
         <div style={{ alignSelf: 'center' }}><StatusBadge status={tx.status} /></div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--faint)', alignSelf: 'center' }}>{hashShort}</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--faint)', alignSelf: 'center' }}>
-          {tx.fee ? `${tx.fee} USDC` : '—'}
-        </div>
       </div>
 
       {expanded && (
@@ -101,8 +98,8 @@ export default function TransactionsPage() {
 
   const exportCsv = () => {
     const rows = [
-      ['id', 'date', 'recipient', 'memo', 'amount', 'fee', 'status', 'hash'],
-      ...filtered.map(t => [t.id, t.createdAt, t.recipientAddress, t.memo ?? '', t.amount, t.fee, t.status, t.stellarTxHash ?? '']),
+      ['id', 'date', 'recipient', 'memo', 'amount', 'status', 'hash'],
+      ...filtered.map(t => [t.id, t.createdAt, t.recipientAddress, t.memo ?? '', t.amount, t.status, t.stellarTxHash ?? '']),
     ]
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -166,8 +163,8 @@ export default function TransactionsPage() {
 
         {/* Table */}
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 150px 90px 120px 90px', padding: '9px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
-            {['Time', 'Memo / Recipient', 'Amount', 'Status', 'Tx Hash', 'Fee'].map(h => (
+          <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 150px 90px 120px', padding: '9px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+            {['Time', 'Memo / Recipient', 'Amount', 'Status', 'Tx Hash'].map(h => (
               <div key={h} style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</div>
             ))}
           </div>
