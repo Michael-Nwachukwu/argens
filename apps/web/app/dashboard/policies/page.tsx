@@ -157,8 +157,8 @@ export default function PoliciesPage() {
 
   return (
     <div style={{ overflowY: 'auto' }}>
-      <TopBar title="Policies" subtitle="Enforced by Soroban smart contracts — not application logic." />
-      <div style={{ padding: '24px 32px', maxWidth: 740, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <TopBar title="Policies" subtitle="Spending rules enforced on every agent payment." />
+      <div style={{ padding: '24px 40px', maxWidth: 860, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Info banner */}
         <div style={{ padding: '12px 16px', background: 'var(--accent-low)', border: '1px solid var(--accent-mid)', borderRadius: 8, fontSize: 13, color: 'var(--text2)', display: 'flex', gap: 10, alignItems: 'center' }}>

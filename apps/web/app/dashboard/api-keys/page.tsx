@@ -43,7 +43,7 @@ export default function ApiKeysPage() {
   return (
     <div style={{ overflowY: 'auto' }}>
       <TopBar title="API Keys" subtitle="Keys authorize agent payments — treat them like passwords." />
-      <div style={{ padding: '24px 32px', maxWidth: 620 }}>
+      <div style={{ padding: '24px 40px', maxWidth: 860, width: '100%', margin: '0 auto' }}>
 
         {/* Current key card */}
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: 22, marginBottom: 16 }}>

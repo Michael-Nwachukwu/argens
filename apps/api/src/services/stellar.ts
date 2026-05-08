@@ -70,7 +70,7 @@ export async function fundNewAccount(publicKey: string): Promise<void> {
       .addOperation(
         Operation.createAccount({
           destination: publicKey,
-          startingBalance: '1.5000000', // 1 XLM base reserve + 0.5 XLM trustline reserve
+          startingBalance: '2.0000000', // 1 XLM base + 0.5 XLM trustline reserve + 0.5 XLM fee buffer (~50k txs)
         }),
       )
       .setTimeout(30)
@@ -129,6 +129,19 @@ export async function getUsdcBalance(publicKey: string): Promise<string> {
       publicKey,
       error: (e as Error).message,
     })
+  }
+}
+
+/**
+ * Returns the native XLM balance as a string, or null if the account doesn't exist.
+ */
+export async function getXlmBalance(publicKey: string): Promise<string | null> {
+  try {
+    const account = await server.loadAccount(publicKey)
+    const native = account.balances.find((b) => b.asset_type === 'native')
+    return native?.balance ?? '0.0000000'
+  } catch {
+    return null
   }
 }
 

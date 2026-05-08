@@ -171,8 +171,12 @@ export default function WalletPage() {
             </div>
             <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '20px 22px' }}>
               <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>XLM (fees)</div>
-              <div style={{ fontFamily: 'var(--font-head)', fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1 }}>—</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>covers Stellar tx fees</div>
+              <div style={{ fontFamily: 'var(--font-head)', fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1 }}>
+                {loading ? '—' : parseFloat(walletData?.xlm_balance ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>
+                {loading ? 'Loading…' : `${walletData?.xlm_balance ?? '0.0000000'} XLM`}
+              </div>
             </div>
           </div>
 

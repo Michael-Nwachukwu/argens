@@ -70,7 +70,7 @@ export default function SettingsPage() {
   return (
     <div style={{ overflowY: 'auto' }}>
       <TopBar title="Settings" subtitle="Account and notification preferences." />
-      <div style={{ padding: '24px 32px', maxWidth: 620, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ padding: '24px 40px', maxWidth: 860, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Account */}
         <Section title="Account">

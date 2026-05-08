@@ -94,6 +94,7 @@ export const auth = {
 export interface WalletBalance {
   balance: string
   currency: string
+  xlm_balance: string
   wallet_address: string
   cached_at: string
 }

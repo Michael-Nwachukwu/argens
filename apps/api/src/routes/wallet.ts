@@ -12,7 +12,7 @@ import { z } from 'zod'
 import { requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { getUsdcBalance, isStellarAddress, validateMemo } from '../services/stellar.js'
+import { getUsdcBalance, getXlmBalance, isStellarAddress, validateMemo } from '../services/stellar.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
 import { decryptSecretKey } from '../lib/crypto.js'
@@ -102,9 +102,12 @@ walletRouter.get('/wallet/balance', requireJwtOrApiKey, async (req, res, next) =
       }
     }
 
+    const xlmBalance = await getXlmBalance(wallet.stellarPublicKey).catch(() => null)
+
     sendSuccess(res, {
       balance,
       currency: 'USDC',
+      xlm_balance: xlmBalance ?? '0.0000000',
       wallet_address: wallet.stellarPublicKey,
       cached_at: cachedAt,
     })

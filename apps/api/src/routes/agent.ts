@@ -141,39 +141,37 @@ agentRouter.get('/spend/summary', requireJwtOrApiKey, async (req, res, next) => 
         break
     }
 
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        userId,
-        status: 'SUCCESS',
-        createdAt: { gte: periodStart },
-      },
-      select: {
-        id: true,
-        amount: true,
-        recipientAddress: true,
-        createdAt: true,
-        memo: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    })
+    const [successTxs, blockedCount] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { userId, status: 'SUCCESS', createdAt: { gte: periodStart } },
+        select: { amount: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.transaction.count({
+        where: { userId, status: 'BLOCKED', createdAt: { gte: periodStart } },
+      }),
+    ])
 
-    const totalSpend = transactions
+    const totalSpent = successTxs
       .reduce((sum, tx) => sum + parseFloat(tx.amount.toFixed(7)), 0)
       .toFixed(7)
 
+    // Group by date bucket (YYYY-MM-DD) for the chart breakdown
+    const buckets: Record<string, number> = {}
+    for (const tx of successTxs) {
+      const key = tx.createdAt.toISOString().slice(0, 10)
+      buckets[key] = (buckets[key] ?? 0) + parseFloat(tx.amount.toFixed(7))
+    }
+    const breakdown = Object.entries(buckets)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, amount]) => ({ date, amount: amount.toFixed(7), count: 1 }))
+
     sendSuccess(res, {
       period,
-      period_start: periodStart.toISOString(),
-      period_end: now.toISOString(),
-      total_spend: totalSpend,
-      transaction_count: transactions.length,
-      transactions: transactions.map((tx) => ({
-        id: tx.id,
-        amount: tx.amount.toFixed(7),
-        recipient: tx.recipientAddress,
-        memo: tx.memo,
-        timestamp: tx.createdAt,
-      })),
+      total_spent: totalSpent,
+      transaction_count: successTxs.length,
+      blocked_count: blockedCount,
+      breakdown,
     })
   } catch (err) {
     next(err)
