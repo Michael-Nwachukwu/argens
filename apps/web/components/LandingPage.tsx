@@ -454,7 +454,7 @@ function Hero() {
             </div>
             <div className="lp-hero-stats" style={{ marginTop: 40, display: 'flex', alignItems: 'center', gap: 28, animation: 'fadeInUp 0.6s 0.42s both ease-out' }}>
               {[
-                { v: '20+',        l: 'AI services on mainnet' },
+                { v: '40+',        l: 'AI services on mainnet' },
                 { v: '$0',         l: 'fee on direct transfers' },
                 { v: '3',          l: 'policy rules to set' },
               ].map((s, i) => (
@@ -668,105 +668,107 @@ function HowItWorks() {
 
 // ─── Marketplace ──────────────────────────────────────────────────────────────
 function Marketplace() {
-  const [activeService, setActiveService] = useState(0)
-
   const services = [
-    { name: 'Web search',      provider: 'exa-search',    cost: '0.0010000', tag: 'data',    tagColor: t.success,  tagBg: t.successLow,  snippet: `{ service_id: "exa-search",\n  payload: { query: "AI funding 2025" } }` },
-    { name: 'Image generation',provider: 'flux-schnell',  cost: '0.0030000', tag: 'compute', tagColor: t.pending,  tagBg: t.pendingLow,  snippet: `{ service_id: "flux-schnell",\n  payload: { prompt: "futuristic city" } }` },
-    { name: 'Code execution',  provider: 'e2b-sandbox',   cost: '0.0050000', tag: 'compute', tagColor: t.pending,  tagBg: t.pendingLow,  snippet: `{ service_id: "e2b-sandbox",\n  payload: { code: "print('hello')" } }` },
-    { name: 'Email delivery',  provider: 'agentmail',     cost: '0.0020000', tag: 'comms',   tagColor: t.accent,   tagBg: t.accentLow,   snippet: `{ service_id: "agentmail",\n  payload: { to: "...", body: "..." } }` },
-    { name: 'Blockchain data', provider: 'codex-graphql', cost: '0.0100000', tag: 'data',    tagColor: t.success,  tagBg: t.successLow,  snippet: `{ service_id: "codex-graphql",\n  payload: { query: "{ accounts { ... } }" } }` },
+    { name: 'Web Search',       id: 'exa-search',    cost: '0.0010', tag: 'Search',  desc: 'Real-time web results across the open web for any query.' },
+    { name: 'Image Generation', id: 'flux-schnell',  cost: '0.0030', tag: 'Vision',  desc: 'Text-to-image via Flux Schnell — high quality, sub-second.' },
+    { name: 'Code Execution',   id: 'e2b-sandbox',   cost: '0.0050', tag: 'Compute', desc: 'Secure, isolated sandbox environments to run and test code.' },
+    { name: 'Email Delivery',   id: 'agentmail',     cost: '0.0020', tag: 'Comms',   desc: 'Send emails and handle replies autonomously from your agent.' },
+    { name: 'Blockchain Data',  id: 'codex-graphql', cost: '0.0100', tag: 'Data',    desc: 'Query on-chain data across major networks via GraphQL.' },
+  ]
+
+  const tagColors: Record<string, { color: string; bg: string }> = {
+    Search:  { color: t.success, bg: t.successLow },
+    Vision:  { color: t.pending, bg: t.pendingLow },
+    Compute: { color: t.pending, bg: t.pendingLow },
+    Comms:   { color: t.accent,  bg: t.accentLow  },
+    Data:    { color: t.success, bg: t.successLow },
+  }
+
+  const features = [
+    {
+      title: 'Zero Setup',
+      desc:  'Enable any service in the dashboard. Your agent gets access immediately — no accounts, no API keys to manage per provider.',
+    },
+    {
+      title: 'Per-Call Pricing',
+      desc:  'Pay fractions of a cent per API call. No monthly commitments. Your agent spends only what it uses.',
+    },
+    {
+      title: 'Skill Files Included',
+      desc:  'Every service ships a skill file your agent loads to understand exactly how to call the API — no documentation to read.',
+    },
   ]
 
   return (
     <section className="lp-section-lg" style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="marketplace">
       <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
-        <div className="lp-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'start' }}>
 
+        {/* Section header */}
+        <div className="lp-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'end', marginBottom: 52 }}>
           <FadeUp>
             <div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.muted, border: `1px solid ${t.border}`, padding: '3px 10px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.04em' }}>
-                Powered by MPP Router · Stellar mainnet
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 22 }}>
+                <div style={{ width: 10, height: 10, background: t.accent, borderRadius: 2, flexShrink: 0 }}/>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>Pay-per-use marketplace</span>
               </div>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Marketplace</span>
-              <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 20 }}>
-                One key.<br/>20+ AI services.
+              <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(32px,4.2vw,58px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, margin: 0, color: t.text }}>
+                40+ AI services.<br/>Zero subscriptions.
               </h2>
-              <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.75, marginBottom: 28, maxWidth: 420 }}>
-                Your agent calls <code style={{ fontFamily: 'monospace', color: t.text2, background: t.bg3, padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>POST /v1/marketplace/call</code> with a service ID and payload. Argens routes the request, deducts the cost from your wallet, enforces your spending policy, and returns the result.
-              </p>
-              <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.75, marginBottom: 36, maxWidth: 420 }}>
-                No separate billing accounts. No API keys to manage per service. No rate-limit negotiation. The same policy rules that govern transfers apply to every marketplace call.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {[
-                  { step: '→', label: 'Discover services',  desc: 'GET /v1/marketplace/services returns a live catalogue with pricing and categories.' },
-                  { step: '→', label: 'Call a service',      desc: 'One POST request. One USDC payment. One response. The agent never manages a second API key.' },
-                  { step: '→', label: 'Policy guards spend', desc: 'Allowance, max-transaction, and approval rules apply to marketplace calls the same as direct transfers.' },
-                ].map((row, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingTop: i > 0 ? 16 : 0, borderTop: i > 0 ? `1px solid ${t.border}` : 'none' }}>
-                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: t.accent, flexShrink: 0, marginTop: 2 }}>{row.step}</span>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: t.text, marginBottom: 3, fontFamily: 'Space Grotesk, sans-serif' }}>{row.label}</div>
-                      <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{row.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </FadeUp>
-
-          <FadeUp delay={0.12}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Service list */}
-              <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>
-                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint }}>GET /v1/marketplace/services</span>
-                  <span style={{ marginLeft: 'auto', background: t.successLow, color: t.success, fontFamily: 'monospace', fontSize: 9, padding: '1px 6px', borderRadius: 3 }}>200 OK</span>
-                </div>
-                {services.map((svc, i) => (
-                  <div
-                    key={i}
-                    onClick={() => setActiveService(i)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                      borderBottom: i < services.length - 1 ? `1px solid ${t.border}` : 'none',
-                      cursor: 'pointer',
-                      background: activeService === i ? `${t.bg2}` : 'transparent',
-                      borderLeft: activeService === i ? `2px solid ${t.accent}` : '2px solid transparent',
-                      transition: 'background 0.12s, border-color 0.12s',
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: t.text, fontWeight: 500 }}>{svc.name}</div>
-                      <div style={{ fontSize: 11, color: t.muted, fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{svc.provider}</div>
-                    </div>
-                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: svc.tagBg, color: svc.tagColor, fontFamily: 'monospace', flexShrink: 0 }}>{svc.tag}</span>
-                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.text2, flexShrink: 0, textAlign: 'right' as const }}>
-                      <div>{svc.cost}</div>
-                      <div style={{ fontSize: 10, color: t.faint }}>USDC / call</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Call snippet */}
-              <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>
-                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint }}>POST /v1/marketplace/call</span>
-                </div>
-                <div className="lp-mkt-snippet" style={{ padding: '14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.text2, lineHeight: 1.7, whiteSpace: 'pre', animation: 'fadeInUp 0.18s ease-out' }}>
-                  {services[activeService].snippet}
-                </div>
-                <div style={{ padding: '10px 14px', borderTop: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ background: t.successLow, color: t.success, fontSize: 10, padding: '2px 7px', borderRadius: 3, fontFamily: 'monospace' }}>● paid</span>
-                  <span style={{ color: t.faint, fontSize: 11, fontFamily: 'monospace' }}>−{services[activeService].cost} USDC · policy: passed</span>
-                </div>
-              </div>
-              <div style={{ fontSize: 11, color: t.faint, fontFamily: 'JetBrains Mono, monospace', padding: '0 4px' }}>← click a service to preview the call</div>
+          <FadeUp delay={0.1}>
+            <div>
+              <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, marginBottom: 22 }}>
+                Your agent calls any provider — AI models, search engines, code sandboxes, data APIs — paying per use from its Argens wallet. No separate accounts. No API keys to manage per service. No rate-limit negotiations.
+              </p>
+              <a href="#" style={{ fontSize: 14, color: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 500 }}>Browse all services →</a>
             </div>
           </FadeUp>
         </div>
+
+        {/* Service grid — container bg acts as 1px divider between cells */}
+        <FadeUp delay={0.06}>
+          <div style={{ background: t.border, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 64 }}>
+            <div className="lp-svc-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+              {services.map((svc) => {
+                const tc = tagColors[svc.tag] ?? { color: t.muted, bg: t.bg3 }
+                return (
+                  <div key={svc.id} style={{ background: t.bg, padding: '22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 10, padding: '3px 9px', borderRadius: 4, background: tc.bg, color: tc.color, fontFamily: 'monospace' }}>{svc.tag}</span>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.text2 }}>
+                        {svc.cost} <span style={{ color: t.faint, fontSize: 10 }}>USDC</span>
+                      </span>
+                    </div>
+                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text }}>{svc.name}</div>
+                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint }}>{svc.id}</div>
+                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.55, marginTop: 2 }}>{svc.desc}</div>
+                  </div>
+                )
+              })}
+              <div style={{ background: t.bg2, padding: '22px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 120 }}>
+                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: t.accent }}>+35</div>
+                <div style={{ fontSize: 12, color: t.muted, textAlign: 'center' as const, lineHeight: 1.5 }}>more services<br/>on mainnet</div>
+              </div>
+            </div>
+          </div>
+        </FadeUp>
+
+        {/* Feature callouts */}
+        <div className="lp-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 48 }}>
+          {features.map((f, i) => (
+            <FadeUp key={f.title} delay={i * 0.08}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <div style={{ width: 10, height: 10, background: t.accent, borderRadius: 2, flexShrink: 0 }}/>
+                  <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: t.text }}>{f.title}</div>
+                </div>
+                <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.7, margin: 0, paddingLeft: 20 }}>{f.desc}</p>
+              </div>
+            </FadeUp>
+          ))}
+        </div>
+
       </div>
     </section>
   )
@@ -954,76 +956,6 @@ function Policies() {
   )
 }
 
-// ─── Pricing ─────────────────────────────────────────────────────────────────
-function Pricing() {
-  return (
-    <section className="lp-section-lg" style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="pricing">
-      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
-        <FadeUp>
-          <div style={{ textAlign: 'center', marginBottom: 64 }}>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Pricing</span>
-            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 14 }}>Simple. Transparent. Aligned.</h2>
-            <p style={{ fontSize: 16, color: t.muted, maxWidth: 520, margin: '0 auto', lineHeight: 1.7 }}>We charge nothing on transfers. We earn a small markup on marketplace services. That alignment means we only make money when your agent is doing useful work.</p>
-          </div>
-        </FadeUp>
-
-        <div className="lp-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {/* Direct transfers */}
-          <FadeUp delay={0.04}>
-            <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 12, padding: 32, display: 'flex', flexDirection: 'column', gap: 20, height: '100%', boxSizing: 'border-box' }}>
-              <div>
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.muted, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 10 }}>Direct USDC transfers</div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(56px,8vw,88px)', fontWeight: 700, letterSpacing: '-0.04em', color: t.accent, lineHeight: 1 }}>$0</div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 500, color: t.text, marginTop: 8 }}>Argens fee on every transfer.</div>
-              </div>
-              <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.7 }}>Send USDC from your agent to any Stellar address and keep every cent. No percentage. No flat fee. Nothing hidden. Only the Stellar network fee applies.</p>
-              <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { send: '$0.50',     recv: '$0.50'     },
-                  { send: '$25.00',    recv: '$25.00'    },
-                  { send: '$1,000.00', recv: '$1,000.00' },
-                ].map((row, i) => (
-                  <div key={i} className="lp-pricing-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '5px 0', borderBottom: i < 2 ? `1px solid ${t.border}` : 'none' }}>
-                    <span style={{ color: t.muted }}>send {row.send}</span>
-                    <span style={{ color: t.success }}>→ recipient gets {row.recv}</span>
-                  </div>
-                ))}
-                <div style={{ fontSize: 10, color: t.faint, fontFamily: 'JetBrains Mono, monospace', marginTop: 4 }}>~$0.000001 Stellar network fee per tx</div>
-              </div>
-            </div>
-          </FadeUp>
-
-          {/* Marketplace */}
-          <FadeUp delay={0.12}>
-            <div style={{ background: t.bg, border: `1px solid ${t.accentMid}`, borderRadius: 12, padding: 32, display: 'flex', flexDirection: 'column', gap: 20, position: 'relative', overflow: 'hidden', height: '100%', boxSizing: 'border-box' }}>
-              <div style={{ position: 'absolute', top: 0, right: 0, width: '70%', height: '100%', background: 'radial-gradient(ellipse at 90% 10%, rgba(197,162,83,0.07) 0%, transparent 65%)', pointerEvents: 'none' }}/>
-              <div>
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.accent, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 10 }}>Marketplace service calls</div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(56px,8vw,88px)', fontWeight: 700, letterSpacing: '-0.04em', color: t.accent, lineHeight: 1 }}>~20%</div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 500, color: t.text, marginTop: 8 }}>markup on service cost.</div>
-              </div>
-              <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.7 }}>When your agent calls a marketplace service — image gen, web search, code execution — Argens charges a small markup on top of the provider's base cost. No hidden fees, no subscriptions.</p>
-              <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { service: 'exa-search',   base: '0.0010', argens: '0.0012' },
-                  { service: 'flux-schnell', base: '0.0030', argens: '0.0036' },
-                  { service: 'e2b-sandbox',  base: '0.0050', argens: '0.0060' },
-                ].map((row, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, padding: '5px 0', borderBottom: i < 2 ? `1px solid ${t.border}` : 'none' }}>
-                    <span style={{ color: t.muted }}>{row.service}</span>
-                    <span style={{ color: t.text2 }}>{row.argens} USDC</span>
-                  </div>
-                ))}
-                <div style={{ fontSize: 10, color: t.faint, fontFamily: 'JetBrains Mono, monospace', marginTop: 4 }}>base + ~20% Argens markup · exact pricing shown in dashboard</div>
-              </div>
-            </div>
-          </FadeUp>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 // ─── CTA + Footer ─────────────────────────────────────────────────────────────
 function CtaFooter() {
   return (
@@ -1046,7 +978,7 @@ function CtaFooter() {
               Your agent is waiting<br/>to pay its first bill.
             </h2>
             <p style={{ fontSize: 17, color: t.muted, lineHeight: 1.75, marginBottom: 40, maxWidth: 460, margin: '0 auto 40px' }}>
-              A wallet, a policy engine, and a marketplace of 20+ AI services — all behind one API key. Get early access and put your agent to work.
+              A wallet, a policy engine, and a marketplace of 40+ AI services — all behind one API key. Get early access and put your agent to work.
             </p>
             <div className="lp-cta-btns" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap' as const }}>
               <WaitlistButton size="lg" label="Get early access" />
@@ -1093,7 +1025,8 @@ export function LandingPage() {
 
         /* Tablet: 3-col → 2-col */
         @media (max-width: 1023px) {
-          .lp-3col { grid-template-columns: repeat(2, 1fr) !important; }
+          .lp-3col    { grid-template-columns: repeat(2, 1fr) !important; }
+          .lp-svc-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
 
         /* Mobile */
@@ -1107,6 +1040,7 @@ export function LandingPage() {
           .lp-how-code    { grid-column: 1 / -1 !important; }
           .lp-2col        { grid-template-columns: 1fr !important; gap: 20px !important; }
           .lp-3col        { grid-template-columns: 1fr !important; }
+          .lp-svc-grid    { grid-template-columns: 1fr !important; }
           .lp-section-lg  { padding-top: 64px !important; padding-bottom: 64px !important; }
           .lp-mkt-snippet { white-space: pre-wrap !important; word-break: break-word !important; }
           .lp-cta-btns    { flex-direction: column !important; align-items: stretch !important; }
@@ -1125,7 +1059,6 @@ export function LandingPage() {
         <Marketplace />
         <TwoWays />
         <Policies />
-        <Pricing />
         <CtaFooter />
       </main>
     </>

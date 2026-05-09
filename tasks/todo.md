@@ -53,6 +53,22 @@
 
 ---
 
+## Phase Milestone: Per-Service Skill Files
+**Goal:** Every marketplace service ships a machine-readable skill file agents can fetch to understand exactly how to call that API — no documentation to read, no prompt engineering required.
+**Why:** Matches the "Skill Files Included" promise on the landing page. Agents already self-onboard via the global `SKILL.md`; per-service skill files extend this pattern to individual services, making marketplace calls seamless for any agent.
+**Files affected:** `apps/web/public/skills/<service-id>.md` (static files served by Next.js), `GET /v1/marketplace/services` response (add `skill_url` field per service), `apps/api/src/services/marketplace.ts`, `SKILL.md` (link to skill index)
+**Steps:**
+- [ ] Define skill file format: YAML front-matter (id, name, cost, method, path) + plain-text usage guide + example request/response JSON.
+- [ ] Author skill files for the 5 initial services: `exa-search`, `flux-schnell`, `e2b-sandbox`, `agentmail`, `codex-graphql`.
+- [ ] Serve them as static files from `apps/web/public/skills/` (no auth, CORS `*`, Content-Type: text/markdown).
+- [ ] Add `skill_url` field to `GET /v1/marketplace/services` response pointing to each file.
+- [ ] Add a `/skills` index at `apps/web/public/skills/index.md` listing all services for agent discovery.
+- [ ] Update global `SKILL.md` to reference the skills index.
+- [ ] Test: agent fetches skill file, constructs valid `POST /v1/marketplace/call` without reading docs.
+**Done when:** An AI agent, given only a service's `skill_url`, can call that service correctly on the first attempt.
+
+---
+
 ## Recently Completed
 
 - Phase 1 — Foundation: complete.
