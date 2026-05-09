@@ -6,6 +6,8 @@ import { wallet as walletApi, isError } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { WalletBalance } from '@/lib/api'
 
+const BACKUP_ACK_KEY = (userId: string) => `argens_key_acked_${userId}`
+
 function AddFundsModal({ address, onClose }: { address: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
@@ -58,11 +60,13 @@ export default function WalletPage() {
   const [walletData, setWalletData] = useState<WalletBalance | null>(null)
   const [loading, setLoading]       = useState(true)
   const [showFunds, setShowFunds]   = useState(false)
-  const [showSend, setShowSend]     = useState(false)
-  const [copied, setCopied]         = useState(false)
-  const [keyWarning, setKeyWarning] = useState(false)
-  const [showKey, setShowKey]       = useState(false)
-  const [sendForm, setSendForm]     = useState({ recipient: '', amount: '', memo: '', pin: '' })
+  const [showSend, setShowSend]         = useState(false)
+  const [copied, setCopied]             = useState(false)
+  const [keyStep, setKeyStep]           = useState<'idle' | 'warning' | 'password' | 'done'>('idle')
+  const [keyPassword, setKeyPassword]   = useState('')
+  const [keyError, setKeyError]         = useState('')
+  const [keyLoading, setKeyLoading]     = useState(false)
+  const [sendForm, setSendForm]         = useState({ recipient: '', amount: '', memo: '', pin: '' })
   const [sendStep, setSendStep]     = useState<'form' | 'pin' | 'sending' | 'result'>('form')
   const [sendError, setSendError]   = useState('')
   const [sendResult, setSendResult] = useState<{ status: string; message?: string; transaction_id?: string; stellar_tx_hash?: string } | null>(null)
@@ -110,6 +114,42 @@ export default function WalletPage() {
       setSendError('')
       setSendResult(res.data)
     }
+  }
+
+  const downloadKey = async () => {
+    if (!keyPassword) { setKeyError('Enter your password to continue.'); return }
+    setKeyLoading(true)
+    setKeyError('')
+    const res = await walletApi.exportKey(keyPassword)
+    setKeyLoading(false)
+    if (isError(res)) { setKeyError(res.error); return }
+
+    const { secret_key, public_key, network } = res.data
+    const content = [
+      'ARGENS WALLET — PRIVATE KEY BACKUP',
+      '====================================',
+      '',
+      'Keep this file secret. Anyone with the secret key can spend all funds.',
+      '',
+      `Network:    ${network}`,
+      `Public key: ${public_key}`,
+      `Secret key: ${secret_key}`,
+      '',
+      `Exported: ${new Date().toISOString()}`,
+    ].join('\n')
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `argens-wallet-backup-${public_key.slice(0, 8)}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+
+    if (user) {
+      try { localStorage.setItem(BACKUP_ACK_KEY(user.id), '1') } catch { /* ignore */ }
+    }
+    setKeyStep('done')
+    setKeyPassword('')
   }
 
   const resetSend = () => {
@@ -223,31 +263,64 @@ export default function WalletPage() {
           {/* Export key */}
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '20px 22px' }}>
             <div style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Export private key</div>
-            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: '1.6', marginBottom: 14, margin: '0 0 14px' }}>
-              Your wallet is agent-custodial — export the private key at any time to self-custody or migrate. The key is encrypted at rest and never leaves our servers unencrypted, except through this export.
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: '1.6', margin: '0 0 14px' }}>
+              Export your private key to self-custody or migrate your wallet. Encrypted at rest — only decrypted for this export with your password.
             </p>
-            {!keyWarning ? (
-              <button onClick={() => setKeyWarning(true)} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
-                Export private key…
-              </button>
-            ) : !showKey ? (
+            {keyStep === 'done' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ padding: '10px 14px', background: 'var(--error-low)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, fontSize: 13, color: 'var(--error)' }}>
+                <div style={{ padding: '10px 14px', background: 'rgba(54,179,126,0.10)', border: '1px solid rgba(54,179,126,0.25)', borderRadius: 6, fontSize: 13, color: 'var(--success)' }}>
+                  Key downloaded — store the file somewhere safe and offline.
+                </div>
+                <button onClick={() => setKeyStep('idle')} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)', width: 'fit-content' }}>
+                  Export again
+                </button>
+              </div>
+            ) : keyStep === 'password' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ padding: '10px 14px', background: 'rgba(160,72,72,0.10)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, fontSize: 12, color: 'var(--error)' }}>
+                  Anyone with this key controls your wallet. Never share it.
+                </div>
+                {keyError && (
+                  <div style={{ padding: '9px 12px', background: 'rgba(160,72,72,0.10)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, fontSize: 12, color: 'var(--error)' }}>
+                    {keyError}
+                  </div>
+                )}
+                <input
+                  type="password"
+                  value={keyPassword}
+                  onChange={e => { setKeyPassword(e.target.value); setKeyError('') }}
+                  placeholder="Your account password"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') void downloadKey() }}
+                  style={{ background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, padding: '10px 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setKeyStep('idle'); setKeyPassword(''); setKeyError('') }} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
+                    Cancel
+                  </button>
+                  <button onClick={() => void downloadKey()} disabled={keyLoading || !keyPassword} style={{ padding: '7px 14px', background: keyLoading || !keyPassword ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 6, color: keyLoading || !keyPassword ? 'var(--muted)' : '#0C0B0A', fontSize: 13, cursor: keyLoading || !keyPassword ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-head)', fontWeight: 600 }}>
+                    {keyLoading ? 'Downloading…' : 'Download .txt'}
+                  </button>
+                </div>
+              </div>
+            ) : keyStep === 'warning' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ padding: '10px 14px', background: 'rgba(160,72,72,0.10)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, fontSize: 13, color: 'var(--error)' }}>
                   Anyone with this key can spend all funds. Never share it.
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setKeyWarning(false)} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
+                  <button onClick={() => setKeyStep('idle')} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
                     Cancel
                   </button>
-                  <button onClick={() => setShowKey(true)} style={{ padding: '7px 14px', background: 'var(--error-low)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, color: 'var(--error)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)', fontWeight: 500 }}>
-                    I understand — reveal key
+                  <button onClick={() => setKeyStep('password')} style={{ padding: '7px 14px', background: 'rgba(160,72,72,0.12)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, color: 'var(--error)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)', fontWeight: 500 }}>
+                    I understand — continue
                   </button>
                 </div>
               </div>
             ) : (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--error)', background: 'var(--error-low)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, padding: '12px 14px', wordBreak: 'break-all', lineHeight: '1.7' }}>
-                Contact support to export your private key securely. This operation is not available through the dashboard for security reasons.
-              </div>
+              <button onClick={() => setKeyStep('warning')} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
+                Export private key…
+              </button>
             )}
           </div>
         </div>

@@ -114,7 +114,11 @@ export async function createUsdcTrustline(secretKey: string): Promise<void> {
 /**
  * Returns the USDC balance for an account as a string ("0.0000000" if none).
  */
-export async function getUsdcBalance(publicKey: string): Promise<string> {
+/**
+ * Returns USDC balance string, null if the account doesn't exist on this network,
+ * or throws StellarError for actual Horizon connectivity failures.
+ */
+export async function getUsdcBalance(publicKey: string): Promise<string | null> {
   try {
     const account = await server.loadAccount(publicKey)
     const usdcBalance = account.balances.find(
@@ -125,6 +129,11 @@ export async function getUsdcBalance(publicKey: string): Promise<string> {
     )
     return usdcBalance?.balance ?? '0.0000000'
   } catch (e) {
+    const status = (e as { response?: { status?: number } }).response?.status
+    if (status === 404) {
+      // Account doesn't exist on this network — not a connectivity error
+      return null
+    }
     throw new StellarError('Failed to fetch balance', {
       publicKey,
       error: (e as Error).message,

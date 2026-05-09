@@ -110,12 +110,24 @@ export interface SendResult {
   poll_url?: string
 }
 
+export interface ExportKeyResult {
+  secret_key: string
+  public_key: string
+  network: string
+  warning: string
+}
+
 export const wallet = {
   balance: () => authFetch<WalletBalance>('/wallet/balance'),
   send: (data: { recipient: string; amount: string; memo?: string; pin?: string }) =>
     authFetch<SendResult>('/wallet/send', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  exportKey: (password: string) =>
+    authFetch<ExportKeyResult>('/wallet/export-key', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
     }),
 }
 
@@ -144,6 +156,9 @@ export interface Transaction {
   amount: string
   currency: string
   status: TxStatus
+  type?: string
+  serviceId?: string | null
+  costPaid?: string | null
   memo: string | null
   stellarTxHash: string | null
   blockedReason: string | null
@@ -153,11 +168,63 @@ export interface Transaction {
 }
 
 export const transactions = {
-  list: (params?: { page?: number; limit?: number; status?: string; from_date?: string; to_date?: string }) => {
+  list: (params?: { page?: number; limit?: number; status?: string; type?: string; from_date?: string; to_date?: string }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([,v]) => v != null).map(([k,v]) => [k, String(v)]))
     return authFetch<Transaction[]>(`/transactions?${qs.toString()}`)
   },
   get: (id: string) => authFetch<Transaction>(`/transactions/${id}`),
+}
+
+// ─── Marketplace ──────────────────────────────────────────────────────────────
+
+export interface MarketplaceEndpoint {
+  id: string
+  label: string
+  method: 'POST' | 'GET'
+  path: string
+  description: string
+  example_payload: Record<string, unknown> | null
+}
+
+export interface MarketplaceService {
+  id: string
+  name: string
+  service_url: string
+  description: string
+  categories: string[]
+  display_price: string
+  is_available: boolean
+  is_enabled: boolean
+  availability_note: string | null
+  payment_rail: string
+  status: 'active' | 'limited'
+  docs_url: string | null
+  endpoints: MarketplaceEndpoint[]
+}
+
+export interface MarketplaceCallResult {
+  status: 'success'
+  transaction_id: string
+  stellar_tx_hash: string | null
+  service_id: string
+  service_name: string
+  cost_paid: string
+  currency: 'USDC'
+  result: unknown
+}
+
+export const marketplace = {
+  services: () => authFetch<MarketplaceService[]>('/marketplace/services'),
+  setEnabled: (serviceId: string, enabled: boolean) =>
+    authFetch<{ service_id: string; enabled: boolean }>(`/marketplace/services/${serviceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
+  call: (data: { service_id: string; payload?: Record<string, unknown>; query?: Record<string, string | number | boolean> }) =>
+    authFetch<MarketplaceCallResult | { status: 'pending_approval'; transaction_id: string; message: string; poll_url: string }>(
+      '/marketplace/call',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
 }
 
 // ─── Agent status ─────────────────────────────────────────────────────────────

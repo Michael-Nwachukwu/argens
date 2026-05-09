@@ -32,6 +32,7 @@ export const Icons = {
   policies:     'M8 1l5.5 3v4.5A5.5 5.5 0 018 14.5 5.5 5.5 0 012.5 8.5V4L8 1zM5.5 8l2 2 3-3',
   transactions: 'M1 4h14M1 8h10M1 12h7',
   analytics:    'M1 13l4-5 3 3 3-4.5 4 6.5',
+  marketplace:  'M2 5l6-3 6 3-6 3-6-3zm0 3l6 3 6-3M2 11l6 3 6-3',
   apikeys:      'M10 1a5 5 0 010 10 5 5 0 010-10zm-4 5h9M13 4l2 2-2 2',
   settings:     'M8 5a3 3 0 100 6 3 3 0 000-6zM8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4',
   arrow:        'M3 8h10M9 4l4 4-4 4',

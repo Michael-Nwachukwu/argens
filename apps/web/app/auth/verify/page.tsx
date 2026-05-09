@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -13,6 +13,7 @@ function VerifyContent() {
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
+  const requestedRef = useRef(false)
 
   useEffect(() => {
     if (!token) {
@@ -20,6 +21,12 @@ function VerifyContent() {
       setMessage('No verification token found.')
       return
     }
+
+    // Guard against React strict-mode double-invocation in development.
+    // The verification token is single-use — a second call would consume nothing
+    // and report "invalid token" even when the first call succeeded.
+    if (requestedRef.current) return
+    requestedRef.current = true
 
     fetch(`${API}/auth/verify/${token}`)
       .then(r => r.json())

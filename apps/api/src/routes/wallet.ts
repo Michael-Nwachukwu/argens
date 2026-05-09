@@ -7,7 +7,6 @@
 
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
-import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
@@ -21,6 +20,7 @@ import { authLimiter, checkPinAttempt, resetPinAttempts } from '../middleware/ra
 import { sendBlockedEmail, sendPendingApprovalEmail } from '../services/email.js'
 import { generateSecureToken } from '../lib/crypto.js'
 import { logger } from '../lib/logger.js'
+import bcrypt from 'bcryptjs'
 
 export const walletRouter: Router = ExpressRouter()
 
@@ -87,7 +87,12 @@ walletRouter.get('/wallet/balance', requireJwtOrApiKey, async (req, res, next) =
           balance = live
           cachedAt = now.toISOString()
         } else {
-          // USDC trustline not found — return 0
+          // Account doesn't exist on this network (e.g. testnet wallet on mainnet config)
+          // Reset cache to 0 so stale data isn't served on the next cached read
+          await prisma.wallet.update({
+            where: { id: wallet.id },
+            data: { balanceCache: 0, balanceCachedAt: now },
+          })
           balance = '0.0000000'
           cachedAt = now.toISOString()
         }
@@ -352,6 +357,64 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         transaction_id: tx.id,
       })
     }
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /wallet/export-key ──────────────────────────────────────────────────
+// Returns the decrypted Stellar secret key. Requires password confirmation.
+// JWT only — never callable with an API key.
+
+const ExportKeySchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+})
+
+walletRouter.post('/wallet/export-key', requireJwt, authLimiter, validate(ExportKeySchema), async (req, res, next) => {
+  const userId = req.userId!
+  const { password } = req.body as z.infer<typeof ExportKeySchema>
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      sendError(res, 'User not found.', 'NOT_FOUND', 404)
+      return
+    }
+
+    const passwordValid = await bcrypt.compare(password, user.passwordHash)
+    if (!passwordValid) {
+      sendError(res, 'Incorrect password.', 'INVALID_PASSWORD', 401)
+      return
+    }
+
+    const wallet = await prisma.wallet.findUnique({ where: { userId } })
+    if (!wallet) {
+      sendError(res, 'Wallet not found.', 'WALLET_NOT_FOUND', 404)
+      return
+    }
+    if (wallet.status !== 'READY') {
+      sendError(res, 'Wallet is not ready yet.', 'WALLET_NOT_READY', 503)
+      return
+    }
+
+    const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        eventType: 'PRIVATE_KEY_EXPORTED',
+        eventData: { walletAddress: wallet.stellarPublicKey, ip: req.ip ?? null },
+      },
+    })
+
+    logger.warn('Private key exported', { userId, walletAddress: wallet.stellarPublicKey })
+
+    sendSuccess(res, {
+      secret_key: secretKey,
+      public_key: wallet.stellarPublicKey,
+      network: process.env['STELLAR_NETWORK'] ?? 'testnet',
+      warning: 'Keep this key secret. Anyone with it can spend all funds in this wallet.',
+    })
   } catch (err) {
     next(err)
   }

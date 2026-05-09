@@ -53,7 +53,9 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
     const from = process.env['RESEND_FROM_EMAIL'] ?? 'noreply@argens.io'
     // In dev without a verified domain, onboarding@resend.dev can only send to
     // the Resend account owner. Override the `to` so emails actually arrive.
-    const devOverride = process.env['NODE_ENV'] !== 'production' ? process.env['RESEND_DEV_OVERRIDE_TO'] : undefined
+    // Empty string or unset = no override → send to actual recipient.
+    const overrideRaw = process.env['NODE_ENV'] !== 'production' ? process.env['RESEND_DEV_OVERRIDE_TO'] : undefined
+    const devOverride = overrideRaw && overrideRaw.length > 0 ? overrideRaw : undefined
     const to = devOverride ?? payload.to
     const { error } = await resend.emails.send({ from, ...payload, to })
     if (error) throw new Error(`Resend error: ${error.message}`)

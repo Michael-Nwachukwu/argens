@@ -20,6 +20,7 @@ import { decryptSecretKey } from '../lib/crypto.js'
 import { submitPayment } from '../services/payment.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { sendApprovalActedEmail } from '../services/email.js'
+import { executeApprovedMarketplaceTransaction } from '../services/marketplace.js'
 
 export const approveRouter: Router = ExpressRouter()
 
@@ -54,7 +55,9 @@ approveRouter.post('/approve/:token', requireJwt, async (req, res, next) => {
     })
 
     // Re-run policy check (amount could now violate a freshly changed policy)
-    const amount = transaction.amount.toFixed(7)
+    const amount = transaction.type === 'marketplace' && transaction.costPaid
+      ? transaction.costPaid.toFixed(7)
+      : transaction.amount.toFixed(7)
     const policyResult = await checkPolicy(userId, amount)
 
     if (policyResult.status === 'BLOCKED') {
@@ -70,6 +73,48 @@ approveRouter.post('/approve/:token', requireJwt, async (req, res, next) => {
         402,
         { reason: policyResult.reason },
       )
+      return
+    }
+
+    if (transaction.type === 'marketplace') {
+      try {
+        const result = await executeApprovedMarketplaceTransaction(userId, transaction.id)
+
+        void sendApprovalActedEmail(userId, transaction.id, 'approved', result.cost_paid).catch(
+          (e: unknown) =>
+            logger.error('Failed to send marketplace approval acted email', {
+              userId,
+              error: (e as Error).message,
+            }),
+        )
+
+        sendSuccess(res, {
+          status: 'approved',
+          transaction_id: transaction.id,
+          stellar_tx_hash: result.stellar_tx_hash,
+          amount: result.cost_paid,
+          service_id: result.service_id,
+        })
+      } catch (marketplaceErr) {
+        logger.error('Marketplace call failed on approval', {
+          userId,
+          transactionId: transaction.id,
+          error: (marketplaceErr as Error).message,
+        })
+
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: (marketplaceErr as Error).message,
+          },
+        })
+
+        sendError(res, 'Marketplace call failed after approval.', 'MARKETPLACE_APPROVAL_FAILED', 502, {
+          transaction_id: transaction.id,
+          error: (marketplaceErr as Error).message,
+        })
+      }
       return
     }
 

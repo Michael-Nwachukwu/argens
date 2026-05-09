@@ -11,6 +11,7 @@ declare global {
     interface Request {
       userId?: string
       userEmail?: string
+      authType?: 'jwt' | 'apiKey'
     }
   }
 }
@@ -38,6 +39,7 @@ export function requireJwt(req: Request, res: Response, next: NextFunction): voi
     const payload = jwt.verify(token, getJwtSecret()) as JwtPayload
     req.userId = payload.userId
     req.userEmail = payload.email
+    req.authType = 'jwt'
     next()
   } catch {
     sendError(res, 'Invalid or expired token', 'UNAUTHORIZED', 401)
@@ -58,6 +60,7 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction): 
   validateApiKey(key)
     .then((userId) => {
       req.userId = userId
+      req.authType = 'apiKey'
       next()
     })
     .catch(() => {
@@ -82,6 +85,7 @@ export function requireJwtOrApiKey(req: Request, res: Response, next: NextFuncti
     validateApiKey(token)
       .then((userId) => {
         req.userId = userId
+        req.authType = 'apiKey'
         next()
       })
       .catch(() => {
@@ -95,6 +99,7 @@ export function requireJwtOrApiKey(req: Request, res: Response, next: NextFuncti
     const payload = jwt.verify(token, getJwtSecret()) as JwtPayload
     req.userId = payload.userId
     req.userEmail = payload.email
+    req.authType = 'jwt'
     next()
   } catch {
     sendError(res, 'Invalid or expired token', 'UNAUTHORIZED', 401)

@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { id: 'policies',     label: 'Policies',       icon: 'policies'     as const, href: '/dashboard/policies'     },
   { id: 'transactions', label: 'Transactions',   icon: 'transactions' as const, href: '/dashboard/transactions' },
   { id: 'analytics',    label: 'Analytics',      icon: 'analytics'    as const, href: '/dashboard/analytics'    },
+  { id: 'marketplace',  label: 'Marketplace',    icon: 'marketplace'  as const, href: '/dashboard/marketplace'  },
   { id: 'apikeys',      label: 'API Keys',       icon: 'apikeys'      as const, href: '/dashboard/api-keys'     },
   { id: 'settings',     label: 'Settings',       icon: 'settings'     as const, href: '/dashboard/settings'     },
 ]
