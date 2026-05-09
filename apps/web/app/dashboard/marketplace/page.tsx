@@ -219,7 +219,7 @@ export default function MarketplacePage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
           {/* Left: service list summary */}
-          <section style={{ display: 'grid', gap: 10, maxHeight: 'calc(100vh - 140px)', overflowY: 'auto', paddingRight: 6 }}>
+          <section style={{ display: 'grid', gap: 8, maxHeight: 'calc(100vh - 140px)', overflowY: 'auto', paddingRight: 6 }}>
             {filtered.map(service => {
               const active = service.id === selected.id
               return (
@@ -234,12 +234,63 @@ export default function MarketplacePage() {
                     background: active ? 'var(--bg3)' : 'var(--bg2)',
                     cursor: 'pointer',
                     color: 'var(--text)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
-                    <strong style={{ fontSize: 13 }}>{service.name}</strong>
-                    <span style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>{service.display_price}</span>
+                  {/* Name + price row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                    <strong style={{ fontSize: 13, lineHeight: 1.4, flex: 1 }}>{service.name}</strong>
+                    <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{service.display_price}</span>
                   </div>
+
+                  {/* Description — 2-line clamp */}
+                  <p style={{
+                    margin: 0,
+                    fontSize: 11,
+                    color: 'var(--muted)',
+                    lineHeight: 1.45,
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}>
+                    {service.description}
+                  </p>
+
+                  {/* Categories + status badges */}
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {service.categories.slice(0, 2).map(cat => (
+                      <span key={cat} style={{
+                        fontSize: 9,
+                        color: 'var(--text2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 999,
+                        padding: '1px 6px',
+                        fontFamily: 'var(--font-mono)',
+                      }}>{cat}</span>
+                    ))}
+                    <span style={{
+                      fontSize: 9,
+                      color: service.is_enabled ? 'var(--success)' : 'var(--muted)',
+                      border: `1px solid ${service.is_enabled ? 'rgba(54,179,126,0.4)' : 'var(--border)'}`,
+                      borderRadius: 999,
+                      padding: '1px 6px',
+                      fontFamily: 'var(--font-mono)',
+                      marginLeft: 'auto',
+                      flexShrink: 0,
+                    }}>
+                      {service.is_enabled ? 'enabled' : 'disabled'}
+                    </span>
+                  </div>
+
+                  {/* Availability note if present */}
+                  {service.availability_note && (
+                    <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)', opacity: 0.75 }}>
+                      {service.availability_note}
+                    </div>
+                  )}
                 </button>
               )
             })}
@@ -465,8 +516,11 @@ export default function MarketplacePage() {
                 <h2 style={{ margin: '0 0 12px', fontFamily: 'var(--font-head)', fontSize: 16 }}>Result</h2>
                 <pre style={{
                   margin: 0,
+                  maxHeight: 400,
+                  overflowY: 'auto',
                   overflowX: 'auto',
                   whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
                   color: 'var(--text2)',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 12,

@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 import { Logo } from './ui/Logo'
 
-// ─── Design tokens (inline — keeps LP self-contained) ─────────────────────────
+// ─── Design tokens ────────────────────────────────────────────────────────────
 const t = {
   bg:          '#0C0B0A',
   bg2:         '#131210',
@@ -37,7 +36,7 @@ const SYN = {
 const SKILL_PROMPT = 'Hi, read https://argens.xyz/SKILL.md and continue with the onboarding steps.'
 
 // ─── Tally (waitlist) ─────────────────────────────────────────────────────────
-const TALLY_FORM_ID = 'TODO_REPLACE_ME'
+const TALLY_FORM_ID = 'xX9AxG'
 
 function useTally() {
   useEffect(() => {
@@ -49,7 +48,20 @@ function useTally() {
   }, [])
 }
 
-function WaitlistButton({ size = 'sm', label = 'Join the waitlist' }: { size?: 'sm' | 'lg'; label?: string }) {
+// ─── Mobile breakpoint hook ───────────────────────────────────────────────────
+function useIsMobile(bp = 768) {
+  const [is, setIs] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${bp - 1}px)`)
+    setIs(mq.matches)
+    const fn = (e: MediaQueryListEvent) => setIs(e.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
+  }, [bp])
+  return is
+}
+
+function WaitlistButton({ size = 'sm', label = 'Join the waitlist', full }: { size?: 'sm' | 'lg'; label?: string; full?: boolean }) {
   const pad  = size === 'lg' ? '13px 26px' : '7px 14px'
   const font = size === 'lg' ? 15 : 13
   return (
@@ -59,7 +71,13 @@ function WaitlistButton({ size = 'sm', label = 'Join the waitlist' }: { size?: '
       data-tally-width="480"
       data-tally-emoji-text="👋"
       data-tally-emoji-animation="wave"
-      style={{ padding: pad, borderRadius: 7, fontSize: font, fontWeight: 600, background: t.accent, color: t.bg, border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif', display: 'inline-flex', alignItems: 'center' }}
+      style={{
+        padding: pad, borderRadius: 7, fontSize: font, fontWeight: 600,
+        background: t.accent, color: t.bg, border: 'none', cursor: 'pointer',
+        fontFamily: 'Space Grotesk, sans-serif', display: 'inline-flex', alignItems: 'center',
+        justifyContent: 'center',
+        width: full ? '100%' : undefined,
+      }}
     >
       {label}
     </button>
@@ -69,33 +87,117 @@ function WaitlistButton({ size = 'sm', label = 'Join the waitlist' }: { size?: '
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const isMobile = useIsMobile()
   useTally()
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10)
     window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
+
+  // Close menu on resize to desktop
+  useEffect(() => { if (!isMobile) setMenuOpen(false) }, [isMobile])
+
+  const navLinks: [string, string][] = [
+    ['#how', 'How it works'],
+    ['#marketplace', 'Marketplace'],
+    ['#policies', 'Policies'],
+    ['#pricing', 'Pricing'],
+  ]
+
   return (
-    <nav style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 40px', height: 58,
-      background: 'rgba(12,11,10,0.80)',
-      backdropFilter: 'blur(16px) saturate(120%)',
-      borderBottom: `1px solid ${scrolled ? t.border : 'transparent'}`,
-      transition: 'border-color 0.2s',
-    }}>
-      <Logo />
-      <ul style={{ display: 'flex', alignItems: 'center', gap: 28, listStyle: 'none' }}>
-        {[['#how','How it works'],['#marketplace','Marketplace'],['#policies','Policies'],['#pricing','Pricing']].map(([href, label]) => (
-          <li key={href}><a href={href} style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{label}</a></li>
-        ))}
-      </ul>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Link href="/login" style={{ padding: '7px 14px', borderRadius: 6, fontSize: 13, color: t.muted, textDecoration: 'none' }}>Log in</Link>
-        <WaitlistButton />
-      </div>
-    </nav>
+    <>
+      <nav style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 clamp(16px, 4vw, 40px)', height: 58,
+        background: 'rgba(12,11,10,0.90)',
+        backdropFilter: 'blur(16px) saturate(120%)',
+        borderBottom: `1px solid ${scrolled || menuOpen ? t.border : 'transparent'}`,
+        transition: 'border-color 0.2s',
+      }}>
+        <Logo />
+
+        {!isMobile && (
+          <>
+            <ul style={{ display: 'flex', alignItems: 'center', gap: 28, listStyle: 'none', margin: 0, padding: 0 }}>
+              {navLinks.map(([href, label]) => (
+                <li key={href}><a href={href} style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{label}</a></li>
+              ))}
+            </ul>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <WaitlistButton />
+            </div>
+          </>
+        )}
+
+        {isMobile && (
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            style={{
+              background: 'transparent',
+              border: `1px solid ${t.border}`,
+              color: t.muted,
+              borderRadius: 6,
+              padding: '7px 9px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {menuOpen ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M3 3l10 10M13 3L3 13"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M2 4h12M2 8h12M2 12h12"/>
+              </svg>
+            )}
+          </button>
+        )}
+      </nav>
+
+      {/* Mobile dropdown menu */}
+      {isMobile && (
+        <div style={{
+          position: 'fixed', top: 58, left: 0, right: 0, zIndex: 199,
+          background: 'rgba(12,11,10,0.97)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: menuOpen ? `1px solid ${t.border}` : 'none',
+          overflow: 'hidden',
+          maxHeight: menuOpen ? 400 : 0,
+          transition: 'max-height 0.25s ease',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
+          <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {navLinks.map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  fontSize: 16, color: t.text2, textDecoration: 'none',
+                  padding: '14px 4px',
+                  borderBottom: `1px solid ${t.border}`,
+                  display: 'block',
+                }}
+              >
+                {label}
+              </a>
+            ))}
+            <div style={{ marginTop: 20 }}>
+              <WaitlistButton size="lg" label="Join the waitlist" full />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -237,6 +339,7 @@ function Hero() {
   const [pinned, setPinned] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const DWELLS = { REST: 5000, Prompt: 8500 }
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (pinned) return
@@ -250,34 +353,34 @@ function Hero() {
   }
 
   return (
-    <section style={{ padding: '148px 0 88px', position: 'relative', overflow: 'hidden' }}>
+    <section className="lp-hero" style={{ padding: '148px 0 88px', position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, right: 0, width: '55%', height: '100%', background: 'radial-gradient(ellipse at 80% 20%, rgba(197,162,83,0.05) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }}/>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
+        <div className="lp-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
           {/* Left */}
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.accent, background: t.accentLow, border: `1px solid ${t.accentMid}`, padding: '5px 12px', borderRadius: 20, marginBottom: 28, letterSpacing: '0.04em' }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block' }}/>
               Now on Stellar testnet
             </div>
-            <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(44px,5.5vw,72px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 20 }}>
+            <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(38px,5.5vw,72px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 20 }}>
               Give your AI agent the ability to pay.
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.7, color: t.text2, marginBottom: 32, maxWidth: 400 }}>
               An API key that authorizes autonomous USDC spending on Stellar — within policies you define.
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div className="lp-hero-cta" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <WaitlistButton size="lg" label="Join the waitlist" />
               <a href="#how" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 26px', borderRadius: 7, fontSize: 15, color: t.text2, border: `1px solid ${t.border2}`, textDecoration: 'none' }}>See how it works →</a>
             </div>
-            <div style={{ marginTop: 36, display: 'flex', alignItems: 'center', gap: 28 }}>
+            <div className="lp-hero-stats" style={{ marginTop: 36, display: 'flex', alignItems: 'center', gap: 28 }}>
               {[
                 { v: '$0',          l: 'on direct USDC transfers' },
                 { v: '<50ms',       l: 'policy check latency' },
                 { v: '~$0.000001', l: 'Stellar network fee' },
               ].map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-                  {i > 0 && <div style={{ width: 1, height: 30, background: t.border }}/>}
+                  {i > 0 && <div className="lp-stat-div" style={{ width: 1, height: 30, background: t.border }}/>}
                   <div>
                     <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text }}>{s.v}</div>
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{s.l}</div>
@@ -287,7 +390,7 @@ function Hero() {
             </div>
           </div>
 
-          {/* Right */}
+          {/* Right — widget area */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               {(['REST','Prompt'] as const).map(v => (
@@ -308,14 +411,21 @@ function Hero() {
                 }}>auto ↺</button>
               )}
             </div>
-            <div style={{ position: 'relative', height: 310 }}>
-              <div style={{ position: 'absolute', inset: 0, opacity: view==='REST'?1:0, transition: 'opacity 0.45s ease', pointerEvents: view==='REST'?'auto':'none' }}>
-                <HeroCodeWidget />
+            {isMobile ? (
+              /* On mobile: just show the active widget without fixed height */
+              <div>
+                {view === 'REST' ? <HeroCodeWidget /> : <HeroPromptWidget active={view === 'Prompt'} />}
               </div>
-              <div style={{ position: 'absolute', inset: 0, opacity: view==='Prompt'?1:0, transition: 'opacity 0.45s ease', pointerEvents: view==='Prompt'?'auto':'none' }}>
-                <HeroPromptWidget active={view==='Prompt'} />
+            ) : (
+              <div style={{ position: 'relative', height: 310 }}>
+                <div style={{ position: 'absolute', inset: 0, opacity: view==='REST'?1:0, transition: 'opacity 0.45s ease', pointerEvents: view==='REST'?'auto':'none' }}>
+                  <HeroCodeWidget />
+                </div>
+                <div style={{ position: 'absolute', inset: 0, opacity: view==='Prompt'?1:0, transition: 'opacity 0.45s ease', pointerEvents: view==='Prompt'?'auto':'none' }}>
+                  <HeroPromptWidget active={view==='Prompt'} />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -327,9 +437,9 @@ function Hero() {
 function Problem() {
   return (
     <section style={{ padding: '72px 0', borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, background: t.bg2 }}>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(22px,3vw,32px)', fontWeight: 500, lineHeight: 1.45, letterSpacing: '-0.02em', color: t.text }}>
+          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(20px,3vw,32px)', fontWeight: 500, lineHeight: 1.45, letterSpacing: '-0.02em', color: t.text }}>
             AI agents can browse, decide, and act.{' '}
             <span style={{ color: t.muted }}>But when they hit a paywall, the workflow breaks. A human has to step in.</span>
           </p>
@@ -368,20 +478,20 @@ function HowItWorks() {
     },
   ]
   return (
-    <section style={{ padding: '96px 0' }} id="how">
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
+    <section className="lp-section-lg" style={{ padding: '96px 0' }} id="how">
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <div style={{ marginBottom: 64 }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>How it works</span>
-          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 500 }}>From zero to agent payments in three steps.</h2>
+          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 500 }}>From zero to agent payments in three steps.</h2>
         </div>
         {steps.map((s, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '64px 1fr minmax(0,360px)', gap: 40, alignItems: 'start', padding: '36px 0', borderTop: `1px solid ${t.border}` }}>
+          <div key={i} className="lp-how-row" style={{ display: 'grid', gridTemplateColumns: '64px 1fr minmax(0,360px)', gap: 40, alignItems: 'start', padding: '36px 0', borderTop: `1px solid ${t.border}` }}>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.accent, paddingTop: 3, letterSpacing: '0.04em' }}>{s.num}</div>
             <div>
               <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 20, fontWeight: 600, letterSpacing: '-0.015em', marginBottom: 10 }}>{s.title}</div>
               <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.65, maxWidth: 400 }}>{s.desc}</p>
             </div>
-            <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, overflow: 'hidden', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
+            <div className="lp-how-code" style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, overflow: 'hidden', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: t.faint }}>$</span>
                 <span style={{ color: t.text2 }}>{s.snippet}</span>
@@ -431,14 +541,14 @@ function Marketplace() {
   ]
 
   return (
-    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="marketplace">
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'start' }}>
+    <section className="lp-section-lg" style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="marketplace">
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
+        <div className="lp-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'start' }}>
 
           {/* Left — copy */}
           <div>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Marketplace</span>
-            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 20 }}>
+            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 20 }}>
               One key.<br/>Every AI service.
             </h2>
             <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, marginBottom: 28, maxWidth: 420 }}>
@@ -448,7 +558,6 @@ function Marketplace() {
               Each call is an autonomous micropayment. Your policy engine guards the spend. Your wallet settles on Stellar in seconds. No billing relationships, no rate limit negotiations, no keys to rotate.
             </p>
 
-            {/* How it works — compact */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
                 { step: '→', label: 'Agent discovers services', desc: 'GET /v1/marketplace/services returns a live catalogue with pricing.' },
@@ -468,7 +577,6 @@ function Marketplace() {
 
           {/* Right — interactive service picker */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Service catalogue */}
             <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>
               <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint, letterSpacing: '0.04em' }}>GET /v1/marketplace/services</span>
@@ -499,12 +607,11 @@ function Marketplace() {
               ))}
             </div>
 
-            {/* Call snippet */}
             <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden', transition: 'all 0.2s' }}>
               <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint }}>agent call</span>
               </div>
-              <div style={{ padding: '14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.text2, lineHeight: 1.7, whiteSpace: 'pre', animation: 'fadeInUp 0.18s ease-out' }}>
+              <div className="lp-mkt-snippet" style={{ padding: '14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.text2, lineHeight: 1.7, whiteSpace: 'pre', animation: 'fadeInUp 0.18s ease-out' }}>
                 {services[activeService].snippet}
               </div>
               <div style={{ padding: '10px 14px', borderTop: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -531,14 +638,14 @@ function TwoWays() {
     setCopied(true); setTimeout(() => setCopied(false), 1800)
   }
   return (
-    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="integration">
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
+    <section className="lp-section-lg" style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="integration">
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <div style={{ marginBottom: 56 }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Integration</span>
-          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1 }}>Two ways to integrate.</h2>
+          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1 }}>Two ways to integrate.</h2>
           <p style={{ marginTop: 12, fontSize: 16, color: t.muted, maxWidth: 480, lineHeight: 1.7 }}>Write code if you want full control. Prompt your agent if you want it running in under a minute.</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="lp-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           {/* REST card */}
           <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 12, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -622,13 +729,13 @@ function Policies() {
     },
   ]
   return (
-    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="policies">
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
+    <section className="lp-section-lg" style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="policies">
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <div style={{ marginBottom: 56 }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Policies</span>
-          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 520 }}>Guardrails that run automatically, not on good intentions.</h2>
+          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 520 }}>Guardrails that run automatically, not on good intentions.</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
+        <div className="lp-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
           {cards.map(card => (
             <div key={card.title} style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: t.accentLow, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.accent }}>{card.icon}</div>
@@ -649,11 +756,11 @@ function Policies() {
 // ─── Pricing ─────────────────────────────────────────────────────────────────
 function Pricing() {
   return (
-    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="pricing">
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
+    <section className="lp-section-lg" style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg2 }} id="pricing">
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <div style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Pricing</span>
-          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(72px,12vw,120px)', fontWeight: 700, letterSpacing: '-0.04em', color: t.accent, lineHeight: 1, margin: '24px 0 8px' }}>$0</div>
+          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(64px,12vw,120px)', fontWeight: 700, letterSpacing: '-0.04em', color: t.accent, lineHeight: 1, margin: '24px 0 8px' }}>$0</div>
           <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 22, fontWeight: 500, color: t.text, marginBottom: 12, letterSpacing: '-0.01em' }}>on direct USDC transfers.</p>
           <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.7, marginBottom: 36 }}>Send USDC from your agent to any Stellar address and keep every cent. No percentage cut. No flat fee. Nothing hidden.</p>
           <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, padding: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -662,7 +769,7 @@ function Pricing() {
               { send: '$25.00', recv: '$25.00' },
               { send: '$1,000.00', recv: '$1,000.00' },
             ].map((row, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, padding: '6px 0', borderBottom: i < 2 ? `1px solid ${t.border}` : 'none' }}>
+              <div key={i} className="lp-pricing-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, padding: '6px 0', borderBottom: i < 2 ? `1px solid ${t.border}` : 'none' }}>
                 <span style={{ color: t.muted }}>agent sends {row.send}</span>
                 <span style={{ color: t.success }}>→ recipient gets {row.recv}</span>
               </div>
@@ -681,13 +788,10 @@ function Pricing() {
 function CtaFooter() {
   return (
     <div style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Background mesh / radial field */}
+      {/* Background mesh */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-        {/* Primary glow — top centre */}
         <div style={{ position: 'absolute', top: '-10%', left: '50%', transform: 'translateX(-50%)', width: 900, height: 520, background: 'radial-gradient(ellipse at 50% 0%, rgba(197,162,83,0.13) 0%, transparent 70%)', borderRadius: '50%' }}/>
-        {/* Secondary — bottom left bleed */}
         <div style={{ position: 'absolute', bottom: 0, left: '-5%', width: 500, height: 300, background: 'radial-gradient(ellipse at 0% 100%, rgba(77,155,106,0.07) 0%, transparent 70%)' }}/>
-        {/* Dot grid overlay */}
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `radial-gradient(circle, ${t.border2} 1px, transparent 1px)`,
@@ -705,27 +809,24 @@ function CtaFooter() {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block' }}/>
             Early access
           </div>
-          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(36px,5vw,60px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 20, color: t.text }}>
+          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(32px,5vw,60px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 20, color: t.text }}>
             Your agent is waiting<br/>to pay its first bill.
           </h2>
           <p style={{ fontSize: 17, color: t.muted, lineHeight: 1.75, marginBottom: 40, maxWidth: 420, margin: '0 auto 40px' }}>
             Get early access to Argens — a wallet, a policy engine, and a marketplace, all through a single API key.
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+          <div className="lp-cta-btns" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
             <WaitlistButton size="lg" label="Join the waitlist" />
-            <Link href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 26px', borderRadius: 7, fontSize: 15, color: t.text2, border: `1px solid ${t.border2}`, textDecoration: 'none' }}>
-              Start building →
-            </Link>
           </div>
         </div>
       </section>
 
-      {/* Footer — blends in, no hard border */}
-      <footer style={{ position: 'relative', zIndex: 1, padding: '0 40px 48px' }}>
+      {/* Footer */}
+      <footer style={{ position: 'relative', zIndex: 1, padding: '0 clamp(20px, 4vw, 40px) 48px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-          <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 24 }}>
+          <div className="lp-footer-inner" style={{ borderTop: `1px solid ${t.border}`, paddingTop: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 24 }}>
             <Logo />
-            <div style={{ display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' as const }}>
+            <div className="lp-footer-links" style={{ display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' as const }}>
               {['Docs','GitHub','Twitter / X','Privacy','Terms'].map(l => (
                 <a key={l} href="#" style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{l}</a>
               ))}
@@ -748,6 +849,40 @@ export function LandingPage() {
         @keyframes dotPulse { 0%,100%{opacity:0.25;transform:scale(0.85)} 50%{opacity:1;transform:scale(1)} }
         @keyframes fadeInUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
         a:hover { opacity: 0.85; }
+
+        /* ── Responsive ─────────────────────────────────────────────────────── */
+
+        /* Tablet: 3-col → 2-col */
+        @media (max-width: 1023px) {
+          .lp-3col { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+
+        /* Mobile */
+        @media (max-width: 767px) {
+          .lp-pad { padding-left: 20px !important; padding-right: 20px !important; }
+          .lp-hero { padding-top: 96px !important; padding-bottom: 52px !important; }
+          .lp-hero-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+          .lp-hero-stats { gap: 20px !important; flex-wrap: wrap !important; }
+          .lp-stat-div { display: none !important; }
+          .lp-how-row {
+            grid-template-columns: 40px 1fr !important;
+            gap: 12px !important;
+            padding: 24px 0 !important;
+          }
+          .lp-how-code { grid-column: 1 / -1 !important; }
+          .lp-2col { grid-template-columns: 1fr !important; gap: 20px !important; }
+          .lp-3col { grid-template-columns: 1fr !important; }
+          .lp-section-lg { padding-top: 64px !important; padding-bottom: 64px !important; }
+          .lp-mkt-snippet { white-space: pre-wrap !important; word-break: break-word !important; }
+          .lp-cta-btns { flex-direction: column !important; align-items: stretch !important; }
+          .lp-footer-inner {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 20px !important;
+          }
+          .lp-footer-links { gap: 12px 20px !important; }
+          .lp-pricing-row { flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; }
+        }
       `}</style>
       <Nav />
       <main>
