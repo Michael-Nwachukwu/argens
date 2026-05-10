@@ -1,4 +1,4 @@
-# Argens Skill — v1 — updated 2026-05-04
+# Argens Skill — v2 — updated 2026-05-09
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies enforced by Soroban smart contracts.
 
@@ -14,7 +14,7 @@ Set it as `Authorization: Bearer <ARGENS_KEY>` on every request.
 ## Base URL
 
 ```
-https://api.argens.io/v1
+https://api.argens.xyz/v1
 ```
 
 ---
@@ -59,10 +59,8 @@ Pass the recipient address as-is. No `chain:` parameter needed.
     "transaction_id": "txn_abc123",
     "stellar_tx_hash": "abc...xyz",
     "amount": "25.0000000",
-    "fee": "0.1250000",
-    "total_debited": "25.1250000",
     "recipient": "GXXX...",
-    "timestamp": "2026-05-04T12:00:00Z"
+    "timestamp": "2026-05-09T12:00:00Z"
   }
 }
 ```
@@ -100,8 +98,6 @@ Same request as `/pay`. No payment made, no DB record. Returns:
   "data": {
     "status": "would_succeed",
     "amount": "25.0000000",
-    "estimated_fee": "0.1250000",
-    "total_debited": "25.1250000",
     "destination_chain": "stellar",
     "cross_chain": false
   }

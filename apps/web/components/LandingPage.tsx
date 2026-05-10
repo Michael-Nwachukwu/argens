@@ -967,7 +967,7 @@ function CtaFooter() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `radial-gradient(circle, ${t.border2} 1px, transparent 1px)`, backgroundSize: '32px 32px', opacity: 0.5, maskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 100%)', WebkitMaskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 100%)' }}/>
       </div>
 
-      <section style={{ position: 'relative', zIndex: 1, padding: 'clamp(72px,10vw,120px) clamp(20px,4vw,40px) 80px', textAlign: 'center' }}>
+      <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: 'clamp(72px,10vw,120px) clamp(20px,4vw,40px) 80px', textAlign: 'center' }}>
         <FadeUp>
           <div style={{ maxWidth: 600, margin: '0 auto' }}>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.accent, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
