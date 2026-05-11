@@ -8,6 +8,16 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
+## Status — 2026-05-11
+
+- **Network: Stellar MAINNET.** The system runs live on mainnet. Anywhere this file says "testnet first" or treats testnet as the running environment, read it as historical — mainnet is current. The friendbot/testnet code paths still exist for local-dev parity but are not the deployed reality.
+- **Web app: live on Vercel** (`argens.vercel.app`, also `argens.xyz`). Currently the landing page is the deployment target.
+- **API: runs locally only for now.** Railway deployment is deferred until local end-to-end checks pass. The deployed site's dashboard will not work against a hosted API until then — expected.
+- **Cross-chain / CCTP V2: DEFERRED to a later version.** Not in the current build. `POST /pay` is Stellar-only; `routes/x402.ts` is dormant. The nullable `destinationChain` / `destinationTxHash` / `crossChain` schema fields remain for when it's picked up. The CCTP V2 section below describes intended design, not shipped behaviour.
+- **Marketplace: backed by MPP Router on Stellar mainnet** (`apiserver.mpprouter.dev`), not a hand-curated registry. ~88 services / ~489 POST endpoints. ~20% Argens markup, paid as a separate USDC transfer to `ARGENS_FEE_WALLET`. Direct payments carry $0 fee.
+
+---
+
 ## Table of Contents
 
 1. [What Is Argens](#what-is-argens)
@@ -296,7 +306,7 @@ tasks/
 | Backend | Node.js, Express, TypeScript | Separate service from frontend |
 | Database | PostgreSQL via Prisma ORM | See schema below |
 | Smart Contracts | Soroban (Rust) | Policy enforcement on-chain |
-| Blockchain | Stellar — testnet first, mainnet later | USDC only in V1 |
+| Blockchain | Stellar **mainnet** (live) | USDC only in V1; `STELLAR_NETWORK=mainnet` |
 | Auth | Custom JWT + bcrypt | No third-party auth in V1 |
 | Email | Resend | Transactional emails only |
 | Hosting | Vercel (frontend), Railway (backend) | |
@@ -1087,6 +1097,8 @@ export function decryptSecretKey(enc: string): string {
 
 ## CCTP V2 — Cross-Chain Payments
 
+> **STATUS — 2026-05-11: DEFERRED to a later version.** Cross-chain / CCTP V2 is **not in the current build**. `POST /pay` is Stellar-only and does no chain detection; `routes/x402.ts` exists but is dormant. The nullable `destinationChain` / `destinationTxHash` / `crossChain` schema fields remain so no migration is needed when this is picked up. Everything in this section describes the *intended* design — treat it as a spec for future work, not shipped behaviour. Do not propose CCTP work as a near-term next step.
+
 CCTP V2 allows USDC to move natively between Stellar and 15+ chains via Circle's burn-and-mint mechanism. No bridges. No wrapped tokens. No wrapped USDC.
 
 ### V1 scope — Base settlement only
@@ -1237,9 +1249,11 @@ DATABASE_URL="postgresql://user:pass@localhost:5432/argens"
 JWT_SECRET="minimum-32-character-random-string"
 JWT_EXPIRES_IN="1h"   # 1 hour — client-side tab-idle logout (5 min) is primary defense
 
-STELLAR_NETWORK="testnet"
-HORIZON_URL="https://horizon-testnet.stellar.org"
-SOROBAN_RPC_URL="https://soroban-testnet.stellar.org"
+# Live on mainnet. (Testnet values kept here as a comment for local-dev parity:
+#   STELLAR_NETWORK="testnet" / HORIZON_URL="https://horizon-testnet.stellar.org")
+STELLAR_NETWORK="mainnet"
+HORIZON_URL="https://horizon.stellar.org"
+SOROBAN_RPC_URL="https://soroban-testnet.stellar.org"   # unused in V1 — Soroban dropped
 
 ENCRYPTION_KEY="generate-with: openssl rand -hex 32"
 
@@ -1456,7 +1470,7 @@ Do not re-litigate these. They are settled.
 | Source | Closed source | Commercial product |
 | Agent-to-agent | Supported — any Stellar address is valid recipient | Core differentiator |
 | x402 | Leverage where applicable, not compete | Additive to ecosystem |
-| Cross-chain | Base USDC settlement via CCTP V2 is **V1**. Full multi-chain + hooks is V2. | Base covers x402 paywalls; one chain is manageable scope; testnet works free |
+| Cross-chain | **Deferred** to a later version (was planned as V1 Base settlement via CCTP V2). Not in the current build. | Refocused on mainnet direct payments + the MPP marketplace; cross-chain picked up later |
 | CCTP fee handling | Argens absorbs Circle's CCTP protocol fee within its 0.5% cut | Agent sees one clean number; no surprise fee line items |
 | Chain detection | Auto-detected from address format — `G...` = Stellar, `0x...` = Base. No explicit `chain:` param in V1. | Zero friction for agents |
 | CCTP V2 prep | Nullable `destinationChain`, `destinationTxHash`, `crossChain` already in schema | No migration needed when V2 adds more chains |
@@ -1476,7 +1490,7 @@ Do not re-litigate these. They are settled.
 - Not a crypto exchange
 - Not a KYC / AML compliance product
 - Not an agent creation or hosting platform
-- Not a full multi-chain router in V1 — Base USDC settlement is supported; Ethereum/Solana/Avalanche are V2
+- Not a multi-chain router — Stellar USDC only; cross-chain (Base/CCTP V2) is deferred to a later version
 - Not open source
 - Not a bridge — CCTP V2 uses burn-and-mint, not bridging
 - Not responsible for what the AI agent does with the payment capability — that is the developer's responsibility

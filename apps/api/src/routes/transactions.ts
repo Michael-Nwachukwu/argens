@@ -390,7 +390,7 @@ transactionsRouter.get('/transactions', requireJwtOrApiKey, async (req, res, nex
         : {}),
     }
 
-    const [total, transactions] = await Promise.all([
+    const [total, rows] = await Promise.all([
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
         where,
@@ -410,9 +410,17 @@ transactionsRouter.get('/transactions', requireJwtOrApiKey, async (req, res, nex
           memo: true,
           blockedReason: true,
           createdAt: true,
+          approvalQueue: { select: { token: true, status: true } },
         },
       }),
     ])
+
+    // Expose the approval token only while a transaction is still awaiting action — it is
+    // the owner's own data and lets the dashboard link straight to the confirmation page.
+    const transactions = rows.map(({ approvalQueue, ...t }) => ({
+      ...t,
+      approvalToken: approvalQueue?.status === 'PENDING' ? approvalQueue.token : null,
+    }))
 
     const pages = Math.ceil(total / limit)
     sendPaginated(res, transactions, { page, total, pages })
@@ -433,7 +441,7 @@ transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res,
       where: { id, userId },
       include: { approvalQueue: true },
     }) as Awaited<ReturnType<typeof prisma.transaction.findFirst>> & {
-      approvalQueue: { status: string; expiresAt: Date; actedAt: Date | null } | null
+      approvalQueue: { status: string; token: string; expiresAt: Date; actedAt: Date | null } | null
     } | null
 
     if (!tx) throw new NotFoundError('Transaction not found')
@@ -462,6 +470,7 @@ transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res,
       approval: tx.approvalQueue
         ? {
             status: tx.approvalQueue.status,
+            token: tx.approvalQueue.status === 'PENDING' ? tx.approvalQueue.token : null,
             expires_at: tx.approvalQueue.expiresAt,
             acted_at: tx.approvalQueue.actedAt,
           }
@@ -534,6 +543,8 @@ async function checkAndNotifyLowBalance(userId: string, walletId: string): Promi
   }
 
   if (wallet.balanceCache.lessThan(threshold)) {
-    void sendLowBalanceEmail(userId, wallet.balanceCache.toFixed(7), String(threshold)).catch(() => undefined)
+    void sendLowBalanceEmail(userId, wallet.balanceCache.toFixed(7), String(threshold)).catch((e: unknown) =>
+      logger.error('Failed to send low-balance email', { userId, error: (e as Error).message }),
+    )
   }
 }

@@ -5,7 +5,20 @@ import { AuthProvider } from '@/lib/auth-context'
 
 export const metadata: Metadata = {
   title: 'Argens — Programmable payments for AI agents',
-  description: 'An API key that authorizes autonomous USDC spending on Stellar — within policies you define, enforced on-chain.',
+  description: 'Give your AI agent the ability to pay. An API key that authorizes autonomous USDC spending on Stellar, within policies you define.',
+  openGraph: {
+    title: 'Argens — Programmable payments for AI agents',
+    description: 'Give your AI agent the ability to pay. An API key that authorizes autonomous USDC spending on Stellar, within policies you define.',
+    url: 'https://argens.xyz',
+    siteName: 'Argens',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Argens — Programmable payments for AI agents',
+    description: 'Give your AI agent the ability to pay. An API key that authorizes autonomous USDC spending on Stellar, within policies you define.',
+  },
+  metadataBase: new URL('https://argens.xyz'),
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

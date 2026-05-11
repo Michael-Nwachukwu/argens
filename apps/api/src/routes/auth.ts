@@ -11,6 +11,7 @@ import { authLimiter, emailResendLimiter, resetPinAttempts } from '../middleware
 import { bootstrapWallet } from '../services/wallet.js'
 import { sendVerificationEmail, sendWalletReadyEmail } from '../services/email.js'
 import { createApiKey } from '../services/apikey.js'
+import { assertDeliverableEmail, EmailRejectedError } from '../services/email-validation.js'
 import { logger } from '../lib/logger.js'
 import { AppError } from '../lib/errors.js'
 
@@ -45,6 +46,17 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
   const { email, password } = req.body as z.infer<typeof signupSchema>
 
   try {
+    // Only valid, deliverable, non-disposable emails get an account.
+    try {
+      await assertDeliverableEmail(email)
+    } catch (e) {
+      if (e instanceof EmailRejectedError) {
+        sendError(res, e.message, e.code, e.statusCode)
+        return
+      }
+      throw e
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
       sendError(res, 'An account with this email already exists.', 'CONFLICT', 409)

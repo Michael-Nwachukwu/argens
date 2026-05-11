@@ -164,7 +164,29 @@ export interface Transaction {
   blockedReason: string | null
   metadata: Record<string, unknown> | null
   policyResult: Record<string, unknown> | null
+  approvalToken?: string | null  // present only while status is PENDING_APPROVAL
   createdAt: string
+}
+
+// Returned by GET /approve/:token — public, no auth (the 256-bit single-use token is the bearer).
+export interface ApprovalView {
+  transaction: {
+    id: string
+    status: TxStatus
+    type: string
+    recipient: string
+    amount: string
+    currency: string
+    memo: string | null
+    service_id: string | null
+    cost_paid: string | null
+    created_at: string
+  }
+  approval: {
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED'
+    expires_at: string
+    acted_at: string | null
+  }
 }
 
 export const transactions = {
@@ -176,29 +198,32 @@ export const transactions = {
 }
 
 // ─── Marketplace ──────────────────────────────────────────────────────────────
+// The catalog is grouped into PROVIDERS (one card/toggle per provider, e.g. "AgentMail",
+// "OpenAI"). Each provider has child endpoints; agents call a specific endpoint by its `id`.
 
 export interface MarketplaceEndpoint {
-  id: string
-  label: string
+  id: string                    // the MPP operation id — what an agent passes as service_id
+  label: string                 // operation label, e.g. "Send message"
   method: 'POST' | 'GET'
-  path: string
+  path: string                  // upstream public path, e.g. /v1/services/agentmail/inboxes
   description: string
+  price: string                 // e.g. "$0.010/request"
   example_payload: Record<string, unknown> | null
 }
 
+// `MarketplaceService` is the PROVIDER (kept this name for continuity).
 export interface MarketplaceService {
-  id: string
-  name: string
-  service_url: string
+  id: string                    // provider key, e.g. "agentmail"
+  name: string                  // display name, e.g. "AgentMail"
   description: string
   categories: string[]
-  display_price: string
-  is_available: boolean
-  is_enabled: boolean
+  display_price: string         // a range, e.g. "$0.001 – $10/request" or "$0.001/request"
+  is_enabled: boolean           // provider-level toggle (enables all its endpoints)
   availability_note: string | null
   payment_rail: string
   status: 'active' | 'limited'
   docs_url: string | null
+  endpoint_count: number
   endpoints: MarketplaceEndpoint[]
 }
 
@@ -215,11 +240,13 @@ export interface MarketplaceCallResult {
 
 export const marketplace = {
   services: () => authFetch<MarketplaceService[]>('/marketplace/services'),
-  setEnabled: (serviceId: string, enabled: boolean) =>
-    authFetch<{ service_id: string; enabled: boolean }>(`/marketplace/services/${serviceId}`, {
+  // `providerId` is the provider key (e.g. "agentmail"); toggling it affects all its endpoints.
+  setEnabled: (providerId: string, enabled: boolean) =>
+    authFetch<{ provider_id: string; enabled: boolean }>(`/marketplace/services/${providerId}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     }),
+  // `service_id` here is the ENDPOINT id (the MPP operation), not the provider key.
   call: (data: { service_id: string; payload?: Record<string, unknown>; query?: Record<string, string | number | boolean> }) =>
     authFetch<MarketplaceCallResult | { status: 'pending_approval'; transaction_id: string; message: string; poll_url: string }>(
       '/marketplace/call',
@@ -260,11 +287,14 @@ export const apiKeys = {
 }
 
 // ─── Approval ─────────────────────────────────────────────────────────────────
+// These are token-authenticated, not session-authenticated — the email confirmation
+// page is reached without a JWT. The token (crypto.randomBytes(32), single-use, 24h) is
+// the bearer credential, so use the unauthenticated apiFetch, not authFetch.
 
 export const approval = {
-  approve: (token: string) => authFetch<{ status: string; transaction_id: string; stellar_tx_hash: string }>(`/approve/${token}`, { method: 'POST' }),
-  reject:  (token: string) => authFetch<{ status: string; transaction_id: string }>(`/reject/${token}`,  { method: 'POST' }),
-  getTransaction: (id: string) => authFetch<Transaction>(`/transactions/${id}`),
+  view:    (token: string) => apiFetch<ApprovalView>(`/approve/${token}`),
+  approve: (token: string) => apiFetch<{ status: string; transaction_id: string; stellar_tx_hash?: string; amount?: string }>(`/approve/${token}`, { method: 'POST' }),
+  reject:  (token: string) => apiFetch<{ status: string; transaction_id: string; message: string }>(`/reject/${token}`,  { method: 'POST' }),
 }
 
 // ─── Spend summary ────────────────────────────────────────────────────────────

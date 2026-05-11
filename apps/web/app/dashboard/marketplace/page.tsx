@@ -18,6 +18,7 @@ interface UpstreamErrorDetails {
   reason?: string
   service_id?: string
   transaction_id?: string
+  no_payment_made?: boolean
 }
 
 function isUpstreamErrorDetails(d: unknown): d is UpstreamErrorDetails {
@@ -25,27 +26,27 @@ function isUpstreamErrorDetails(d: unknown): d is UpstreamErrorDetails {
 }
 
 /**
- * MPP Router service IDs encode path placeholders as `_<name>_id_` segments
+ * MPP operation ids encode path placeholders as `_<name>_id_` segments
  * (e.g. `agentmail_inboxes_inbox_id_messages_send` needs ?inbox_id=…).
- * Returns a map of detected placeholder names with empty string defaults.
+ * Returns the detected placeholder names with empty-string defaults.
  */
-function detectPlaceholders(serviceId: string): Record<string, string> {
-  if (!serviceId) return {}
+function detectPlaceholders(operationId: string): Record<string, string> {
+  if (!operationId) return {}
   const out: Record<string, string> = {}
-  const matches = serviceId.matchAll(/_([a-z]+_id)_/g)
-  for (const m of matches) {
+  for (const m of operationId.matchAll(/_([a-z]+_id)_/g)) {
     if (m[1]) out[m[1]] = ''
   }
   return out
 }
 
+const MPP_BASE = 'https://apiserver.mpprouter.dev'
+
 export default function MarketplacePage() {
-  const [services, setServices] = useState<MarketplaceService[]>([])
+  const [providers, setProviders] = useState<MarketplaceService[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [endpointId, setEndpointId] = useState<string | null>(null)
   const [payloadText, setPayloadText] = useState('{}')
   const [queryText, setQueryText] = useState('{}')
-  const [showQuery, setShowQuery] = useState(false)
   const [recent, setRecent] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [calling, setCalling] = useState(false)
@@ -54,20 +55,21 @@ export default function MarketplacePage() {
   const [errorDetails, setErrorDetails] = useState<UpstreamErrorDetails | null>(null)
   const [result, setResult] = useState<unknown>(null)
   const [search, setSearch] = useState('')
-  const [endpointCopied, setEndpointCopied] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [endpointsExpanded, setEndpointsExpanded] = useState(false)
+
+  const ENDPOINT_PREVIEW_COUNT = 3
 
   useEffect(() => {
     let mounted = true
     async function load() {
       setLoading(true)
-      const [serviceRes, txRes] = await Promise.all([
+      const [providerRes, txRes] = await Promise.all([
         marketplace.services(),
         transactions.list({ type: 'marketplace', limit: 8 }),
       ])
-
       if (!mounted) return
-
-      if (!isError(serviceRes)) setServices(serviceRes.data)
+      if (!isError(providerRes)) setProviders(providerRes.data)
       if (!isError(txRes)) setRecent(txRes.data)
       setLoading(false)
     }
@@ -77,78 +79,59 @@ export default function MarketplacePage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return services
-    return services.filter(s =>
-      s.name.toLowerCase().includes(q) ||
-      s.id.toLowerCase().includes(q) ||
-      s.description.toLowerCase().includes(q) ||
-      s.categories.some(c => c.toLowerCase().includes(q)),
+    if (!q) return providers
+    return providers.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.id.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.categories.some(c => c.toLowerCase().includes(q)) ||
+      p.endpoints.some(e => e.label.toLowerCase().includes(q) || e.id.toLowerCase().includes(q)),
     )
-  }, [services, search])
+  }, [providers, search])
 
-  const selected = useMemo(
-    () => services.find(service => service.id === selectedId) ?? null,
-    [services, selectedId],
-  )
-
+  const selected = useMemo(() => providers.find(p => p.id === selectedId) ?? null, [providers, selectedId])
   const endpoint = useMemo(
-    () => selected?.endpoints.find(item => item.id === endpointId) ?? selected?.endpoints[0] ?? null,
+    () => selected?.endpoints.find(e => e.id === endpointId) ?? selected?.endpoints[0] ?? null,
     [selected, endpointId],
   )
+  const placeholderKeys = useMemo(() => Object.keys(detectPlaceholders(endpoint?.id ?? '')), [endpoint])
 
-  const openService = (service: MarketplaceService) => {
-    const firstEndpoint = service.endpoints[0] ?? null
-    const placeholders = detectPlaceholders(service.id)
-    const hasPlaceholders = Object.keys(placeholders).length > 0
-    setSelectedId(service.id)
-    setEndpointId(firstEndpoint?.id ?? null)
-    setPayloadText(JSON.stringify(firstEndpoint?.example_payload ?? {}, null, 2))
-    setQueryText(hasPlaceholders ? JSON.stringify(placeholders, null, 2) : '{}')
-    setShowQuery(hasPlaceholders)
-    setResult(null)
-    setError(null)
-    setErrorDetails(null)
+  const selectEndpoint = (e: MarketplaceEndpoint | null) => {
+    setEndpointId(e?.id ?? null)
+    setPayloadText(JSON.stringify(e?.example_payload ?? {}, null, 2))
+    const ph = detectPlaceholders(e?.id ?? '')
+    setQueryText(Object.keys(ph).length > 0 ? JSON.stringify(ph, null, 2) : '{}')
+    setResult(null); setError(null); setErrorDetails(null)
+  }
+
+  const openProvider = (p: MarketplaceService) => {
+    setSelectedId(p.id)
+    setEndpointsExpanded(false)
+    selectEndpoint(p.endpoints[0] ?? null)
   }
 
   const closeDetail = () => {
-    setSelectedId(null)
-    setEndpointId(null)
-    setResult(null)
-    setError(null)
-    setErrorDetails(null)
+    setSelectedId(null); setEndpointId(null)
+    setResult(null); setError(null); setErrorDetails(null)
   }
 
-  const selectEndpoint = (next: MarketplaceEndpoint) => {
-    setEndpointId(next.id)
-    setPayloadText(JSON.stringify(next.example_payload ?? {}, null, 2))
-    setResult(null)
-    setError(null)
-    setErrorDetails(null)
-  }
-
-  const placeholderKeys = useMemo(() => Object.keys(detectPlaceholders(selected?.id ?? '')), [selected])
-
-  const callService = async () => {
+  const callEndpoint = async () => {
     if (!selected || !endpoint || !selected.is_enabled) return
 
     let payload: Record<string, unknown>
     try {
       const parsed = JSON.parse(payloadText) as unknown
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('Payload must be a JSON object.')
-      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Body must be a JSON object.')
       payload = parsed as Record<string, unknown>
     } catch (e) {
-      setError(`Body JSON: ${(e as Error).message}`)
-      setErrorDetails(null)
-      return
+      setError(`Body JSON: ${(e as Error).message}`); setErrorDetails(null); return
     }
 
     let query: Record<string, string | number | boolean> | undefined
-    const trimmedQuery = queryText.trim()
-    if (trimmedQuery && trimmedQuery !== '{}') {
+    const trimmed = queryText.trim()
+    if (trimmed && trimmed !== '{}') {
       try {
-        const parsed = JSON.parse(trimmedQuery) as unknown
+        const parsed = JSON.parse(trimmed) as unknown
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
           const entries = Object.entries(parsed as Record<string, unknown>)
             .filter(([, v]) => v !== '' && v !== null && v !== undefined)
@@ -156,19 +139,12 @@ export default function MarketplacePage() {
           if (entries.length > 0) query = Object.fromEntries(entries)
         }
       } catch (e) {
-        setError(`Query JSON: ${(e as Error).message}`)
-        setErrorDetails(null)
-        return
+        setError(`Query JSON: ${(e as Error).message}`); setErrorDetails(null); return
       }
     }
 
-    setCalling(true)
-    setError(null)
-    setErrorDetails(null)
-    setResult(null)
-
-    const res = await marketplace.call({ service_id: selected.id, payload, ...(query && { query }) })
-
+    setCalling(true); setError(null); setErrorDetails(null); setResult(null)
+    const res = await marketplace.call({ service_id: endpoint.id, payload, ...(query && { query }) })
     if (isError(res)) {
       const err = res as ApiError
       setError(`${err.error} (${err.code})`)
@@ -178,267 +154,198 @@ export default function MarketplacePage() {
       const txRes = await transactions.list({ type: 'marketplace', limit: 8 })
       if (!isError(txRes)) setRecent(txRes.data)
     }
-
     setCalling(false)
   }
 
-  const toggleService = async (service: MarketplaceService) => {
-    setTogglingId(service.id)
-    const next = !service.is_enabled
-    const res = await marketplace.setEnabled(service.id, next)
+  const toggleProvider = async (p: MarketplaceService) => {
+    setTogglingId(p.id)
+    const res = await marketplace.setEnabled(p.id, !p.is_enabled)
     if (!isError(res)) {
-      setServices(current => current.map(s =>
-        s.id === service.id ? { ...s, is_enabled: res.data.enabled } : s,
-      ))
+      setProviders(cur => cur.map(x => x.id === p.id ? { ...x, is_enabled: res.data.enabled } : x))
     }
     setTogglingId(null)
   }
 
-  const copyEndpoint = () => {
-    if (!selected) return
-    navigator.clipboard?.writeText(selected.service_url).catch(() => {})
-    setEndpointCopied(true)
-    setTimeout(() => setEndpointCopied(false), 1800)
+  const copyServiceId = () => {
+    if (!endpoint) return
+    navigator.clipboard?.writeText(endpoint.id).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
   }
 
   // ─── Detail view ───────────────────────────────────────────────────────────
   if (selected) {
+    const totalEps = selected.endpoints.length
+    const showAllEps = endpointsExpanded || totalEps <= ENDPOINT_PREVIEW_COUNT
+    const visibleEps = showAllEps ? selected.endpoints : selected.endpoints.slice(0, ENDPOINT_PREVIEW_COUNT)
+    const hiddenCount = totalEps - visibleEps.length
+
     return (
       <div style={{ padding: '28px 32px 40px', width: '100%', maxWidth: 1180, margin: '0 auto' }}>
         <button
           onClick={closeDetail}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'transparent', border: '1px solid var(--border)',
-            color: 'var(--muted)', borderRadius: 6, padding: '6px 11px',
-            fontSize: 12, cursor: 'pointer', marginBottom: 18, fontFamily: 'var(--font-mono)',
-          }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: 6, padding: '6px 11px', fontSize: 12, cursor: 'pointer', marginBottom: 18, fontFamily: 'var(--font-mono)' }}
         >
-          ← back to marketplace
+          ← all services
         </button>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
-          {/* Left: service list summary */}
-          <section style={{ display: 'grid', gap: 8, maxHeight: 'calc(100vh - 140px)', overflowY: 'auto', paddingRight: 6 }}>
-            {filtered.map(service => {
-              const active = service.id === selected.id
-              return (
-                <button
-                  key={service.id}
-                  onClick={() => openService(service)}
-                  style={{
-                    textAlign: 'left',
-                    padding: 14,
-                    borderRadius: 8,
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    background: active ? 'var(--bg3)' : 'var(--bg2)',
-                    cursor: 'pointer',
-                    color: 'var(--text)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  {/* Name + price row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
-                    <strong style={{ fontSize: 13, lineHeight: 1.4, flex: 1 }}>{service.name}</strong>
-                    <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{service.display_price}</span>
-                  </div>
-
-                  {/* Description — 2-line clamp */}
-                  <p style={{
-                    margin: 0,
-                    fontSize: 11,
-                    color: 'var(--muted)',
-                    lineHeight: 1.45,
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                  }}>
-                    {service.description}
-                  </p>
-
-                  {/* Categories + status badges */}
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {service.categories.slice(0, 2).map(cat => (
-                      <span key={cat} style={{
-                        fontSize: 9,
-                        color: 'var(--text2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 999,
-                        padding: '1px 6px',
-                        fontFamily: 'var(--font-mono)',
-                      }}>{cat}</span>
-                    ))}
-                    <span style={{
-                      fontSize: 9,
-                      color: service.is_enabled ? 'var(--success)' : 'var(--muted)',
-                      border: `1px solid ${service.is_enabled ? 'rgba(54,179,126,0.4)' : 'var(--border)'}`,
-                      borderRadius: 999,
-                      padding: '1px 6px',
-                      fontFamily: 'var(--font-mono)',
-                      marginLeft: 'auto',
-                      flexShrink: 0,
-                    }}>
-                      {service.is_enabled ? 'enabled' : 'disabled'}
-                    </span>
-                  </div>
-
-                  {/* Availability note if present */}
-                  {service.availability_note && (
-                    <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)', opacity: 0.75 }}>
-                      {service.availability_note}
+        {/* The RIGHT column dictates the height (natural content height). The LEFT column
+            is a grid item that stretches to match that height; its scrollable list is an
+            absolutely-positioned child so the (long) list never inflates the row height. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) minmax(0, 1fr)', gap: 20, alignItems: 'stretch' }}>
+          {/* LEFT — list of other services (matches right's height, scrolls internally) */}
+          <aside style={{ position: 'relative', minWidth: 0 }}>
+            <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 6 }}>
+              {filtered.map(p => {
+                const active = p.id === selected.id
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => openProvider(p)}
+                    style={{ textAlign: 'left', padding: 14, borderRadius: 10, border: `1px solid ${active ? 'var(--accent)' : p.is_enabled ? 'rgba(54,179,126,0.3)' : 'var(--border)'}`, background: active ? 'var(--bg3)' : 'var(--bg2)', cursor: 'pointer', color: 'var(--text)', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                      <strong style={{ fontSize: 13, lineHeight: 1.4, flex: 1, fontFamily: 'var(--font-head)', fontWeight: 600 }}>{p.name}</strong>
+                      <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{p.display_price}</span>
                     </div>
-                  )}
-                </button>
-              )
-            })}
-          </section>
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)', lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.description}</p>
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {p.categories.slice(0, 2).map(c => (
+                        <span key={c} style={{ fontSize: 9, color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 999, padding: '1px 6px', fontFamily: 'var(--font-mono)' }}>{c}</span>
+                      ))}
+                      <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{p.endpoint_count} ep</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 9, color: p.is_enabled ? 'var(--success)' : 'var(--muted)', border: `1px solid ${p.is_enabled ? 'rgba(54,179,126,0.4)' : 'var(--border)'}`, borderRadius: 999, padding: '1px 6px', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{p.is_enabled ? 'enabled' : 'disabled'}</span>
+                    </div>
+                    {p.availability_note && (
+                      <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--font-mono)', opacity: 0.75 }}>{p.availability_note}</div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </aside>
 
-          <main style={{ display: 'grid', gap: 16 }}>
-            <section style={{ border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg2)', padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'start', marginBottom: 16 }}>
+          {/* RIGHT — active provider interface (natural height — drives the row height) */}
+          <main style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {/* Provider header */}
+            <section style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg2)', padding: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0 }}>
-                  <h2 style={{ margin: 0, fontFamily: 'var(--font-head)', fontSize: 20, color: 'var(--text)' }}>{selected.name}</h2>
-                  <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
-                    {selected.description}
-                  </p>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+                  <h2 style={{ margin: 0, fontFamily: 'var(--font-head)', fontSize: 22, color: 'var(--text)' }}>{selected.name}</h2>
+                  <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>{selected.description}</p>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{selected.display_price}</span>
                     <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
+                    <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{selected.endpoint_count} endpoint{selected.endpoint_count === 1 ? '' : 's'}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
                     <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>20% Argens markup</span>
-                    {selected.docs_url && (
-                      <>
-                        <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
-                        <a href={selected.docs_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}>
-                          docs ↗
-                        </a>
-                      </>
-                    )}
+                    {selected.docs_url && (<>
+                      <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
+                      <a href={selected.docs_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}>docs ↗</a>
+                    </>)}
                   </div>
-                </div>
-                <Switch
-                  enabled={selected.is_enabled}
-                  loading={togglingId === selected.id}
-                  onClick={() => void toggleService(selected)}
-                />
-              </div>
-
-              {/* Endpoint URL with copy */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                  Endpoint
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-                  <code style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '9px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)', overflow: 'auto', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: 'var(--accent)', marginRight: 8 }}>{endpoint?.method ?? 'POST'}</span>
-                    {selected.service_url}
-                  </code>
-                  <button
-                    onClick={copyEndpoint}
-                    style={{
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg3)',
-                      color: endpointCopied ? 'var(--success)' : 'var(--muted)',
-                      borderRadius: 6,
-                      padding: '0 12px',
-                      cursor: 'pointer',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 12,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {endpointCopied ? '✓ copied' : 'copy'}
-                  </button>
-                </div>
-              </div>
-
-              {endpoint ? (
-                <>
-                  {placeholderKeys.length > 0 && (
-                    <div style={{ marginBottom: 14, padding: 10, border: '1px solid var(--border)', background: 'var(--bg3)', borderRadius: 7, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
-                      This endpoint requires path parameters as query string values:
-                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginLeft: 6 }}>
-                        {placeholderKeys.map(k => `?${k}=…`).join(' ')}
-                      </span>
-                    </div>
+                  {selected.availability_note && (
+                    <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', opacity: 0.8 }}>{selected.availability_note}</div>
                   )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                  <Switch enabled={selected.is_enabled} loading={togglingId === selected.id} onClick={() => void toggleProvider(selected)} />
+                  <span style={{ fontSize: 10, color: selected.is_enabled ? 'var(--success)' : 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                    {selected.is_enabled ? 'enabled' : 'disabled'}
+                  </span>
+                </div>
+              </div>
+            </section>
 
-                  {showQuery ? (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                          Query parameters (JSON object → ?key=value)
-                        </div>
-                        {placeholderKeys.length === 0 && (
-                          <button
-                            onClick={() => { setShowQuery(false); setQueryText('{}') }}
-                            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)' }}
-                          >
-                            remove
-                          </button>
+            {/* Endpoints + call form — one card */}
+            <section style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg2)', overflow: 'hidden' }}>
+              {/* Endpoints list (collapsible after ENDPOINT_PREVIEW_COUNT) */}
+              <div style={{ padding: '13px 18px 9px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>Endpoints ({totalEps})</span>
+                <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>pick one to call</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 92px', gap: 12, padding: '8px 18px', borderBottom: '1px solid var(--border)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                <span>Method</span><span>Endpoint</span><span style={{ textAlign: 'right' }}>Price</span>
+              </div>
+              <div style={{ position: 'relative' }}>
+                {visibleEps.map(e => {
+                  const active = e.id === endpoint?.id
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => selectEndpoint(e)}
+                      style={{ width: '100%', textAlign: 'left', display: 'grid', gridTemplateColumns: '60px 1fr 92px', gap: 12, padding: '11px 18px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`, background: active ? 'var(--bg3)' : 'transparent', cursor: 'pointer', color: 'var(--text)', alignItems: 'start' }}
+                    >
+                      <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--accent)', background: 'rgba(197,162,83,0.12)', border: '1px solid rgba(197,162,83,0.3)', borderRadius: 4, padding: '2px 5px', fontFamily: 'var(--font-mono)', textAlign: 'center', alignSelf: 'start' }}>{e.method}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, display: 'block' }}>{e.label}</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{e.path}</span>
+                        {e.description && e.description !== selected.description && (
+                          <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 3, lineHeight: 1.4 }}>{e.description}</span>
                         )}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{e.price}</span>
+                    </button>
+                  )
+                })}
+                {!showAllEps && (
+                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 38, pointerEvents: 'none', background: 'linear-gradient(to bottom, transparent, var(--bg2))' }} />
+                )}
+              </div>
+              {totalEps > ENDPOINT_PREVIEW_COUNT && (
+                <button
+                  onClick={() => setEndpointsExpanded(v => !v)}
+                  style={{ width: '100%', padding: '9px 18px', background: 'var(--bg2)', border: 'none', borderBottom: '1px solid var(--border)', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer' }}
+                >
+                  {showAllEps ? '▴ show fewer endpoints' : `▾ load more — ${hiddenCount} more endpoint${hiddenCount === 1 ? '' : 's'}`}
+                </button>
+              )}
+
+              {/* Call form for the selected endpoint — same card */}
+              {endpoint && (
+                <div style={{ padding: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+                    <h3 style={{ margin: 0, fontFamily: 'var(--font-head)', fontSize: 16 }}>Call: {endpoint.label}</h3>
+                    <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{endpoint.price}</span>
+                  </div>
+
+                  {/* service_id (what an agent passes) */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
+                      Service ID — agents pass this to <code style={{ color: 'var(--text2)' }}>POST /v1/marketplace/call</code>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                      <code style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '9px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)', overflow: 'auto', whiteSpace: 'nowrap' }}>{endpoint.id}</code>
+                      <button onClick={copyServiceId} style={{ border: '1px solid var(--border)', background: 'var(--bg3)', color: copied ? 'var(--success)' : 'var(--muted)', borderRadius: 6, padding: '0 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'nowrap' }}>{copied ? '✓ copied' : 'copy'}</button>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: 6, opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      upstream: {endpoint.method} {MPP_BASE}{endpoint.path}
+                    </div>
+                  </div>
+
+                  {/* path placeholders → query params */}
+                  {placeholderKeys.length > 0 && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
+                        Path parameters (sent as query string: {placeholderKeys.map(k => `?${k}=…`).join(' ')})
                       </div>
                       <textarea
                         value={queryText}
                         onChange={e => setQueryText(e.target.value)}
                         spellCheck={false}
-                        style={{
-                          width: '100%',
-                          minHeight: 70,
-                          resize: 'vertical',
-                          background: 'var(--bg)',
-                          color: 'var(--text)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 7,
-                          padding: 12,
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 12,
-                          lineHeight: 1.55,
-                          boxSizing: 'border-box',
-                          marginBottom: 14,
-                        }}
+                        style={{ width: '100%', minHeight: 64, resize: 'vertical', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 7, padding: 12, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.55, boxSizing: 'border-box' }}
                       />
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setShowQuery(true)}
-                      style={{
-                        marginBottom: 14,
-                        background: 'transparent',
-                        border: '1px dashed var(--border)',
-                        color: 'var(--muted)',
-                        borderRadius: 7,
-                        padding: '8px 12px',
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      + add query parameters (only needed for some services)
-                    </button>
+                    </div>
                   )}
 
-                  <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                    Request body (JSON)
-                  </div>
+                  <div style={{ fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>Request body (JSON)</div>
                   <p style={{ color: 'var(--muted)', fontSize: 12, margin: '0 0 8px', lineHeight: 1.5 }}>
-                    Refer to the service docs for required body fields. Argens charges your wallet only after the upstream service responds.
+                    See the service docs for required fields. Argens charges your wallet only after the upstream service responds.
                   </p>
 
                   {!selected.is_enabled && (
-                    <div style={{
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg3)',
-                      color: 'var(--muted)',
-                      borderRadius: 7,
-                      padding: 12,
-                      fontSize: 13,
-                      lineHeight: 1.5,
-                      marginBottom: 12,
-                    }}>
-                      Enable this service before agents can call it with an API key.
+                    <div style={{ border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted)', borderRadius: 7, padding: 12, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
+                      Enable <strong>{selected.name}</strong> (toggle above) before agents — or this panel — can call its endpoints.
                     </div>
                   )}
 
@@ -446,86 +353,42 @@ export default function MarketplacePage() {
                     value={payloadText}
                     onChange={e => setPayloadText(e.target.value)}
                     spellCheck={false}
-                    style={{
-                      width: '100%',
-                      minHeight: 220,
-                      resize: 'vertical',
-                      background: 'var(--bg)',
-                      color: 'var(--text)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 7,
-                      padding: 12,
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 12,
-                      lineHeight: 1.55,
-                      boxSizing: 'border-box',
-                    }}
+                    style={{ width: '100%', minHeight: 200, resize: 'vertical', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 7, padding: 12, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.55, boxSizing: 'border-box' }}
                   />
 
                   {error && (
                     <div style={{ marginTop: 12, border: '1px solid rgba(160,72,72,0.3)', background: 'rgba(160,72,72,0.10)', borderRadius: 7, padding: 12 }}>
-                      <div style={{ color: 'var(--error)', fontSize: 13, marginBottom: errorDetails ? 8 : 0, fontWeight: 500 }}>
-                        {error}
-                      </div>
-                      {errorDetails && Boolean(errorDetails.upstream_status || errorDetails.upstream_body) && (
-                        <>
-                          <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
-                            Upstream response{errorDetails.upstream_status ? ` (HTTP ${errorDetails.upstream_status})` : ''}:
-                          </div>
-                          <pre style={{ margin: 0, padding: '8px 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)', fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.5, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                            {typeof errorDetails.upstream_body === 'string'
-                              ? errorDetails.upstream_body
-                              : JSON.stringify(errorDetails.upstream_body, null, 2)}
-                          </pre>
-                          {errorDetails.transaction_id && (
-                            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-                              Transaction logged: {errorDetails.transaction_id}
-                            </div>
-                          )}
-                        </>
-                      )}
+                      <div style={{ color: 'var(--error)', fontSize: 13, marginBottom: errorDetails ? 8 : 0, fontWeight: 500 }}>{error}</div>
+                      {errorDetails && Boolean(errorDetails.upstream_status || errorDetails.upstream_body) && (<>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+                          Upstream response{errorDetails.upstream_status ? ` (HTTP ${errorDetails.upstream_status})` : ''}{errorDetails.no_payment_made ? ' — no USDC charged' : ''}:
+                        </div>
+                        <pre style={{ margin: 0, padding: '8px 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)', fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.5, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {typeof errorDetails.upstream_body === 'string' ? errorDetails.upstream_body : JSON.stringify(errorDetails.upstream_body, null, 2)}
+                        </pre>
+                        {errorDetails.transaction_id && (
+                          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>Transaction logged: {errorDetails.transaction_id}</div>
+                        )}
+                      </>)}
                     </div>
                   )}
 
                   <button
-                    onClick={callService}
+                    onClick={() => void callEndpoint()}
                     disabled={calling || !selected.is_enabled}
-                    style={{
-                      marginTop: 14,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      border: '1px solid var(--accent)',
-                      background: calling || !selected.is_enabled ? 'var(--bg3)' : 'var(--accent)',
-                      color: calling || !selected.is_enabled ? 'var(--muted)' : '#0C0B0A',
-                      borderRadius: 7,
-                      padding: '10px 14px',
-                      cursor: calling || !selected.is_enabled ? 'default' : 'pointer',
-                      fontWeight: 600,
-                    }}
+                    style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid var(--accent)', background: calling || !selected.is_enabled ? 'var(--bg3)' : 'var(--accent)', color: calling || !selected.is_enabled ? 'var(--muted)' : '#0C0B0A', borderRadius: 7, padding: '10px 14px', cursor: calling || !selected.is_enabled ? 'default' : 'pointer', fontWeight: 600 }}
                   >
                     <Icon d={Icons.arrow} size={14} />
-                    {calling ? 'Calling…' : selected.is_enabled ? 'Call service' : 'Enable service first'}
+                    {calling ? 'Calling…' : selected.is_enabled ? `Call ${endpoint.label}` : 'Enable provider first'}
                   </button>
-                </>
-              ) : null}
+                </div>
+              )}
             </section>
 
             {result !== null && (
-              <section style={{ border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg2)', padding: 18 }}>
-                <h2 style={{ margin: '0 0 12px', fontFamily: 'var(--font-head)', fontSize: 16 }}>Result</h2>
-                <pre style={{
-                  margin: 0,
-                  maxHeight: 400,
-                  overflowY: 'auto',
-                  overflowX: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  color: 'var(--text2)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  lineHeight: 1.55,
-                }}>{JSON.stringify(result, null, 2)}</pre>
+              <section style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg2)', padding: 18 }}>
+                <h3 style={{ margin: '0 0 12px', fontFamily: 'var(--font-head)', fontSize: 16 }}>Result</h3>
+                <pre style={{ margin: 0, maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text2)', fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.55 }}>{JSON.stringify(result, null, 2)}</pre>
               </section>
             )}
 
@@ -536,18 +399,16 @@ export default function MarketplacePage() {
     )
   }
 
-  // ─── Grid view (default) ───────────────────────────────────────────────────
+  // ─── Grid view ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: '28px 32px 40px', width: '100%', maxWidth: 1180, margin: '0 auto' }}>
+    <div style={{ padding: '28px 32px 40px', width: '100%', maxWidth: 1100, margin: '0 auto' }}>
       <header style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span style={{ color: 'var(--accent)' }}><Icon d={Icons.marketplace} size={18} /></span>
-          <h1 style={{ fontFamily: 'var(--font-head)', fontSize: 28, margin: 0, color: 'var(--text)' }}>
-            Marketplace
-          </h1>
+          <h1 style={{ fontFamily: 'var(--font-head)', fontSize: 28, margin: 0, color: 'var(--text)' }}>Marketplace</h1>
         </div>
-        <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14, maxWidth: 700, lineHeight: 1.6 }}>
-          MPP-enabled services on Stellar mainnet. Toggle a service to allow agents to call it. Click a service for the call interface.
+        <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14, maxWidth: 720, lineHeight: 1.6 }}>
+          MPP-enabled services on Stellar mainnet. Enable a service to let your agents call any of its endpoints with an API key. Click a service for its endpoints and a call interface.
         </p>
       </header>
 
@@ -555,53 +416,27 @@ export default function MarketplacePage() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search services by name, ID, description, or category…"
-          style={{
-            width: '100%',
-            background: 'var(--bg2)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            padding: '11px 14px 11px 38px',
-            fontFamily: 'var(--font-body)',
-            fontSize: 13,
-            color: 'var(--text)',
-            outline: 'none',
-            boxSizing: 'border-box',
-          }}
+          placeholder="Search services by name, description, category, or endpoint…"
+          style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 14px 11px 38px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
         />
         <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>⌕</span>
         {search && (
-          <button
-            onClick={() => setSearch('')}
-            style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 14 }}
-          >
-            ×
-          </button>
+          <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 14 }}>×</button>
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-          {loading ? 'loading…' : `${filtered.length} of ${services.length} services`}
-        </span>
+      <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 14 }}>
+        {loading ? 'loading…' : `${filtered.length} of ${providers.length} services`}
       </div>
 
       {loading ? (
         <div style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>Loading marketplace…</div>
       ) : filtered.length === 0 ? (
-        <div style={{ color: 'var(--muted)', fontSize: 13, padding: 24, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 8 }}>
-          No services match "{search}".
-        </div>
+        <div style={{ color: 'var(--muted)', fontSize: 13, padding: 24, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 8 }}>No services match &ldquo;{search}&rdquo;.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-          {filtered.map(service => (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              toggling={togglingId === service.id}
-              onToggle={() => void toggleService(service)}
-              onOpen={() => openService(service)}
-            />
+          {filtered.map(p => (
+            <ProviderCard key={p.id} provider={p} toggling={togglingId === p.id} onToggle={() => void toggleProvider(p)} onOpen={() => openProvider(p)} />
           ))}
         </div>
       )}
@@ -613,74 +448,31 @@ export default function MarketplacePage() {
   )
 }
 
-// ─── Service card ────────────────────────────────────────────────────────────
+// ─── Provider card ───────────────────────────────────────────────────────────
 
-function ServiceCard({
-  service,
-  toggling,
-  onToggle,
-  onOpen,
-}: {
-  service: MarketplaceService
-  toggling: boolean
-  onToggle: () => void
-  onOpen: () => void
-}) {
+function ProviderCard({ provider, toggling, onToggle, onOpen }: { provider: MarketplaceService; toggling: boolean; onToggle: () => void; onOpen: () => void }) {
   return (
     <div
       onClick={onOpen}
-      style={{
-        background: 'var(--bg2)',
-        border: `1px solid ${service.is_enabled ? 'rgba(54,179,126,0.3)' : 'var(--border)'}`,
-        borderRadius: 10,
-        padding: 16,
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        minHeight: 156,
-        transition: 'border-color 0.15s, transform 0.15s',
-      }}
+      style={{ background: 'var(--bg2)', border: `1px solid ${provider.is_enabled ? 'rgba(54,179,126,0.3)' : 'var(--border)'}`, borderRadius: 10, padding: 16, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 156, transition: 'border-color 0.15s' }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = service.is_enabled ? 'rgba(54,179,126,0.3)' : 'var(--border)' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = provider.is_enabled ? 'rgba(54,179,126,0.3)' : 'var(--border)' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {service.name}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-            {service.display_price}
-          </div>
+          <div style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 15, color: 'var(--text)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{provider.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{provider.display_price}</div>
         </div>
         <div onClick={e => e.stopPropagation()}>
-          <Switch enabled={service.is_enabled} loading={toggling} onClick={onToggle} />
+          <Switch enabled={provider.is_enabled} loading={toggling} onClick={onToggle} />
         </div>
       </div>
-      <p style={{
-        margin: 0,
-        fontSize: 12,
-        color: 'var(--muted)',
-        lineHeight: 1.5,
-        overflow: 'hidden',
-        display: '-webkit-box',
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical',
-        flex: 1,
-      }}>
-        {service.description}
-      </p>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {service.categories.slice(0, 3).map(category => (
-          <span key={category} style={{
-            fontSize: 10,
-            color: 'var(--text2)',
-            border: '1px solid var(--border)',
-            borderRadius: 999,
-            padding: '2px 7px',
-            fontFamily: 'var(--font-mono)',
-          }}>{category}</span>
+      <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', flex: 1 }}>{provider.description}</p>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        {provider.categories.slice(0, 3).map(c => (
+          <span key={c} style={{ fontSize: 10, color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 999, padding: '2px 7px', fontFamily: 'var(--font-mono)' }}>{c}</span>
         ))}
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{provider.endpoint_count} ep</span>
       </div>
     </div>
   )
@@ -691,36 +483,12 @@ function ServiceCard({
 function Switch({ enabled, loading, onClick }: { enabled: boolean; loading: boolean; onClick: () => void }) {
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); onClick() }}
+      onClick={e => { e.stopPropagation(); onClick() }}
       disabled={loading}
       aria-label={enabled ? 'Disable service' : 'Enable service'}
-      style={{
-        position: 'relative',
-        width: 36,
-        height: 20,
-        borderRadius: 999,
-        border: 'none',
-        background: enabled ? 'var(--success)' : 'var(--bg3)',
-        cursor: loading ? 'wait' : 'pointer',
-        padding: 0,
-        transition: 'background-color 0.15s',
-        opacity: loading ? 0.6 : 1,
-        flexShrink: 0,
-      }}
+      style={{ position: 'relative', width: 36, height: 20, borderRadius: 999, border: 'none', background: enabled ? 'var(--success)' : 'var(--bg3)', cursor: loading ? 'wait' : 'pointer', padding: 0, transition: 'background-color 0.15s', opacity: loading ? 0.6 : 1, flexShrink: 0 }}
     >
-      <span
-        style={{
-          position: 'absolute',
-          top: 2,
-          left: enabled ? 18 : 2,
-          width: 16,
-          height: 16,
-          borderRadius: '50%',
-          background: '#fff',
-          transition: 'left 0.15s',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-        }}
-      />
+      <span style={{ position: 'absolute', top: 2, left: enabled ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
     </button>
   )
 }
@@ -729,32 +497,17 @@ function Switch({ enabled, loading, onClick }: { enabled: boolean; loading: bool
 
 function RecentList({ recent }: { recent: Transaction[] }) {
   return (
-    <section style={{ border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg2)', padding: 18 }}>
-      <h2 style={{ margin: '0 0 12px', fontFamily: 'var(--font-head)', fontSize: 16 }}>Recent marketplace calls</h2>
+    <section style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg2)', padding: 18 }}>
+      <h3 style={{ margin: '0 0 12px', fontFamily: 'var(--font-head)', fontSize: 16 }}>Recent marketplace calls</h3>
       {recent.length === 0 ? (
         <div style={{ color: 'var(--muted)', fontSize: 13 }}>No marketplace transactions yet.</div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {recent.map(tx => (
-            <div key={tx.id} style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto auto',
-              gap: 12,
-              alignItems: 'center',
-              borderTop: '1px solid var(--border)',
-              paddingTop: 8,
-              color: 'var(--text2)',
-              fontSize: 13,
-            }}>
+            <div key={tx.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 8, color: 'var(--text2)', fontSize: 13 }}>
               <span style={{ fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.serviceId ?? tx.id}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{tx.costPaid ?? tx.amount} USDC</span>
-              <span style={{
-                color: tx.status === 'SUCCESS' ? 'var(--success)'
-                  : tx.status === 'FAILED' || tx.status === 'BLOCKED' ? 'var(--error)'
-                  : 'var(--muted)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-              }}>{tx.status}</span>
+              <span style={{ color: tx.status === 'SUCCESS' ? 'var(--success)' : tx.status === 'FAILED' || tx.status === 'BLOCKED' ? 'var(--error)' : 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{tx.status}</span>
             </div>
           ))}
         </div>
