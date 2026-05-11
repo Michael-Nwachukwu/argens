@@ -254,7 +254,9 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         include: { approvalQueue: true },
       })
 
-      void sendPendingApprovalEmail(userId, tx.id, token, amount, recipient).catch(() => undefined)
+      void sendPendingApprovalEmail(userId, tx.id, token, amount, recipient).catch((e: unknown) =>
+        logger.error('Failed to send pending-approval email', { userId, error: (e as Error).message }),
+      )
 
       sendSuccess(
         res,

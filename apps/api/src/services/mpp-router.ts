@@ -82,6 +82,37 @@ export async function findMppRouterService(serviceId: string): Promise<MppRouter
   return services.find((service) => service.id === serviceId) ?? null
 }
 
+/**
+ * Provider key for grouping operations into one card/toggle.
+ * The MPP catalog flattens ~493 POST operations across ~86 providers; each operation is
+ * its own catalog entry. The {provider} segment of `/v1/services/{provider}/{operation}`
+ * (equivalently the part of the service id before the first underscore) is the group key.
+ */
+export function providerKey(service: MppRouterService): string {
+  const m = String(service.public_path || '').match(/^\/v1\/services\/([^/]+)\//)
+  if (m && m[1]) return m[1]
+  return providerKeyFromServiceId(service.id)
+}
+
+/** Provider key derived from an operation id alone (when the catalog entry isn't in hand). */
+export function providerKeyFromServiceId(serviceId: string): string {
+  const head = String(serviceId || '').split('_')[0]
+  return head || serviceId
+}
+
+/** Human-friendly provider name — most catalog names are "Provider – Operation". */
+export function providerDisplayName(service: MppRouterService): string {
+  const head = String(service.name || '').split(/\s+[–—-]\s+/)[0]?.trim()
+  return head || providerKey(service)
+}
+
+/** The operation label (the part after "Provider – "), falling back to the full name. */
+export function operationLabel(service: MppRouterService): string {
+  const parts = String(service.name || '').split(/\s+[–—-]\s+/)
+  if (parts.length > 1) return parts.slice(1).join(' – ').trim()
+  return String(service.name || service.id)
+}
+
 export function buildMppRouterUrl(
   service: MppRouterService,
   query?: Record<string, string | number | boolean>,

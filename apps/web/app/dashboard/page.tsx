@@ -166,8 +166,9 @@ function ApproveModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
             Close
           </button>
           <button
-            onClick={() => router.push(`/approve/confirm?token=${tx.id}`)}
-            style={{ flex: 1, padding: '9px', background: 'var(--accent)', border: 'none', borderRadius: 7, color: '#0C0B0A', fontFamily: 'var(--font-head)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            onClick={() => { if (tx.approvalToken) router.push(`/approve/confirm?token=${tx.approvalToken}`) }}
+            disabled={!tx.approvalToken}
+            style={{ flex: 1, padding: '9px', background: tx.approvalToken ? 'var(--accent)' : 'var(--bg3)', border: 'none', borderRadius: 7, color: tx.approvalToken ? '#0C0B0A' : 'var(--muted)', fontFamily: 'var(--font-head)', fontSize: 14, fontWeight: 600, cursor: tx.approvalToken ? 'pointer' : 'not-allowed' }}
           >
             Review →
           </button>

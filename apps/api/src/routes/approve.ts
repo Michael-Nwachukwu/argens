@@ -1,18 +1,22 @@
 /**
  * routes/approve.ts
  *
- * POST /approve/:token — approve a pending transaction (dashboard form submits this)
- * POST /reject/:token  — reject a pending transaction (dashboard form submits this)
+ * GET  /approve/:token — read the pending transaction behind an approval token
+ *                        (public — the 256-bit single-use token IS the bearer auth;
+ *                         the email confirmation page calls this without a session)
+ * POST /approve/:token — approve a pending transaction (confirmation page submits this)
+ * POST /reject/:token  — reject a pending transaction (confirmation page submits this)
  *
- * Security: tokens are single-use, expire after 24h.
- * NEVER expose GET endpoints that perform state changes — email scanners auto-fetch GET URLs.
- * The email links to a dashboard confirmation page; the dashboard submits POST here.
+ * Security: tokens are crypto.randomBytes(32) hex, single-use, expire after 24h, and are
+ * only ever delivered to the account owner's email — that is sufficient authorisation.
+ * NEVER expose GET endpoints that perform STATE CHANGES — email scanners auto-fetch GET URLs.
+ * GET /approve/:token is read-only/idempotent (it only lazily flips an already-expired token
+ * to EXPIRED), so it is safe for scanners to hit.
  * (CLAUDE.md Security Rules)
  */
 
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
-import { requireJwt } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
@@ -24,29 +28,78 @@ import { executeApprovedMarketplaceTransaction } from '../services/marketplace.j
 
 export const approveRouter: Router = ExpressRouter()
 
-// ─── POST /approve/:token ─────────────────────────────────────────────────────
+// ─── GET /approve/:token ──────────────────────────────────────────────────────
+// Read-only summary of the transaction behind a token, so the confirmation page can
+// render it before the user approves/rejects. No session required — the token is the bearer.
 
-approveRouter.post('/approve/:token', requireJwt, async (req, res, next) => {
+approveRouter.get('/approve/:token', async (req, res, next) => {
   const tokenParam = req.params.token
   if (!tokenParam || Array.isArray(tokenParam)) {
     sendError(res, 'Invalid token parameter', 'INVALID_REQUEST', 400)
     return
   }
-  const userId = req.userId!
 
   try {
-    const entry = await findAndValidateToken(tokenParam, userId)
+    const queue = await prisma.approvalQueue.findUnique({
+      where: { token: tokenParam },
+      include: { transaction: true },
+    })
+
+    if (!queue) {
+      sendError(res, 'Approval link is invalid.', 'INVALID_TOKEN', 404)
+      return
+    }
+
+    // Lazily mark an already-expired pending token so the page shows the right state.
+    let status = queue.status
+    if (status === 'PENDING' && queue.expiresAt < new Date()) {
+      await prisma.approvalQueue.update({ where: { id: queue.id }, data: { status: 'EXPIRED' } })
+      status = 'EXPIRED'
+    }
+
+    const tx = queue.transaction
+    sendSuccess(res, {
+      transaction: {
+        id: tx.id,
+        status: tx.status,
+        type: tx.type,
+        recipient: tx.recipientAddress,
+        amount: tx.amount.toFixed(7),
+        currency: tx.currency,
+        memo: tx.memo,
+        service_id: tx.serviceId,
+        cost_paid: tx.costPaid?.toFixed(7) ?? null,
+        created_at: tx.createdAt,
+      },
+      approval: {
+        status,
+        expires_at: queue.expiresAt,
+        acted_at: queue.actedAt,
+      },
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /approve/:token ─────────────────────────────────────────────────────
+
+approveRouter.post('/approve/:token', async (req, res, next) => {
+  const tokenParam = req.params.token
+  if (!tokenParam || Array.isArray(tokenParam)) {
+    sendError(res, 'Invalid token parameter', 'INVALID_REQUEST', 400)
+    return
+  }
+
+  try {
+    const entry = await findAndValidateToken(tokenParam)
     if (!entry) {
-      sendError(
-        res,
-        'Approval token is invalid, expired, or already used.',
-        'INVALID_TOKEN',
-        400,
-      )
+      sendError(res, 'Approval token is invalid, expired, or already used.', 'INVALID_TOKEN', 400)
       return
     }
 
     const { queue, transaction } = entry
+    const userId = transaction.userId
 
     // Mark token consumed immediately (single-use)
     await prisma.approvalQueue.update({
@@ -185,27 +238,22 @@ approveRouter.post('/approve/:token', requireJwt, async (req, res, next) => {
 
 // ─── POST /reject/:token ──────────────────────────────────────────────────────
 
-approveRouter.post('/reject/:token', requireJwt, async (req, res, next) => {
+approveRouter.post('/reject/:token', async (req, res, next) => {
   const tokenParam = req.params.token
   if (!tokenParam || Array.isArray(tokenParam)) {
     sendError(res, 'Invalid token parameter', 'INVALID_REQUEST', 400)
     return
   }
-  const userId = req.userId!
 
   try {
-    const entry = await findAndValidateToken(tokenParam, userId)
+    const entry = await findAndValidateToken(tokenParam)
     if (!entry) {
-      sendError(
-        res,
-        'Approval token is invalid, expired, or already used.',
-        'INVALID_TOKEN',
-        400,
-      )
+      sendError(res, 'Approval token is invalid, expired, or already used.', 'INVALID_TOKEN', 400)
       return
     }
 
     const { queue, transaction } = entry
+    const userId = transaction.userId
 
     // Mark rejected (single-use, consumed)
     await prisma.approvalQueue.update({
@@ -242,18 +290,17 @@ approveRouter.post('/reject/:token', requireJwt, async (req, res, next) => {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-async function findAndValidateToken(token: string, userId: string) {
+async function findAndValidateToken(token: string) {
   const queue = await prisma.approvalQueue.findUnique({
     where: { token },
     include: { transaction: true },
   })
 
-  // Token must exist, belong to this user, be PENDING, and not expired
+  // Token must exist, be PENDING, and not expired. (The token itself is the bearer
+  // authorisation — it is only ever sent to the account owner's email.)
   if (!queue) return null
-  if (queue.userId !== userId) return null
   if (queue.status !== 'PENDING') return null
   if (queue.expiresAt < new Date()) {
-    // Mark expired
     await prisma.approvalQueue.update({
       where: { id: queue.id },
       data: { status: 'EXPIRED' },

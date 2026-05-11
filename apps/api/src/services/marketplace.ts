@@ -14,7 +14,15 @@ import { logger } from '../lib/logger.js'
 import { checkPolicy, incrementTotalSpent, type PolicyResult } from './policy.js'
 import { submitPayment } from './payment.js'
 import { performMppRequest, type MppChallengeSnapshot, type MppRequestResult } from './mpp-client.js'
-import { buildMppRouterUrl, findMppRouterService, listMppRouterServices, type MppRouterService } from './mpp-router.js'
+import {
+  buildMppRouterUrl,
+  findMppRouterService,
+  listMppRouterServices,
+  operationLabel,
+  providerDisplayName,
+  providerKey,
+  type MppRouterService,
+} from './mpp-router.js'
 import { sendBlockedEmail, sendPendingApprovalEmail } from './email.js'
 
 const MARKUP_RATE = new Decimal('0.20')
@@ -64,57 +72,104 @@ interface ApprovedMarketplaceTransaction {
   metadata: unknown
 }
 
+/**
+ * Returns the marketplace catalog grouped into PROVIDERS (one card per provider, e.g.
+ * "AgentMail", "OpenAI"), each with its child endpoints. Enablement is per-provider —
+ * a `MarketplaceServiceSetting` row is keyed by the provider key, not the operation id.
+ */
 export async function getMarketplaceServicesForResponse(userId: string) {
   const [services, settings] = await Promise.all([
     listMppRouterServices(),
     prisma.marketplaceServiceSetting.findMany({ where: { userId } }),
   ])
-  const enabledByService = new Map(settings.map((setting) => [setting.serviceId, setting.enabled]))
+  const enabledByProvider = new Map(settings.map((s) => [s.serviceId, s.enabled]))
 
-  return services.map((service) => ({
-    id: service.id,
-    name: service.name,
-    service_url: buildMppRouterUrl(service),
-    description: service.description,
-    categories: normalizeCategories(service),
-    display_price: service.price,
-    is_available: true,
-    is_enabled: enabledByService.get(service.id) ?? false,
-    availability_note: service.status === 'limited' ? service.status_note ?? 'Limited service metadata.' : null,
-    payment_rail: 'stellar-mainnet',
-    status: service.status,
-    docs_url: service.docs_url ?? service.docs?.homepage ?? null,
-    endpoints: [
-      {
-        id: service.id,
-        label: service.name,
-        method: service.method,
-        path: service.public_path,
-        description: service.description,
-        example_payload: {},
-      },
-    ],
-  }))
+  const groups = new Map<string, MppRouterService[]>()
+  for (const svc of services) {
+    const key = providerKey(svc)
+    const arr = groups.get(key)
+    if (arr) arr.push(svc)
+    else groups.set(key, [svc])
+  }
+
+  const providers = [...groups.entries()].map(([id, ops]) => {
+    const name = providerDisplayName(ops[0]!)
+    const descs = ops.map((o) => o.description).filter(Boolean).sort((a, b) => a.length - b.length)
+    const description = descs[0] ?? `${ops.length} ${name} endpoints`
+
+    const categories = new Set<string>()
+    ops.forEach((o) => normalizeCategories(o).forEach((c) => categories.add(c)))
+
+    const limited = ops.some((o) => o.status === 'limited')
+    const docsUrl =
+      ops.find((o) => o.docs?.homepage)?.docs?.homepage ?? ops.find((o) => o.docs_url)?.docs_url ?? null
+
+    return {
+      id,
+      name,
+      description,
+      categories: [...categories],
+      display_price: priceRangeLabel(ops.map((o) => o.price)),
+      is_enabled: enabledByProvider.get(id) ?? false,
+      status: limited ? ('limited' as const) : ('active' as const),
+      availability_note: limited ? 'Some endpoints have limited metadata.' : null,
+      payment_rail: 'stellar-mainnet',
+      docs_url: docsUrl,
+      endpoint_count: ops.length,
+      endpoints: ops
+        .map((o) => ({
+          id: o.id,
+          label: operationLabel(o),
+          method: o.method,
+          path: o.public_path,
+          description: o.description,
+          price: o.price,
+          example_payload: null as Record<string, unknown> | null,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    }
+  })
+
+  return providers.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** Enable or disable a whole provider (all of its endpoints) for a user. */
 export async function setMarketplaceServiceEnabled(
   userId: string,
-  serviceId: string,
+  providerId: string,
   enabled: boolean,
 ) {
-  const service = await findMppRouterService(serviceId)
-  if (!service) throw new AppError('Marketplace service not found', 'SERVICE_NOT_FOUND', 404)
+  const services = await listMppRouterServices()
+  const exists = services.some((s) => providerKey(s) === providerId)
+  if (!exists) throw new AppError('Marketplace provider not found', 'SERVICE_NOT_FOUND', 404)
 
   const setting = await prisma.marketplaceServiceSetting.upsert({
-    where: { userId_serviceId: { userId, serviceId } },
+    where: { userId_serviceId: { userId, serviceId: providerId } },
     update: { enabled },
-    create: { userId, serviceId, enabled },
+    create: { userId, serviceId: providerId, enabled },
   })
 
   return {
-    service_id: setting.serviceId,
+    provider_id: setting.serviceId,
     enabled: setting.enabled,
   }
+}
+
+function parsePrice(p: string): number | null {
+  if (/free/i.test(p)) return 0
+  const m = String(p).match(/\$\s*([0-9]*\.?[0-9]+)/)
+  return m ? parseFloat(m[1]!) : null
+}
+
+function priceRangeLabel(priceStrings: string[]): string {
+  const nums = priceStrings.map(parsePrice).filter((n): n is number => n != null)
+  if (nums.length === 0) return priceStrings[0] ?? 'see endpoints'
+  const min = Math.min(...nums)
+  const max = Math.max(...nums)
+  const fmt = (n: number) => (n === 0 ? 'free' : `$${n}`)
+  if (min === max) return `${fmt(min)}/request`
+  if (min === 0) return `free – ${fmt(max)}/request`
+  return `${fmt(min)} – ${fmt(max)}/request`
 }
 
 export async function executeMarketplaceCall(
@@ -164,7 +219,7 @@ async function executeMarketplaceCallInternal(
   const service = await findMppRouterService(input.serviceId)
   if (!service) throw new AppError('Marketplace service not found', 'SERVICE_NOT_FOUND', 404)
 
-  await assertServiceEnabled(userId, service.id)
+  await assertServiceEnabled(userId, service)
 
   const wallet = await prisma.wallet.findUnique({ where: { userId } })
   if (!wallet) throw new AppError('Wallet not found.', 'WALLET_NOT_FOUND', 404)
@@ -376,9 +431,10 @@ async function executeMarketplaceCallInternal(
   }
 }
 
-async function assertServiceEnabled(userId: string, serviceId: string): Promise<void> {
+async function assertServiceEnabled(userId: string, service: MppRouterService): Promise<void> {
+  const provider = providerKey(service)
   const setting = await prisma.marketplaceServiceSetting.findUnique({
-    where: { userId_serviceId: { userId, serviceId } },
+    where: { userId_serviceId: { userId, serviceId: provider } },
   })
 
   if (!setting?.enabled) {
@@ -387,8 +443,9 @@ async function assertServiceEnabled(userId: string, serviceId: string): Promise<
       'SERVICE_DISABLED',
       403,
       {
-        service_id: serviceId,
-        message: 'Enable this service from the dashboard before agents can call it.',
+        service_id: service.id,
+        provider,
+        message: `Enable "${providerDisplayName(service)}" from the dashboard before agents can call it.`,
       },
     )
   }

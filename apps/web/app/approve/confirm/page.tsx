@@ -1,53 +1,46 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense } from 'react'
 import { Logo } from '@/components/ui/Logo'
 import { StatusBadge } from '@/components/ui/Badge'
-import { approval as approvalApi, transactions as txApi, isError } from '@/lib/api'
-import type { Transaction } from '@/lib/api'
+import { approval as approvalApi, isError } from '@/lib/api'
+import type { ApprovalView } from '@/lib/api'
 
 function ApproveConfirmContent() {
-  const params  = useSearchParams()
-  const router  = useRouter()
-  const token   = params.get('token') ?? ''
+  const params = useSearchParams()
+  const router = useRouter()
+  const token  = params.get('token') ?? ''
 
-  // In V1, the token IS the transaction ID (dashboard-only flows)
-  const [tx, setTx]         = useState<Transaction | null>(null)
+  const [view, setView]       = useState<ApprovalView | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState('')
-  const [done, setDone]     = useState<'approved' | 'rejected' | null>(null)
-  const [acting, setActing] = useState(false)
+  const [error, setError]     = useState('')
+  const [done, setDone]       = useState<'approved' | 'rejected' | null>(null)
+  const [acting, setActing]   = useState(false)
 
   useEffect(() => {
-    if (!token) { setError('Missing token'); setLoading(false); return }
-    txApi.get(token)
+    if (!token) { setError('Missing approval token.'); setLoading(false); return }
+    approvalApi.view(token)
       .then(r => {
         if (isError(r)) setError(r.error)
-        else setTx(r.data)
+        else setView(r.data)
       })
-      .catch(() => setError('Could not load transaction'))
+      .catch(() => setError('Could not load the transaction.'))
       .finally(() => setLoading(false))
   }, [token])
 
-  const approve = async () => {
+  const act = async (kind: 'approved' | 'rejected') => {
     setActing(true)
     setError('')
-    const r = await approvalApi.approve(token)
+    const r = kind === 'approved' ? await approvalApi.approve(token) : await approvalApi.reject(token)
     setActing(false)
     if (isError(r)) setError(r.error)
-    else setDone('approved')
+    else setDone(kind)
   }
 
-  const reject = async () => {
-    setActing(true)
-    setError('')
-    const r = await approvalApi.reject(token)
-    setActing(false)
-    if (isError(r)) setError(r.error)
-    else setDone('rejected')
-  }
+  const tx = view?.transaction ?? null
+  const approvalStatus = view?.approval.status ?? null
+  const isPending = approvalStatus === 'PENDING' && tx?.status === 'PENDING_APPROVAL'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -62,9 +55,9 @@ function ApproveConfirmContent() {
             <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>Loading…</div>
           )}
 
-          {!loading && error && (
+          {!loading && error && !view && (
             <>
-              <div style={{ fontFamily: 'var(--font-head)', fontSize: 17, fontWeight: 600, marginBottom: 8 }}>Invalid token</div>
+              <div style={{ fontFamily: 'var(--font-head)', fontSize: 17, fontWeight: 600, marginBottom: 8 }}>Invalid approval link</div>
               <div style={{ padding: '12px 14px', background: 'var(--error-low)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 7, fontSize: 13, color: 'var(--error)', marginBottom: 20 }}>
                 {error}
               </div>
@@ -74,27 +67,31 @@ function ApproveConfirmContent() {
             </>
           )}
 
-          {!loading && !error && tx && !done && (
+          {!loading && tx && !done && (
             <>
-              <div style={{ fontFamily: 'var(--font-head)', fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Approve payment?</div>
+              <div style={{ fontFamily: 'var(--font-head)', fontSize: 17, fontWeight: 600, marginBottom: 6 }}>
+                {isPending ? 'Approve payment?' : 'Pending payment'}
+              </div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-                This payment exceeded your approval threshold and requires your action.
+                {tx.type === 'marketplace'
+                  ? 'A marketplace call exceeded your approval threshold and requires your action.'
+                  : 'This payment exceeded your approval threshold and requires your action.'}
               </div>
 
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {([
-                  ['Recipient', tx.recipientAddress],
-                  ['Amount', `${tx.amount} USDC`],
+                  tx.type === 'marketplace' && tx.service_id ? ['Service', tx.service_id] : ['Recipient', tx.recipient],
+                  ['Amount', `${tx.cost_paid ?? tx.amount} ${tx.currency}`],
                   ['Memo', tx.memo ?? '—'],
                   ['Status', null],
-                  ['Requested', new Date(tx.createdAt).toLocaleString()],
+                  ['Requested', new Date(tx.created_at).toLocaleString()],
                 ] as const).map(([k, v]) => (
-                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
-                    <span style={{ color: 'var(--muted)' }}>{k}</span>
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, gap: 12 }}>
+                    <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{k}</span>
                     {k === 'Status' ? (
                       <StatusBadge status={tx.status} />
                     ) : (
-                      <span style={{ color: 'var(--text2)', fontFamily: ['Recipient', 'Amount'].includes(k as string) ? 'var(--font-mono)' : 'inherit', fontSize: k === 'Recipient' ? 11 : 13 }}>
+                      <span style={{ color: 'var(--text2)', fontFamily: (['Recipient', 'Service'] as string[]).includes(k) ? 'var(--font-mono)' : 'inherit', fontSize: k === 'Recipient' ? 11 : 13, textAlign: 'right', overflowWrap: 'anywhere' }}>
                         {v as string}
                       </span>
                     )}
@@ -102,27 +99,29 @@ function ApproveConfirmContent() {
                 ))}
               </div>
 
-              {tx.status !== 'PENDING_APPROVAL' && (
+              {!isPending && (
                 <div style={{ padding: '10px 14px', background: 'var(--warning-low)', border: '1px solid rgba(197,162,83,0.3)', borderRadius: 7, fontSize: 13, color: 'var(--warning)', marginBottom: 16 }}>
-                  This transaction is no longer pending — it has already been {tx.status.toLowerCase()}.
+                  {approvalStatus === 'EXPIRED'
+                    ? 'This approval link has expired (links are valid for 24 hours). The transaction was not executed.'
+                    : `This transaction is no longer pending — it has already been ${(approvalStatus ?? tx.status).toLowerCase()}.`}
                 </div>
               )}
 
-              {tx.status === 'PENDING_APPROVAL' && (
+              {isPending && (
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button
-                    onClick={reject}
+                    onClick={() => void act('rejected')}
                     disabled={acting}
                     style={{ flex: 1, padding: '10px', background: 'var(--error-low)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 7, color: 'var(--error)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 500, cursor: acting ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}
                   >
                     Reject
                   </button>
                   <button
-                    onClick={approve}
+                    onClick={() => void act('approved')}
                     disabled={acting}
                     style={{ flex: 1, padding: '10px', background: 'var(--accent)', border: 'none', borderRadius: 7, color: '#0C0B0A', fontFamily: 'var(--font-head)', fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}
                   >
-                    {acting ? 'Processing…' : `Approve ${tx.amount} USDC`}
+                    {acting ? 'Processing…' : `Approve ${tx.cost_paid ?? tx.amount} ${tx.currency}`}
                   </button>
                 </div>
               )}
