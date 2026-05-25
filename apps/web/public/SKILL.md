@@ -1,13 +1,14 @@
-# Argens Skill — v1 — updated 2026-05-04
+# Argens Skill — v2 — updated 2026-05-25
 
-Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies enforced by Soroban smart contracts.
+Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
 ---
 
 ## Authentication
 
-Ask the user for their `ARGENS_KEY` (format: `argns_live_...`).
-Set it as `Authorization: Bearer <ARGENS_KEY>` on every request.
+Ask the user for their `ARGENS_KEY` (format: `argns_live_...`).  
+Set it as `Authorization: Bearer <ARGENS_KEY>` on every request.  
+Treat it like a password — never log it, never include it in output.
 
 ---
 
@@ -19,118 +20,65 @@ https://api.argens.io/v1
 
 ---
 
-## Amount format
+## Response envelope
 
-**All amounts are JSON strings with 7 decimal places.**
-- ✓ `"25.0000000"`
-- ✗ `25.0` (number — never use)
+Every response — success or error — uses this shape:
+
+```json
+{ "data": { ... } }
+{ "error": "Human readable message", "code": "MACHINE_CODE", "details": { ... } }
+```
+
+Paginated lists include `"meta": { "page": 1, "total": 86, "pages": 5 }` alongside `"data"`.
 
 ---
 
-## Chain detection
+## Amount format
 
-Argens auto-detects the destination chain from the recipient address:
-- `G...` (56 chars) → Stellar USDC payment
-- `0x...` (42 chars) → Base USDC via CCTP V2 (cross-chain burn-and-mint)
+**All amounts are JSON strings with 7 decimal places. Never numbers.**
 
-Pass the recipient address as-is. No `chain:` parameter needed.
+- ✓ `"25.0000000"`
+- ✗ `25.0` (number — rejected by the API)
+
+---
+
+## Policies — understand before calling /pay
+
+The developer sets three optional spending rules. Policy is checked on every `/pay` call:
+
+| Policy | What it does | Result when breached |
+|---|---|---|
+| `max_transaction_limit` | Caps a single payment | **402 BLOCKED** — do not retry |
+| `allowance_limit` | Cumulative spend cap (resets manually) | **402 BLOCKED** — do not retry |
+| `approval_threshold` | Payments above this need human sign-off | **202 PENDING** — poll for status |
+
+Rules with `null` values are inactive (unlimited).  
+Check `/agent/status` first to see current limits and remaining allowance.
+
+---
+
+## Onboarding steps
+
+Walk the user through these in order:
+
+1. **Account** — If no account, send them to `https://argens.xyz/signup` to create one and verify their email.
+2. **API key** — Ask for their key (`argns_live_...`). Treat it like a password.
+3. **Verify key** — Call `GET /agent/status`. Show the user their balance, policies, and today's spend.
+4. **First payment** — Always state the amount and purpose before calling `/pay` for the first time.
 
 ---
 
 ## Core endpoints
 
-### POST /pay — Execute a payment
-
-```json
-{
-  "recipient": "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  "amount": "25.0000000",
-  "currency": "USDC",
-  "memo": "Payment for API usage",
-  "metadata": { "agent_id": "my-agent", "service": "openai" }
-}
-```
-
-**Success (200):**
-```json
-{
-  "data": {
-    "status": "success",
-    "transaction_id": "txn_abc123",
-    "stellar_tx_hash": "abc...xyz",
-    "amount": "25.0000000",
-    "fee": "0.1250000",
-    "total_debited": "25.1250000",
-    "recipient": "GXXX...",
-    "timestamp": "2026-05-04T12:00:00Z"
-  }
-}
-```
-
-**Policy blocked (402):**
-```json
-{
-  "error": "Transaction blocked by policy",
-  "code": "POLICY_BLOCKED",
-  "details": { "reason": "max_transaction_exceeded" }
-}
-```
-Do **not** retry a 402.
-
-**Pending approval (202):**
-```json
-{
-  "data": {
-    "status": "pending_approval",
-    "transaction_id": "txn_abc125",
-    "message": "Awaiting developer approval.",
-    "poll_url": "/v1/transactions/txn_abc125"
-  }
-}
-```
-Poll `poll_url` to check status.
-
----
-
-### POST /quote — Dry run
-
-Same request as `/pay`. No payment made, no DB record. Returns:
-```json
-{
-  "data": {
-    "status": "would_succeed",
-    "amount": "25.0000000",
-    "estimated_fee": "0.1250000",
-    "total_debited": "25.1250000",
-    "destination_chain": "stellar",
-    "cross_chain": false
-  }
-}
-```
-
----
-
-### GET /wallet/balance
-
-```json
-{
-  "data": {
-    "balance": "492.5000000",
-    "currency": "USDC",
-    "wallet_address": "GXXX...",
-    "cached_at": "2026-05-04T11:55:00Z"
-  }
-}
-```
-
----
-
 ### GET /agent/status
+
+Health check. Call this first to confirm the key works and see current limits.
 
 ```json
 {
   "data": {
     "api_key_status": "active",
+    "wallet_status": "READY",
     "wallet_balance": "492.5000000",
     "policies": {
       "allowance_limit": "500.0000000",
@@ -144,29 +92,285 @@ Same request as `/pay`. No payment made, no DB record. Returns:
 }
 ```
 
+`policies` is `null` if no policies have been configured — all transactions will pass.
+
+---
+
+### POST /quote — dry run
+
+Same body as `/pay`. No payment made, no record created. Use this before large payments to check whether a transaction would pass, be blocked, or require approval.
+
+**Request:**
+```json
+{
+  "recipient": "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "amount": "25.0000000",
+  "currency": "USDC"
+}
+```
+
+**Responses:**
+
+```json
+{ "data": { "status": "would_succeed", "amount": "25.0000000", "policy_check": { "allowance": "would_pass", "max_transaction": "would_pass", "approval_threshold": "would_pass" } } }
+
+{ "data": { "status": "would_be_blocked", "amount": "25.0000000", "reason": "max_transaction_exceeded", "policy_check": { ... } } }
+
+{ "data": { "status": "would_require_approval", "amount": "25.0000000", "policy_check": { ... } } }
+```
+
+---
+
+### POST /pay — execute a payment
+
+Direct USDC payment on Stellar. **$0 Argens fee** — the wallet is debited exactly `amount`.  
+Only Stellar addresses (`G...`, 56 chars) are accepted in V1.
+
+**Request:**
+```json
+{
+  "recipient": "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "amount": "25.0000000",
+  "currency": "USDC",
+  "memo": "Payment for API usage",
+  "metadata": { "agent_id": "my-agent", "job_id": "job_123" }
+}
+```
+
+`memo` is optional, max 28 bytes. `metadata` is optional, stored for your records.
+
+**Success (200):**
+```json
+{
+  "data": {
+    "status": "success",
+    "transaction_id": "clxyz123",
+    "stellar_tx_hash": "abc...xyz",
+    "amount": "25.0000000",
+    "recipient": "GXXX...",
+    "timestamp": "2026-05-25T12:00:00Z",
+    "policy_check": { "allowance": "passed", "max_transaction": "passed", "approval_threshold": "passed" }
+  }
+}
+```
+
+**Policy blocked (402) — do NOT retry:**
+```json
+{
+  "error": "Transaction blocked by policy",
+  "code": "POLICY_BLOCKED",
+  "details": {
+    "reason": "max_transaction_exceeded",
+    "policy": { "max_transaction_limit": "50.0000000" }
+  }
+}
+```
+
+**Pending approval (202) — poll for status:**
+```json
+{
+  "data": {
+    "status": "pending_approval",
+    "transaction_id": "clxyz125",
+    "message": "Awaiting developer approval.",
+    "poll_url": "/v1/transactions/clxyz125"
+  }
+}
+```
+
+Poll `GET /v1/transactions/{id}` and check `data.status`. It will become `SUCCESS`, `APPROVED`, or `REJECTED`.
+
+---
+
+### GET /wallet/balance
+
+```json
+{
+  "data": {
+    "balance": "492.5000000",
+    "currency": "USDC",
+    "xlm_balance": "2.5000000",
+    "wallet_address": "GXXX...",
+    "cached_at": "2026-05-25T11:55:00Z"
+  }
+}
+```
+
+Balance is cached for 30 seconds. `xlm_balance` is for reserve monitoring only.
+
+---
+
+### GET /transactions
+
+Returns a paginated list of the wallet's transactions.
+
+**Query params:** `page` (default 1), `limit` (default 20, max 100), `status` (`SUCCESS | BLOCKED | PENDING_APPROVAL | APPROVED | REJECTED | FAILED`), `type` (`payment | marketplace`), `from_date`, `to_date` (ISO 8601).
+
 ---
 
 ### GET /transactions/:id
 
-Returns full transaction detail including status.
+Returns full transaction detail including current status. Use to poll a `pending_approval` transaction.
+
+```json
+{
+  "data": {
+    "id": "clxyz125",
+    "status": "SUCCESS",
+    "type": "payment",
+    "amount": "25.0000000",
+    "currency": "USDC",
+    "recipientAddress": "GXXX...",
+    "stellarTxHash": "abc...xyz",
+    "memo": null,
+    "createdAt": "2026-05-25T12:00:00Z"
+  }
+}
+```
 
 ---
 
-## Onboarding steps
+## Marketplace — pay for AI services
 
-Walk the user through these steps:
+The Argens Marketplace connects agents to 80+ paid AI services (LLMs, web search, email, data APIs, and more). You call a service and pay for it in a single API call — Argens handles the USDC payment automatically.
 
-1. **Do you have an Argens account?** If not, direct them to `https://argens.xyz/signup` to create one and verify their email.
-2. **Ask for their API key.** It starts with `argns_live_`. Treat it like a password.
-3. **Verify the key** by calling `GET /agent/status`. Show the user their current balance and policies.
-4. **You are ready to pay.** Always describe what you are about to pay for and the amount before calling `/pay` for the first time.
+**Pricing:** Services show their base price. Argens adds a ~20% markup to cover infrastructure. The `cost_paid` field in the response is the total amount debited (base + markup). The same policy rules apply to marketplace calls.
+
+**Prerequisite:** The developer must enable a provider from their dashboard before agents can call it. If a provider is disabled, calls return `403 SERVICE_DISABLED`.
+
+---
+
+### Step 1 — Discover services
+
+```
+GET /marketplace/services
+```
+
+Returns all providers grouped with their endpoints. Supports filtering:
+
+| Param | Example | Effect |
+|---|---|---|
+| `search` | `?search=email` | Filter providers by name, description, or endpoint labels |
+| `category` | `?category=llm` | Filter by category tag |
+| `enabled` | `?enabled=true` | Only show providers the user has enabled |
+
+**Single provider detail:**
+```
+GET /marketplace/services/{provider_id}
+```
+
+**Response shape (one provider):**
+```json
+{
+  "id": "agentmail",
+  "name": "AgentMail",
+  "description": "AI-native email service for agents",
+  "categories": ["email", "messaging"],
+  "display_price": "$0.01 – $0.10/request",
+  "is_enabled": true,
+  "status": "active",
+  "docs_url": "https://agentmail.to/docs",
+  "endpoint_count": 12,
+  "endpoints": [
+    {
+      "id": "agentmail_inboxes_create",
+      "label": "Create inbox",
+      "method": "POST",
+      "path": "/v1/services/agentmail/inboxes",
+      "description": "Create a new inbox for an agent",
+      "price": "$0.01/request"
+    }
+  ]
+}
+```
+
+**Key fields:**
+- `id` — the provider key (e.g. `"agentmail"`). Used to enable/disable the provider; NOT used for calling.
+- `endpoints[].id` — the endpoint operation id (e.g. `"agentmail_inboxes_create"`). **This is `service_id` in `/marketplace/call`.**
+- `endpoints[].path` — the upstream API path. Read this and `description` to understand what the endpoint does.
+
+---
+
+### Step 2 — Call a service
+
+```
+POST /marketplace/call
+```
+
+**Request:**
+```json
+{
+  "service_id": "agentmail_inboxes_create",
+  "payload": { "username": "my-agent" },
+  "query": { "format": "json" }
+}
+```
+
+- `service_id` — the **endpoint id** from `endpoints[].id`, not the provider `id`
+- `payload` — the JSON request body the upstream service expects (optional for GET-like endpoints)
+- `query` — URL query parameters for the upstream service (optional)
+
+**Success (200):**
+```json
+{
+  "data": {
+    "status": "success",
+    "transaction_id": "clxyz200",
+    "stellar_tx_hash": "abc...xyz",
+    "service_id": "agentmail_inboxes_create",
+    "service_name": "AgentMail",
+    "cost_paid": "0.0120000",
+    "currency": "USDC",
+    "result": { ...upstream service response... }
+  }
+}
+```
+
+`result` is the raw response body from the upstream service.
+
+**Policy blocked (402):** same shape as `/pay` blocked — do not retry.
+
+**Pending approval (202):** same shape as `/pay` pending — poll `/v1/transactions/{id}`.
+
+**Common errors:**
+
+| Code | Meaning |
+|---|---|
+| `SERVICE_NOT_FOUND` | `service_id` doesn't match any endpoint in the catalog |
+| `SERVICE_DISABLED` | Provider not enabled — user must enable from dashboard |
+| `MARKETPLACE_NOT_MPP` | Upstream service rejected before payment — no USDC charged, fix the request |
+| `MARKETPLACE_UPSTREAM_FAILED` | Payment sent but upstream service errored — see `upstream_body` in details |
+
+---
+
+### Discovery workflow (step by step)
+
+```
+1. GET /marketplace/services?search=<what you need>
+   → find the right provider and its endpoints
+   → note the endpoint's "id" field
+
+2. Confirm provider "is_enabled": true
+   → if false, tell the user to enable it from https://argens.xyz/dashboard/marketplace
+
+3. POST /marketplace/call
+   { "service_id": "<endpoint id>", "payload": { ...per service docs... } }
+
+4. Handle the response:
+   200 → success, read "result" for the upstream response
+   402 → blocked by policy, report to user, do not retry
+   202 → pending approval, poll /v1/transactions/{id}
+```
 
 ---
 
 ## Rules to never break
 
 - Never log or expose the API key
-- Never retry a 402 response — the payment was blocked by policy, not a transient error
-- Never call `/pay` without stating the amount and purpose to the user first
-- Always check `/quote` before large payments if you are unsure of policy limits
-- For cross-chain (Base): `stellar_tx_hash` is the burn tx; `destination_tx_hash` is the Base mint tx
+- Never retry a 402 — the payment was blocked by policy, not a transient error
+- Never call `/pay` or `/marketplace/call` without stating the amount and purpose to the user first
+- Always call `/quote` before a large payment if you are unsure whether the policy allows it
+- Always call `GET /agent/status` to confirm key + balance before starting a session
+- `service_id` in `/marketplace/call` is the **endpoint id** (`endpoints[].id`), not the provider `id`
+- A `SERVICE_DISABLED` error means the provider is off in the user's dashboard — do not retry; tell the user to enable it
+- A `MARKETPLACE_NOT_MPP` error means no USDC was charged — the request payload was wrong; fix it and retry
