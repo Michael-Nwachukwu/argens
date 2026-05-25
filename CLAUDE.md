@@ -8,13 +8,17 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
-## Status — 2026-05-11
+## Status — 2026-05-25
 
-- **Network: Stellar MAINNET.** The system runs live on mainnet. Anywhere this file says "testnet first" or treats testnet as the running environment, read it as historical — mainnet is current. The friendbot/testnet code paths still exist for local-dev parity but are not the deployed reality.
-- **Web app: live on Vercel** (`argens.vercel.app`, also `argens.xyz`). Currently the landing page is the deployment target.
-- **API: runs locally only for now.** Railway deployment is deferred until local end-to-end checks pass. The deployed site's dashboard will not work against a hosted API until then — expected.
-- **Cross-chain / CCTP V2: DEFERRED to a later version.** Not in the current build. `POST /pay` is Stellar-only; `routes/x402.ts` is dormant. The nullable `destinationChain` / `destinationTxHash` / `crossChain` schema fields remain for when it's picked up. The CCTP V2 section below describes intended design, not shipped behaviour.
-- **Marketplace: backed by MPP Router on Stellar mainnet** (`apiserver.mpprouter.dev`), not a hand-curated registry. ~88 services / ~489 POST endpoints. ~20% Argens markup, paid as a separate USDC transfer to `ARGENS_FEE_WALLET`. Direct payments carry $0 fee.
+- **Network: Stellar MAINNET.** Live on mainnet. Testnet code paths exist for local-dev parity only.
+- **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` accessible at `argens.xyz/SKILL.md`. Vercel root directory set to `apps/web` for GitHub-triggered deployments.
+- **API: local only.** Railway deployment is the next infrastructure task. The live dashboard cannot call the API for external users until this is done.
+- **Cross-chain / CCTP V2: DEFERRED.** `POST /pay` is Stellar-only. `routes/x402.ts` is dormant. Schema fields (`destinationChain`, `destinationTxHash`, `crossChain`) reserved.
+- **Marketplace: LIVE on mainnet.** 86 providers / 493 endpoints via MPP Router (`apiserver.mpprouter.dev`). Provider-level enablement toggles. Search/filter on `GET /marketplace/services`. All policy paths verified E2E. ~20% markup to `ARGENS_FEE_WALLET`.
+- **SKILL.md: v2, deployed.** Accurate response shapes, marketplace discovery workflow, error codes, service discoverability. Accessible at `argens.xyz/SKILL.md`.
+- **Approval flow: fixed.** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
+- **Email validation: live.** Signup rejects disposable domains and addresses that fail DNS MX check.
+- **What is NOT done yet:** Railway API deploy, example payloads, docs page, per-service skill files, demo Loom, error audit.
 
 ---
 

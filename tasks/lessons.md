@@ -4,6 +4,38 @@ Format: most recent first.
 
 ---
 
+## Lesson 2026-05-25 — Test new endpoints before reporting them done
+
+**What went wrong:** Added marketplace search/filter endpoints and reported them as done without curling them. The server was running stale compiled code and the endpoint returned 500. The user had to ask if they were tested before the issue was caught.
+**Root cause:** Assumed tsx watch had hot-reloaded the changes. It had not — a server restart was required.
+**Rule going forward:** After any route change, always restart the dev server and curl the affected endpoint before marking the task complete. Do not rely on hot-reload to pick up route-level changes.
+
+---
+
+## Lesson 2026-05-25 — Ask for credentials before digging through the DB
+
+**What went wrong:** Needed an API key to test endpoints. Instead of asking the user, started querying the database to find key prefixes.
+**Root cause:** Defaulted to self-sufficiency when the right move was a simple question.
+**Rule going forward:** If a test requires a credential (API key, password, token) that the user would reasonably have, ask them directly first. Only resort to DB inspection if they confirm they don't have it.
+
+---
+
+## Lesson 2026-05-25 — Vestigial route groups cause Vercel manifest errors
+
+**What went wrong:** `app/(dashboard)/page.tsx` was a pass-through re-export of `app/page.tsx` left over from an earlier restructure. Vercel's build tracer expected a `page_client-reference-manifest.js` for it that the Next.js build never generated, causing a hard ENOENT crash on every deployment.
+**Root cause:** The `(dashboard)` route group was hollowed out when the real dashboard moved to `app/dashboard/`, but the files were never deleted.
+**Rule going forward:** When restructuring Next.js route groups, delete the old group's files entirely rather than leaving pass-through stubs. A stub `page.tsx` in a route group creates a real route that the build system tracks.
+
+---
+
+## Lesson 2026-05-25 — SKILL.md must be committed for Vercel CLI to include it
+
+**What went wrong:** `argens.xyz/SKILL.md` returned a Next.js 404 page after deployment. The file existed locally but the deployment was stale — the previous `vercel deploy` had failed (due to the manifest error above) and never updated the live site.
+**Root cause:** Two separate issues: (1) the deployment failure meant the live site was never updated; (2) the user wasn't aware `vercel deploy` (without `--prod`) creates a preview URL, not a production update.
+**Rule going forward:** After fixing a deployment blocker, confirm with the user that `vercel deploy --prod` ran successfully and check the live URL directly before closing the task.
+
+---
+
 ## Lesson 2026-05-09 — Separate native MPP merchants from router bridges
 **What went wrong:** The first marketplace direction treated directly probed public MPP services as the whole opportunity, which made the idea look blocked when those services exposed Tempo/Base rails instead of Stellar testnet.
 **Root cause:** We had not classified marketplace access into native Stellar merchants, router-bridged services, and unsupported direct services before judging feasibility.
