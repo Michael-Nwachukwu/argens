@@ -1,7 +1,7 @@
 # Argens — Project State
 
-> Last updated: 2026-05-25
-> Current phase: **Phase 4 complete → Phase 5 (Polish & Demo) next**
+> Last updated: 2026-05-26
+> Current phase: **Phase 4 complete → Phase 5 (Polish & Demo) + CCTP verification**
 
 ---
 
@@ -12,12 +12,13 @@
 | Network | ✅ Mainnet live | STELLAR_NETWORK=mainnet |
 | Web app | ✅ Live on Vercel | argens.xyz — landing + full dashboard |
 | API | ⚠️ Local only | Railway deploy is the next infrastructure task |
-| SKILL.md | ✅ v2 deployed | argens.xyz/SKILL.md — accurate, comprehensive |
+| SKILL.md | ✅ v3 local | v2 deployed; v3 adds CCTP response shapes and Base recipient rules |
 | Phase 1 — Foundation | ✅ Complete | Auth, wallet bootstrap, API keys |
 | Phase 2 — Core API | ✅ Complete | All payment/policy/transaction endpoints |
 | Phase 3 — Dashboard | ✅ Complete | All pages built and functional |
 | Phase 4 — Marketplace | ✅ Complete | 86 providers, E2E verified on mainnet |
 | Phase 5 — Polish & Demo | 🔄 In progress | Partially done; see below |
+| CCTP Stellar → Base | ✅ Direct path verified | 0.0100000 USDC mainnet burn + Iris attestation + Base relay succeeded locally |
 | Phase 6 — Mainnet infra | ⚠️ Partial | Mainnet code is live; Railway + alerting pending |
 
 ---
@@ -46,8 +47,8 @@
 ### Phase 2 — Core API ✅
 
 - [x] TypeScript policy engine — max tx, allowance, approval threshold (correct check order)
-- [x] POST /pay — Stellar-only, policy → Stellar tx → notify
-- [x] POST /quote — dry run, returns would_succeed / would_be_blocked / would_require_approval
+- [x] POST /pay — Stellar direct + Base/CCTP, policy → tx → notify/relay
+- [x] POST /quote — dry run, returns would_succeed / would_be_blocked / would_require_approval, including Base recipient metadata
 - [x] GET /wallet/balance — USDC + XLM, 30s cache
 - [x] GET /agent/status
 - [x] GET /transactions + GET /transactions/:id (with approvalToken when PENDING)
@@ -60,7 +61,8 @@
 - [x] Rate limiting — 100 req/min per API key
 - [x] Zod validation on all endpoints
 - [x] All 10 test scenarios verified E2E on mainnet ✅
-- [ ] POST /pay — Base/CCTP V2 path — **DEFERRED**
+- [x] POST /pay — Base/CCTP V2 direct-approved path verified on mainnet
+- [ ] POST /approve/:token — Base/CCTP approval path compiles but still needs live approval-path verification
 - [ ] Wallet-funded SSE watcher — code exists, never E2E tested
 - [ ] XLM balance alerting on ops wallet — not implemented
 

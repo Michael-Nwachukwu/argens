@@ -8,14 +8,14 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
-## Status — 2026-05-25
+## Status — 2026-05-26
 
 - **Network: Stellar MAINNET.** Live on mainnet. Testnet code paths exist for local-dev parity only.
 - **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` accessible at `argens.xyz/SKILL.md`. Vercel root directory set to `apps/web` for GitHub-triggered deployments.
 - **API: local only.** Railway deployment is the next infrastructure task. The live dashboard cannot call the API for external users until this is done.
-- **Cross-chain / CCTP V2: DEFERRED.** `POST /pay` is Stellar-only. `routes/x402.ts` is dormant. Schema fields (`destinationChain`, `destinationTxHash`, `crossChain`) reserved.
+- **Cross-chain / CCTP V2: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. A 0.0100000 USDC mainnet Stellar → Base transfer completed burn, Iris attestation, Base relay, and transaction-history update on 2026-05-26. Approval-token CCTP path compiles but still needs live approval-path verification.
 - **Marketplace: LIVE on mainnet.** 86 providers / 493 endpoints via MPP Router (`apiserver.mpprouter.dev`). Provider-level enablement toggles. Search/filter on `GET /marketplace/services`. All policy paths verified E2E. ~20% markup to `ARGENS_FEE_WALLET`.
-- **SKILL.md: v2, deployed.** Accurate response shapes, marketplace discovery workflow, error codes, service discoverability. Accessible at `argens.xyz/SKILL.md`.
+- **SKILL.md: v3 local.** v2 is deployed; v3 documents CCTP response shapes and Base recipient rules. Deploy v3 after the current CCTP repair is reviewed.
 - **Approval flow: fixed.** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
 - **Email validation: live.** Signup rejects disposable domains and addresses that fail DNS MX check.
 - **What is NOT done yet:** Railway API deploy, example payloads, docs page, per-service skill files, demo Loom, error audit.
@@ -1101,7 +1101,7 @@ export function decryptSecretKey(enc: string): string {
 
 ## CCTP V2 — Cross-Chain Payments
 
-> **STATUS — 2026-05-11: DEFERRED to a later version.** Cross-chain / CCTP V2 is **not in the current build**. `POST /pay` is Stellar-only and does no chain detection; `routes/x402.ts` exists but is dormant. The nullable `destinationChain` / `destinationTxHash` / `crossChain` schema fields remain so no migration is needed when this is picked up. Everything in this section describes the *intended* design — treat it as a spec for future work, not shipped behaviour. Do not propose CCTP work as a near-term next step.
+> **STATUS — 2026-05-26: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. Direct-approved Stellar → Base CCTP completed on mainnet with burn + Iris attestation + Base relay. Approval-token CCTP path is implemented and builds, but still needs live approval-path verification before calling it fully done.
 
 CCTP V2 allows USDC to move natively between Stellar and 15+ chains via Circle's burn-and-mint mechanism. No bridges. No wrapped tokens. No wrapped USDC.
 
@@ -1145,12 +1145,11 @@ function detectChain(recipient: string): 'stellar' | 'base' {
 
 ### Fee handling for cross-chain payments
 
-Circle's CCTP V2 Fast Transfer charges a small protocol fee. In V1, Argens absorbs this within its 0.5% fee — the user sees one clean number. The agent is debited `amount + 0.5%` as normal. Do not pass Circle's protocol fee through as a separate line item in V1.
+Circle's CCTP V2 can charge a protocol fee depending on route and amount. V1 does **not** add an Argens direct-payment fee to CCTP payments. Marketplace markup remains marketplace-only.
 
 ```
-total_debited = amount + argens_fee (0.5%)
-Argens pays CCTP protocol fee from its own cut
-// On testnet: CCTP fees are not charged — works free for demo
+total_debited = amount
+// Any CCTP protocol fee is handled inside the burn/mint path via max_fee.
 ```
 
 ### Cross-chain success response
@@ -1158,13 +1157,25 @@ Argens pays CCTP protocol fee from its own cut
 ```json
 {
   "data": {
-    "status": "success",
+    "status": "cross_chain_pending",
     "transaction_id": "txn_abc123",
+    "stellar_tx_hash": "abc...xyz",
+    "destination_chain": "base",
+    "message": "USDC burned on Stellar. Relay to Base is in progress.",
+    "poll_url": "/v1/transactions/txn_abc123"
+  }
+}
+```
+
+After the relay completes, `GET /transactions/:id` returns:
+
+```json
+{
+  "data": {
+    "status": "SUCCESS",
     "stellar_tx_hash": "abc...xyz",
     "destination_tx_hash": "0xdef...456",
     "amount": "25.0000000",
-    "fee": "0.1250000",
-    "total_debited": "25.1250000",
     "recipient": "0xABC...123",
     "destination_chain": "base",
     "cross_chain": true,

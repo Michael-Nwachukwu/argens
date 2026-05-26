@@ -8,6 +8,20 @@ This file is the **single source of truth** for the Codex agent building Argens.
 
 ---
 
+## Status — 2026-05-26
+
+- **Network: Stellar MAINNET.** Live on mainnet. Testnet paths exist only for local-dev parity.
+- **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` is accessible at `argens.xyz/SKILL.md`. Vercel GitHub deployments must use root directory `apps/web`.
+- **API: local only.** Railway deployment is the #1 external-user blocker. The live dashboard cannot serve external users until the API is deployed.
+- **Marketplace: Phase 4 complete.** MPP Router mainnet integration is live locally: 86 providers / 493 endpoints, provider-level enablement toggles, search/filter endpoints, mainnet policy paths verified E2E, ~20% markup to `ARGENS_FEE_WALLET`.
+- **SKILL.md: v3.** v2 covered accurate response shapes, marketplace discovery, error codes, and service discoverability. v3 adds CCTP / `0x...` recipient guidance.
+- **CCTP V2 / Base settlement: direct path verified.** `POST /pay` accepts Base `0x...` addresses and routes Stellar → Base via Circle CCTP V2. A 0.0100000 USDC mainnet transfer completed burn, Iris attestation, Base relay, and transaction-history update. Approval-token CCTP path builds but still needs live approval-path verification.
+- **Approval flow: fixed for public token reads.** `GET /approve/:token` is public, magic-link based, and the token is the bearer credential. Cross-chain approval execution was being patched when the previous session stopped.
+- **Current CCTP follow-up:** verify the approval-token CCTP path with a small pending transaction, then deploy SKILL.md v3 only after review.
+- **What is NOT done yet:** Railway API deploy, example payloads, docs page, per-service skill files, `llms.txt`, error handling audit, demo script/Loom, ops XLM alerting, wallet-funded SSE E2E, low-balance email E2E.
+
+---
+
 ## Table of Contents
 
 1. [What Is Argens](#what-is-argens)
@@ -79,7 +93,7 @@ const account = await server.loadAccount(publicKey)
 Never assume:
 - A database migration has run
 - An environment variable is set
-- A Stellar testnet wallet is funded
+- A Stellar mainnet wallet is funded
 - A Soroban contract is deployed
 - A previous build step succeeded
 
@@ -176,7 +190,7 @@ const fee = new Decimal(amount).mul('0.005').toFixed(7)
 Before calling any task done, confirm:
 - Does the endpoint return the exact response shape in this file?
 - Does it handle error cases, not just the happy path?
-- Has it been tested against the testnet, not just mocked?
+- Has it been tested against the active network, not just mocked?
 - Would a staff engineer approve this without changes?
 
 If any answer is no — it is not done.
@@ -231,10 +245,10 @@ Review `tasks/lessons.md` at the start of every new session.
 ### 3. Verification Before Done
 
 Never mark a task complete without proving it works:
-- Run the endpoint against testnet
+- Run the endpoint against the active network
 - Check the database reflects expected state
 - Verify error cases, not just happy path
-- For payment flows: verify the Stellar transaction appears on the testnet explorer
+- For payment flows: verify the Stellar transaction appears on the relevant Stellar explorer
 
 ---
 
@@ -296,7 +310,7 @@ tasks/
 | Backend | Node.js, Express, TypeScript | Separate service from frontend |
 | Database | PostgreSQL via Prisma ORM | See schema below |
 | Smart Contracts | Soroban (Rust) | Policy enforcement on-chain |
-| Blockchain | Stellar — testnet first, mainnet later | USDC only in V1 |
+| Blockchain | Stellar **mainnet** (live) | USDC only in V1; `STELLAR_NETWORK=mainnet` |
 | Auth | Custom JWT + bcrypt | No third-party auth in V1 |
 | Email | Resend | Transactional emails only |
 | Hosting | Vercel (frontend), Railway (backend) | |

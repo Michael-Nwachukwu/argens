@@ -1,4 +1,4 @@
-# Argens Skill — v2 — updated 2026-05-25
+# Argens Skill — v3 — updated 2026-05-26
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -123,8 +123,9 @@ Same body as `/pay`. No payment made, no record created. Use this before large p
 
 ### POST /pay — execute a payment
 
-Direct USDC payment on Stellar. **$0 Argens fee** — the wallet is debited exactly `amount`.  
-Only Stellar addresses (`G...`, 56 chars) are accepted in V1.
+**Stellar (direct):** Send USDC to a Stellar address (`G...`, 56 chars). **$0 Argens fee** — wallet debited exactly `amount`.
+
+**Base (cross-chain via CCTP):** Send USDC to a Base EVM address (`0x...`, 42 chars). Argens burns on Stellar and mints on Base via Circle CCTP V2. No Argens direct-payment fee is added; any Circle protocol fee is handled inside the CCTP burn/mint path. Response returns immediately after the burn; poll `poll_url` for the Base `destination_tx_hash`.
 
 **Request:**
 ```json
@@ -179,6 +180,22 @@ Only Stellar addresses (`G...`, 56 chars) are accepted in V1.
 ```
 
 Poll `GET /v1/transactions/{id}` and check `data.status`. It will become `SUCCESS`, `APPROVED`, or `REJECTED`.
+
+**Cross-chain pending (200) — Base recipient only:**
+```json
+{
+  "data": {
+    "status": "cross_chain_pending",
+    "transaction_id": "clxyz126",
+    "stellar_tx_hash": "abc...xyz",
+    "destination_chain": "base",
+    "message": "USDC burned on Stellar. Relay to Base is in progress.",
+    "poll_url": "/v1/transactions/clxyz126"
+  }
+}
+```
+
+Poll until `data.status` is `SUCCESS` and `data.destination_tx_hash` is set — that hash is the Base mint transaction.
 
 ---
 
@@ -371,6 +388,9 @@ POST /marketplace/call
 - Never call `/pay` or `/marketplace/call` without stating the amount and purpose to the user first
 - Always call `/quote` before a large payment if you are unsure whether the policy allows it
 - Always call `GET /agent/status` to confirm key + balance before starting a session
+- `G...` (56 chars) = Stellar address → direct payment, $0 fee
+- `0x...` (42 chars) = Base EVM address → CCTP cross-chain, poll for `destination_tx_hash`
+- A `cross_chain_pending` response means the burn succeeded — poll `poll_url` until `SUCCESS`
 - `service_id` in `/marketplace/call` is the **endpoint id** (`endpoints[].id`), not the provider `id`
 - A `SERVICE_DISABLED` error means the provider is off in the user's dashboard — do not retry; tell the user to enable it
 - A `MARKETPLACE_NOT_MPP` error means no USDC was charged — the request payload was wrong; fix it and retry

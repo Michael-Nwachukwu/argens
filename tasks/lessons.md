@@ -4,6 +4,14 @@ Format: most recent first.
 
 ---
 
+## Lesson 2026-05-26 — Email delivery must surface provider setup errors
+
+**What went wrong:** Approval/blocked/low-balance emails appeared not to send, while the API continued the main flow and only logged the failure.
+**Root cause:** Resend rejected messages because the configured `updates.argens.xyz` sender domain is not verified, and the async email `.catch()` path did not make that visible in the dashboard/API response.
+**Rule going forward:** When testing notification-dependent flows, check provider logs and server logs immediately. Before demo or production, verify the sender domain and add an admin-visible health/check warning for email provider failures.
+
+---
+
 ## Lesson 2026-05-25 — Test new endpoints before reporting them done
 
 **What went wrong:** Added marketplace search/filter endpoints and reported them as done without curling them. The server was running stale compiled code and the endpoint returned 500. The user had to ask if they were tested before the issue was caught.
