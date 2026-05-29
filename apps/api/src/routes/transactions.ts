@@ -246,8 +246,6 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           data: { stellarTxHash },
         })
 
-        await incrementTotalSpent(userId, amount)
-
         void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
         void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
 
@@ -372,7 +370,7 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       where: { id: transaction_id, userId },
     })
 
-    if (!original) throw new NotFoundError('Transaction not found')
+    if (!original) throw new NotFoundError('Transaction')
 
     if (original.status !== 'SUCCESS') {
       sendError(res, 'Only transactions with SUCCESS status can be refunded.', 'REFUND_NOT_ELIGIBLE', 400, {
@@ -538,7 +536,7 @@ transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res,
       approvalQueue: { status: string; token: string; expiresAt: Date; actedAt: Date | null } | null
     } | null
 
-    if (!tx) throw new NotFoundError('Transaction not found')
+    if (!tx) throw new NotFoundError('Transaction')
 
     const horizonBase =
       process.env['STELLAR_NETWORK'] === 'mainnet'

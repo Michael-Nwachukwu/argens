@@ -8,17 +8,18 @@ This file is the **single source of truth** for the Codex agent building Argens.
 
 ---
 
-## Status — 2026-05-26
+## Status — 2026-05-27
 
 - **Network: Stellar MAINNET.** Live on mainnet. Testnet paths exist only for local-dev parity.
 - **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` is accessible at `argens.xyz/SKILL.md`. Vercel GitHub deployments must use root directory `apps/web`.
 - **API: local only.** Railway deployment is the #1 external-user blocker. The live dashboard cannot serve external users until the API is deployed.
-- **Marketplace: Phase 4 complete.** MPP Router mainnet integration is live locally: 86 providers / 493 endpoints, provider-level enablement toggles, search/filter endpoints, mainnet policy paths verified E2E, ~20% markup to `ARGENS_FEE_WALLET`.
-- **SKILL.md: v3.** v2 covered accurate response shapes, marketplace discovery, error codes, and service discoverability. v3 adds CCTP / `0x...` recipient guidance.
-- **CCTP V2 / Base settlement: direct path verified.** `POST /pay` accepts Base `0x...` addresses and routes Stellar → Base via Circle CCTP V2. A 0.0100000 USDC mainnet transfer completed burn, Iris attestation, Base relay, and transaction-history update. Approval-token CCTP path builds but still needs live approval-path verification.
-- **Approval flow: fixed for public token reads.** `GET /approve/:token` is public, magic-link based, and the token is the bearer credential. Cross-chain approval execution was being patched when the previous session stopped.
-- **Current CCTP follow-up:** verify the approval-token CCTP path with a small pending transaction, then deploy SKILL.md v3 only after review.
-- **What is NOT done yet:** Railway API deploy, example payloads, docs page, per-service skill files, `llms.txt`, error handling audit, demo script/Loom, ops XLM alerting, wallet-funded SSE E2E, low-balance email E2E.
+- **Marketplace: Phase 4 complete.** MPP Router mainnet integration is live locally: 86 providers / 493 endpoints, provider-level enablement toggles, search/filter endpoints, mainnet policy paths verified E2E, marketplace revenue routed to `ARGENS_FEE_WALLET`.
+- **SKILL.md: v4 local.** v4 covers CCTP / `0x...` recipient guidance, per-provider skill files, `/docs`, and `/llms.txt`.
+- **Docs and discoverability: implemented locally.** `/docs`, `/llms.txt`, API provider skill markdown, and web `/SKILL/<provider>.md` proxy all build and smoke-test locally. Deploy still depends on normal Vercel flow.
+- **CCTP V2 / Base settlement: direct path verified twice.** `POST /pay` accepts Base `0x...` addresses and routes Stellar → Base via Circle CCTP V2. Latest 0.0100000 USDC mainnet verification: transaction `cmpn8yh5900011uqzobaa94qn`, Stellar burn `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044`, Base relay `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`. Approval-token CCTP path builds but still needs live approval-path verification.
+- **Approval flow: fixed for public token reads.** `GET /approve/:token` is public, magic-link based, and the token is the bearer credential. Cross-chain approval execution is wired but still needs live approval-path verification.
+- **Current CCTP follow-up:** verify the approval-token CCTP path with a small pending transaction, then deploy SKILL.md v4 after review.
+- **What is NOT done yet:** Railway API deploy, approval-token CCTP live verification, example payloads, full endpoint-by-endpoint error audit, demo script/Loom, ops XLM alerting, wallet-funded SSE E2E, low-balance email E2E.
 
 ---
 
@@ -51,7 +52,7 @@ This file is the **single source of truth** for the Codex agent building Argens.
 
 ## What Is Argens?
 
-Argens is a programmable payment infrastructure platform for autonomous AI agents. It gives AI agents the ability to spend USDC autonomously on the Stellar blockchain, within human-defined spending policies enforced by Soroban smart contracts.
+Argens is a programmable payment infrastructure platform for autonomous AI agents. It gives AI agents the ability to spend USDC autonomously on Stellar, within human-defined spending policies enforced by the TypeScript policy engine in V1.
 
 **One-line pitch:** Argens gives your AI agent the ability to pay — an API key that authorizes autonomous USDC spending on Stellar, within rules you define.
 
@@ -59,7 +60,7 @@ Argens is a programmable payment infrastructure platform for autonomous AI agent
 1. **Smart Wallet** — **agent-custodial** USDC wallet on Stellar. Argens holds an encrypted signing key so agents can transact autonomously within policy. Developer funds the wallet with USDC, and can export the private key at any time. Manual dashboard transfers are also supported (with optional 4-digit transfer PIN).
 2. **Policy Engine** — TypeScript-enforced spending rules. Three rules in V1: Allowance, Max Transaction, Approval Threshold. This is the permanent V1 policy engine — Soroban was dropped (see Key Decisions).
 3. **REST API** — any AI agent can call with just an API key. No blockchain knowledge required.
-4. **MPP Marketplace** — a curated catalog of AI services (LLMs, data, tooling) that agents can call and pay for in a single step. Argens applies a ~20% markup — this is the primary revenue model. Direct USDC transfers carry no Argens fee.
+4. **MPP Marketplace** — a curated catalog of AI services (LLMs, data, tooling) that agents can call and pay for in a single step. Marketplace spread is the primary revenue model. Direct USDC transfers carry no Argens fee.
 
 > **Custody terminology.** Do not write "non-custodial" in code, comments, user-facing strings, or docs. Use **agent-custodial** and explain the trade-off when asked. This language must stay consistent with the PRD.
 

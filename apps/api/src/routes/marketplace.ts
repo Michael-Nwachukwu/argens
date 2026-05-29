@@ -14,6 +14,7 @@ import { sendSuccess, sendError } from '../lib/response.js'
 import { AppError } from '../lib/errors.js'
 import {
   executeMarketplaceCall,
+  getMarketplaceProviderSkillMarkdown,
   getMarketplaceServicesForResponse,
   MarketplaceBlockedError,
   MarketplacePendingApprovalError,
@@ -42,7 +43,7 @@ marketplaceRouter.get('/marketplace/services', requireJwtOrApiKey, async (req, r
   try {
     const parsed = MarketplaceServicesQuerySchema.safeParse(req.query)
     if (!parsed.success) {
-      sendError(res, 'Invalid query parameters', 'VALIDATION_ERROR', 400)
+      sendError(res, 'Invalid query parameters', 'VALIDATION_ERROR', 400, parsed.error.flatten())
       return
     }
     const { search, category, enabled } = parsed.data
@@ -73,6 +74,33 @@ marketplaceRouter.get('/marketplace/services', requireJwtOrApiKey, async (req, r
     }
 
     sendSuccess(res, providers)
+  } catch (err) {
+    next(err)
+  }
+})
+
+marketplaceRouter.get('/marketplace/services/:providerId/skill.md', async (req, res, next) => {
+  try {
+    const providerId = req.params.providerId
+    if (!providerId || Array.isArray(providerId)) {
+      sendError(res, 'Invalid provider id.', 'INVALID_REQUEST', 400)
+      return
+    }
+
+    const markdown = await getMarketplaceProviderSkillMarkdown(providerId)
+    if (!markdown) {
+      sendError(res, 'Marketplace provider not found', 'SERVICE_NOT_FOUND', 404)
+      return
+    }
+
+    res
+      .status(200)
+      .set({
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=300',
+      })
+      .send(markdown)
   } catch (err) {
     next(err)
   }

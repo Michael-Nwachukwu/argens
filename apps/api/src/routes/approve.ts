@@ -77,6 +77,9 @@ approveRouter.get('/approve/:token', async (req, res, next) => {
         memo: tx.memo,
         service_id: tx.serviceId,
         cost_paid: tx.costPaid?.toFixed(7) ?? null,
+        destination_chain: tx.destinationChain,
+        destination_tx_hash: tx.destinationTxHash,
+        cross_chain: tx.crossChain,
         created_at: tx.createdAt,
       },
       approval: {
@@ -247,17 +250,25 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
           }
         })()
       } catch (burnErr) {
+        const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
+        const errStr = String(burnErr)
+        const errJson = (() => { try { return JSON.stringify(burnErr) } catch { return null } })()
         logger.error('CCTP burn failed on approval', {
           userId,
           transactionId: transaction.id,
-          error: (burnErr as Error).message,
+          error: errMsg,
+          raw: errStr,
+          json: errJson,
         })
         await prisma.transaction.update({
           where: { id: transaction.id },
-          data: { status: 'FAILED', blockedReason: (burnErr as Error).message },
+          data: { status: 'FAILED', blockedReason: errMsg || errStr },
         })
         sendError(res, 'Cross-chain payment failed during burn on Stellar.', 'CCTP_BURN_FAILED', 502, {
           transaction_id: transaction.id,
+          error: errMsg,
+          raw: errStr,
+          json: errJson,
         })
       }
     } else {

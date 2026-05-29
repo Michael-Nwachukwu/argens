@@ -10,16 +10,18 @@
 **Goal:** Finish the CCTP verification loop, document the API clearly for agents/developers, expose per-service skill files, and tighten loose error-handling edges.
 **Files affected:** `apps/api/src/routes/*`, `apps/api/src/services/*`, `apps/web/public/SKILL.md`, `apps/web/public/llms.txt`, `apps/web/app/docs/page.tsx`, `tasks/*`, docs/status files.
 **Steps:**
-- [ ] Explain the approval-token CCTP status in plain language.
-- [ ] Run another small mainnet CCTP burn through the public API-key endpoints and verify both Stellar + Base hashes.
-- [ ] Ensure `POST /quote`, `POST /pay`, `GET /transactions/:id`, and approval paths return complete CCTP response shapes.
-- [ ] Update `/SKILL.md` with CCTP, docs, `llms.txt`, and per-service skill discovery.
-- [ ] Add `GET /marketplace/services/:providerId/skill.md` for agent-readable per-provider service docs.
-- [ ] Add `/SKILL/<provider>.md` proxy endpoint on the web app for service skill files.
-- [ ] Create `/docs` with a comprehensive responsive guide and code snippets.
-- [ ] Add `/llms.txt` so agents can discover Argens docs and skill entry points.
-- [ ] Audit expected endpoint errors for clean response envelopes and fix obvious loose ends.
-- [ ] Run API/web builds and focused endpoint smoke tests.
+- [x] Explain the approval-token CCTP status in plain language.
+- [x] Run another small mainnet CCTP burn through the public API-key endpoints and verify both Stellar + Base hashes.
+- [x] Ensure `POST /quote`, `POST /pay`, `GET /transactions/:id`, and approval paths return complete CCTP response shapes.
+- [x] Update `/SKILL.md` with CCTP, docs, `llms.txt`, and per-service skill discovery.
+- [x] Add `GET /marketplace/services/:providerId/skill.md` for agent-readable per-provider service docs.
+- [x] Add `/SKILL/<provider>.md` proxy endpoint on the web app for service skill files.
+- [x] Create `/docs` with a comprehensive responsive guide and code snippets.
+- [x] Add `/llms.txt` so agents can discover Argens docs and skill entry points.
+- [x] Audit expected endpoint errors for clean response envelopes and fix obvious loose ends.
+- [x] Run API/web builds and focused endpoint smoke tests.
+**Verification:** New 0.0100000 USDC CCTP mainnet tx `cmpn8yh5900011uqzobaa94qn` succeeded with Stellar burn `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044` and Base relay `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`. API/web builds passed. Local smoke tests passed for `/v1/marketplace/services/agentmail/skill.md`, `/docs`, `/llms.txt`, and `/SKILL/agentmail.md`.
+**Follow-up:** Approval-token CCTP still needs a live pending-approval payment test. The direct path has now been verified twice.
 **Risks:** Mainnet CCTP tests spend real USDC/Base gas; MPP Router catalog shape may drift; documentation must not overpromise unverified approval-path behavior.
 **Done when:** A new CCTP tx succeeds end-to-end, service skill discovery works, docs build, errors are cleaner, and task/status docs match reality.
 
@@ -72,18 +74,18 @@
 
 - [ ] **Railway API deploy** — biggest external-user blocker; dashboard is non-functional without it
 - [ ] **Example payloads** — `example_payload` is always `null`; marketplace call form has no prefills; need a generation pipeline (curated + OpenAPI extraction + LLM-generated fallback)
-- [ ] **Documentation page** (`/docs`) — at minimum: quickstart, API reference, policies explainer, marketplace guide, agent onboarding walkthrough
+- [x] **Documentation page** (`/docs`) — quickstart, API reference, policies, marketplace, CCTP, agent onboarding
 
 ### Medium priority
 
-- [ ] **Error handling audit** — walk every endpoint, confirm all error cases return correct codes and shapes; prerequisite for SCF demo quality
+- [x] **Targeted error handling audit** — fixed obvious CCTP/marketplace loose ends; full endpoint-by-endpoint audit can still happen before demo
 - [ ] **Demo script** — define the exact scenario: signup → fund → set policy → agent pays → block → approve → marketplace call
 - [ ] **Loom demo recording** — required for SCF submission
 
 ### Lower priority (after above)
 
-- [ ] Per-service skill files (`/SKILL/<provider>.md`) — sourced from `docs.llms_txt` field in MPP catalog
-- [ ] `llms.txt` at argens.xyz/llms.txt — links SKILL.md + docs pages; depends on docs existing first
+- [x] Per-service skill files (`/SKILL/<provider>.md`) — generated from the MPP catalog and upstream docs links
+- [x] `llms.txt` at argens.xyz/llms.txt — links SKILL.md + docs pages
 - [ ] XLM balance alerting on ops wallet
 - [ ] Wallet-funded SSE watcher E2E test
 - [ ] Low balance email E2E verification
@@ -92,7 +94,6 @@
 
 ## Deferred (not V1)
 
-- CCTP V2 / Base settlement
 - SDK (@argens/sdk npm)
 - Soroban contract enforcement
-- Multi-chain routing
+- Multi-chain routing beyond Stellar and Base

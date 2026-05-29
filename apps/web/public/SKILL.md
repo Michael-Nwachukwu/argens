@@ -1,4 +1,4 @@
-# Argens Skill — v3 — updated 2026-05-26
+# Argens Skill — v4 — updated 2026-05-27
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -251,7 +251,7 @@ Returns full transaction detail including current status. Use to poll a `pending
 
 The Argens Marketplace connects agents to 80+ paid AI services (LLMs, web search, email, data APIs, and more). You call a service and pay for it in a single API call — Argens handles the USDC payment automatically.
 
-**Pricing:** Services show their base price. Argens adds a ~20% markup to cover infrastructure. The `cost_paid` field in the response is the total amount debited (base + markup). The same policy rules apply to marketplace calls.
+**Pricing:** Services show their provider price. The `cost_paid` field in the response is the total amount debited for a completed marketplace call. The same policy rules apply to marketplace calls.
 
 **Prerequisite:** The developer must enable a provider from their dashboard before agents can call it. If a provider is disabled, calls return `403 SERVICE_DISABLED`.
 
@@ -287,6 +287,8 @@ GET /marketplace/services/{provider_id}
   "is_enabled": true,
   "status": "active",
   "docs_url": "https://agentmail.to/docs",
+  "skill_url": "https://argens.xyz/SKILL/agentmail.md",
+  "api_skill_url": "/v1/marketplace/services/agentmail/skill.md",
   "endpoint_count": 12,
   "endpoints": [
     {
@@ -305,6 +307,18 @@ GET /marketplace/services/{provider_id}
 - `id` — the provider key (e.g. `"agentmail"`). Used to enable/disable the provider; NOT used for calling.
 - `endpoints[].id` — the endpoint operation id (e.g. `"agentmail_inboxes_create"`). **This is `service_id` in `/marketplace/call`.**
 - `endpoints[].path` — the upstream API path. Read this and `description` to understand what the endpoint does.
+- `skill_url` — provider-specific instructions agents can read after discovering a provider.
+- `api_skill_url` — the same provider skill served from the API.
+
+**Provider skill files:**
+After choosing a provider, fetch its provider skill file before constructing the call:
+
+```
+GET https://argens.xyz/SKILL/{provider_id}.md
+GET https://api.argens.io/v1/marketplace/services/{provider_id}/skill.md
+```
+
+These files list the provider's endpoint ids, paths, prices shown by the provider, upstream docs, and response-handling rules.
 
 ---
 
@@ -367,13 +381,15 @@ POST /marketplace/call
    → find the right provider and its endpoints
    → note the endpoint's "id" field
 
-2. Confirm provider "is_enabled": true
+2. Fetch /SKILL/{provider_id}.md for provider-specific endpoint guidance
+
+3. Confirm provider "is_enabled": true
    → if false, tell the user to enable it from https://argens.xyz/dashboard/marketplace
 
-3. POST /marketplace/call
+4. POST /marketplace/call
    { "service_id": "<endpoint id>", "payload": { ...per service docs... } }
 
-4. Handle the response:
+5. Handle the response:
    200 → success, read "result" for the upstream response
    402 → blocked by policy, report to user, do not retry
    202 → pending approval, poll /v1/transactions/{id}
@@ -392,5 +408,15 @@ POST /marketplace/call
 - `0x...` (42 chars) = Base EVM address → CCTP cross-chain, poll for `destination_tx_hash`
 - A `cross_chain_pending` response means the burn succeeded — poll `poll_url` until `SUCCESS`
 - `service_id` in `/marketplace/call` is the **endpoint id** (`endpoints[].id`), not the provider `id`
+- Fetch `/SKILL/{provider_id}.md` after service discovery when you need endpoint-specific marketplace instructions
 - A `SERVICE_DISABLED` error means the provider is off in the user's dashboard — do not retry; tell the user to enable it
 - A `MARKETPLACE_NOT_MPP` error means no USDC was charged — the request payload was wrong; fix it and retry
+
+---
+
+## Other public discovery files
+
+- Full docs: `https://argens.xyz/docs`
+- LLM discovery index: `https://argens.xyz/llms.txt`
+
+`SKILL.md` is the primary instruction file. `llms.txt` is an index that helps agents and crawlers find `SKILL.md`, `/docs`, marketplace discovery, and provider skill files.

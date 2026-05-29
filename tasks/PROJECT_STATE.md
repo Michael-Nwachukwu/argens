@@ -1,7 +1,7 @@
 # Argens — Project State
 
-> Last updated: 2026-05-26
-> Current phase: **Phase 4 complete → Phase 5 (Polish & Demo) + CCTP verification**
+> Last updated: 2026-05-27
+> Current phase: **Phase 4 complete → Phase 5 (Polish & Demo) + approval-token CCTP verification**
 
 ---
 
@@ -12,13 +12,13 @@
 | Network | ✅ Mainnet live | STELLAR_NETWORK=mainnet |
 | Web app | ✅ Live on Vercel | argens.xyz — landing + full dashboard |
 | API | ⚠️ Local only | Railway deploy is the next infrastructure task |
-| SKILL.md | ✅ v3 local | v2 deployed; v3 adds CCTP response shapes and Base recipient rules |
+| SKILL.md | ✅ v4 local | v4 adds per-service skill discovery, docs, and llms.txt guidance |
 | Phase 1 — Foundation | ✅ Complete | Auth, wallet bootstrap, API keys |
 | Phase 2 — Core API | ✅ Complete | All payment/policy/transaction endpoints |
 | Phase 3 — Dashboard | ✅ Complete | All pages built and functional |
 | Phase 4 — Marketplace | ✅ Complete | 86 providers, E2E verified on mainnet |
 | Phase 5 — Polish & Demo | 🔄 In progress | Partially done; see below |
-| CCTP Stellar → Base | ✅ Direct path verified | 0.0100000 USDC mainnet burn + Iris attestation + Base relay succeeded locally |
+| CCTP Stellar → Base | ✅ Direct path verified twice | Latest 0.0100000 USDC mainnet burn + Base relay succeeded locally on 2026-05-27 |
 | Phase 6 — Mainnet infra | ⚠️ Partial | Mainnet code is live; Railway + alerting pending |
 
 ---
@@ -93,6 +93,7 @@
 - [x] GET /marketplace/services — all providers, grouped by provider key
 - [x] GET /marketplace/services?search=&category=&enabled= — server-side filtering
 - [x] GET /marketplace/services/:providerId — single provider detail
+- [x] GET /marketplace/services/:providerId/skill.md — public provider-specific skill markdown
 - [x] PATCH /marketplace/services/:serviceId — enable/disable provider toggle
 - [x] POST /marketplace/call — proxy + markup + policy + tx log
 - [x] Provider-level MarketplaceServiceSetting (migration applied — collapsed from operation-keyed)
@@ -110,11 +111,12 @@
 - [x] Meta title, description, OG, Twitter card tags
 - [x] Vercel build fixed — removed vestigial (dashboard) route group
 - [x] Vercel root directory set to apps/web for GitHub integration
+- [x] SKILL.md v4 local — adds `/docs`, `/llms.txt`, and per-provider skill file discovery
+- [x] Documentation page (`/docs`) — quickstart, payments, CCTP, approvals, marketplace, errors
+- [x] Per-service skill files (`/SKILL/<provider>.md`) — web proxy + API markdown endpoint
+- [x] llms.txt at `/llms.txt` — discovery index for agents and crawlers
+- [x] Targeted error handling audit — CCTP burn details, duplicate spend accounting, marketplace replay query metadata, cleaner marketplace validation details
 - [ ] Example payloads for marketplace endpoints
-- [ ] Documentation page (/docs) — quickstart, API reference, policies, marketplace, agent onboarding
-- [ ] Per-service skill files (/SKILL/<provider>.md)
-- [ ] llms.txt at argens.xyz/llms.txt (depends on docs page)
-- [ ] Error handling audit — all endpoints
 - [ ] Demo script rehearsed
 - [ ] Loom demo recording (SCF submission requirement)
 
@@ -139,20 +141,19 @@
 | Priority | Task | Blocks |
 |---|---|---|
 | 1 | **Railway API deploy** | Everything for external users |
-| 2 | **Example payloads** | Marketplace UX usable by agents |
-| 3 | **Documentation page** | External onboarding, llms.txt |
-| 4 | **Error handling audit** | Phase 5 gate, SCF demo quality |
+| 2 | **Approval-token CCTP live verification** | Accurate CCTP claims for approval flow |
+| 3 | **Example payloads** | Marketplace UX usable by agents |
+| 4 | **Full endpoint-by-endpoint error audit** | Phase 5 gate, SCF demo quality |
 | 5 | **Loom demo** | SCF submission |
-| 6 | **Per-service skill files + llms.txt** | Agent DX, after docs |
+| 6 | **Demo script** | SCF submission |
 
 ---
 
 ## What Is Not In Scope (V1)
 
-- CCTP V2 / Base settlement — deferred
 - Soroban contract enforcement — dropped (TS policy engine is permanent V1)
 - SDK (@argens/sdk npm package) — V2
-- Multi-chain routing beyond Stellar — V2
+- Multi-chain routing beyond Stellar and Base — V2
 - KYC / AML — not in scope
 
 ---
@@ -187,3 +188,11 @@
 | Fee on direct payments | $0 — single-op Stellar tx, no Argens fee |
 | Service discoverability | GET /marketplace/services with ?search, ?category, ?enabled filters |
 | Agent onboarding | SKILL.md at argens.xyz/SKILL.md — no SDK in V1 |
+
+## Latest CCTP Verification
+
+- Transaction id: `cmpn8yh5900011uqzobaa94qn`
+- Amount: `0.0100000` USDC
+- Stellar burn tx: `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044`
+- Base relay tx: `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`
+- Status: `SUCCESS`
