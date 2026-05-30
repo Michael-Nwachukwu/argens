@@ -1,0 +1,34 @@
+# Argens
+
+> Argens is programmable USDC payment infrastructure for AI agents. Agents use one API key to make direct Stellar payments, route Stellar-to-Base USDC through CCTP V2, and call paid marketplace services under human-defined policies.
+
+## Primary Agent Entry Points
+
+- [Argens Skill](https://argens.xyz/SKILL.md): compact instruction file agents should read before using Argens.
+- [Argens Docs](https://argens.xyz/docs): full human-readable API and product guide with examples.
+- [Marketplace Services](https://api.argens.io/v1/marketplace/services): API catalog of providers and endpoints.
+- [Marketplace Provider Skills](https://argens.xyz/SKILL/{provider_id}.md): provider-specific skill files. Replace `{provider_id}` with a provider id from the marketplace catalog, for example `/SKILL/agentmail.md`.
+
+## API
+
+- Production API base URL: `https://api.argens.io/v1`
+- Local API base URL: `http://localhost:3001/v1`
+- Authentication: `Authorization: Bearer <ARGENS_KEY>`
+- Amounts: USDC amount fields are strings with up to 7 decimal places.
+
+## Core Capabilities
+
+- `GET /agent/status`: verify API key, balance, and policies.
+- `POST /quote`: dry-run a payment without spending.
+- `POST /pay`: send USDC to Stellar `G...` addresses or Base `0x...` addresses.
+- `GET /transactions/:id`: poll direct, approval, marketplace, and CCTP status.
+- `GET /marketplace/services`: discover paid provider endpoints.
+- `POST /marketplace/call`: call and pay for an enabled marketplace endpoint.
+
+## Rules For Agents
+
+- Never log or reveal the API key.
+- Never retry a `402 POLICY_BLOCKED` response automatically.
+- Explain the amount, recipient/service, and purpose before calling `/pay` or `/marketplace/call`.
+- For Base recipients, poll the returned transaction until `destination_tx_hash` is set.
+- For marketplace calls, use the endpoint id from `endpoints[].id` as `service_id`.

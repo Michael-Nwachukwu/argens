@@ -115,6 +115,8 @@ export async function getMarketplaceServicesForResponse(userId: string) {
       availability_note: limited ? 'Some endpoints have limited metadata.' : null,
       payment_rail: 'stellar-mainnet',
       docs_url: docsUrl,
+      skill_url: `${publicWebBaseUrl()}/SKILL/${id}.md`,
+      api_skill_url: `/v1/marketplace/services/${id}/skill.md`,
       endpoint_count: ops.length,
       endpoints: ops
         .map((o) => ({
@@ -131,6 +133,98 @@ export async function getMarketplaceServicesForResponse(userId: string) {
   })
 
   return providers.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export async function getMarketplaceProviderSkillMarkdown(providerId: string): Promise<string | null> {
+  const services = await listMppRouterServices()
+  const ops = services
+    .filter((service) => providerKey(service) === providerId)
+    .sort((a, b) => operationLabel(a).localeCompare(operationLabel(b)))
+
+  if (ops.length === 0) return null
+
+  const name = providerDisplayName(ops[0]!)
+  const description = `${ops.length} ${name} endpoints available through the Argens marketplace.`
+  const categories = [...new Set(ops.flatMap(normalizeCategories))].sort()
+  const docs = collectProviderDocs(ops)
+  const first = ops[0]!
+
+  return [
+    `# Argens Marketplace Skill — ${name}`,
+    '',
+    `Provider id: \`${providerId}\``,
+    `Payment rail: Stellar mainnet USDC through Argens marketplace`,
+    `Status: ${ops.some((o) => o.status === 'limited') ? 'limited metadata' : 'active'}`,
+    categories.length ? `Categories: ${categories.map((c) => `\`${c}\``).join(', ')}` : null,
+    '',
+    description,
+    '',
+    '## How agents should use this provider',
+    '',
+    '1. Ask the user for their Argens API key and set `Authorization: Bearer <ARGENS_KEY>`.',
+    '2. Check `GET /v1/agent/status` for wallet balance and policy limits.',
+    `3. Confirm this provider is enabled with \`GET /v1/marketplace/services/${providerId}\`.`,
+    '4. Pick an endpoint from this file and pass its endpoint id as `service_id` to `POST /v1/marketplace/call`.',
+    '5. Explain the service, expected cost, and purpose to the user before making the call.',
+    '',
+    'If the provider is disabled, `POST /v1/marketplace/call` returns `403 SERVICE_DISABLED`. Do not retry; tell the user to enable the provider in the Argens dashboard.',
+    '',
+    '## Call shape',
+    '',
+    '```http',
+    'POST https://api.argens.io/v1/marketplace/call',
+    'Authorization: Bearer <ARGENS_KEY>',
+    'Content-Type: application/json',
+    '```',
+    '',
+    '```json',
+    JSON.stringify(
+      {
+        service_id: first.id,
+        payload: {},
+        query: {},
+      },
+      null,
+      2,
+    ),
+    '```',
+    '',
+    'Use `payload` for the upstream JSON body and `query` for URL query parameters. Omit either field when the endpoint does not need it.',
+    '',
+    '## Endpoints',
+    '',
+    ...ops.flatMap((op) => [
+      `### ${operationLabel(op)}`,
+      '',
+      `- Endpoint id: \`${op.id}\``,
+      `- Method: \`${op.method}\``,
+      `- Upstream path: \`${op.public_path}\``,
+      `- Price shown by provider: ${op.price}`,
+      op.description ? `- Description: ${op.description}` : null,
+      op.docs_url ? `- Docs: ${op.docs_url}` : null,
+      '',
+    ]),
+    docs.length ? '## Upstream Docs' : null,
+    '',
+    ...docs.map((url) => `- ${url}`),
+    '',
+    '## Response handling',
+    '',
+    '- `200` with `data.status: "success"` means the marketplace call completed. Read `data.result` for the upstream response.',
+    '- `202` means the transaction needs human approval. Poll `data.poll_url` until the transaction resolves.',
+    '- `402 POLICY_BLOCKED` means policy blocked the spend. Do not retry automatically.',
+    '- `403 SERVICE_DISABLED` means the user must enable this provider in the dashboard.',
+    '- `502 MARKETPLACE_NOT_MPP` means the upstream service rejected the request before payment. No USDC was charged; fix the request payload or query.',
+    '',
+    '## More Argens context',
+    '',
+    `- Argens skill: ${publicWebBaseUrl()}/SKILL.md`,
+    `- Argens docs: ${publicWebBaseUrl()}/docs`,
+    `- Provider skill URL: ${publicWebBaseUrl()}/SKILL/${providerId}.md`,
+    '',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n')
 }
 
 /** Enable or disable a whole provider (all of its endpoints) for a user. */
@@ -287,6 +381,7 @@ async function executeMarketplaceCallInternal(
             walletId: wallet.id,
             service,
             payload,
+            query: input.query,
             cost: challengeCost,
             status: 'BLOCKED',
             policyResult,
@@ -315,6 +410,7 @@ async function executeMarketplaceCallInternal(
             walletId: wallet.id,
             service,
             payload,
+            query: input.query,
             cost: challengeCost,
             status: 'PENDING_APPROVAL',
             policyResult,
@@ -334,6 +430,7 @@ async function executeMarketplaceCallInternal(
           walletId: wallet.id,
           service,
           payload,
+          query: input.query,
           cost: challengeCost,
           status: 'APPROVED',
           policyResult,
@@ -401,7 +498,7 @@ async function executeMarketplaceCallInternal(
       stellarTxHash: mppHash,
       policyResult: state.policyResultForTx as unknown as object | undefined,
       metadata: {
-        marketplace: buildStoredMarketplaceRequest(service.id, payload),
+        marketplace: buildStoredMarketplaceRequest(service.id, payload, input.query),
         mpp_router: {
           public_path: service.public_path,
           challenge: sanitizeChallenge(finalChallenge),
@@ -515,6 +612,7 @@ async function createMarketplaceTransaction(params: {
   walletId: string
   service: MppRouterService
   payload: Record<string, unknown>
+  query?: Record<string, string | number | boolean>
   cost: CostBreakdown
   status: 'APPROVED' | 'BLOCKED' | 'PENDING_APPROVAL'
   policyResult: PolicyResult
@@ -532,11 +630,11 @@ async function createMarketplaceTransaction(params: {
       status: params.status,
       type: 'marketplace',
       serviceId: params.service.id,
-      serviceEndpoint: buildMppRouterUrl(params.service),
+      serviceEndpoint: buildMppRouterUrl(params.service, params.query),
       costPaid: params.cost.totalString,
       memo: `MPP ${params.service.id}`.slice(0, 28),
       metadata: {
-        marketplace: buildStoredMarketplaceRequest(params.service.id, params.payload),
+        marketplace: buildStoredMarketplaceRequest(params.service.id, params.payload, params.query),
         mpp_router: {
           public_path: params.service.public_path,
           challenge: sanitizeChallenge(params.challenge),
@@ -586,6 +684,21 @@ function normalizeCategories(service: MppRouterService): string[] {
     .map((category) => category.toLowerCase())
 }
 
+function publicWebBaseUrl(): string {
+  return (process.env['ARGENS_WEB_URL'] ?? process.env['WEB_URL'] ?? 'https://argens.xyz').replace(/\/$/, '')
+}
+
+function collectProviderDocs(services: MppRouterService[]): string[] {
+  const docs = new Set<string>()
+  for (const service of services) {
+    if (service.docs_url) docs.add(service.docs_url)
+    if (service.docs?.homepage) docs.add(service.docs.homepage)
+    if (service.docs?.llms_txt) docs.add(service.docs.llms_txt)
+    if (service.docs?.api_reference) docs.add(service.docs.api_reference)
+  }
+  return [...docs].sort()
+}
+
 function formatAmount(amount: Decimal): string {
   return amount.toDecimalPlaces(7).toFixed(7)
 }
@@ -612,8 +725,9 @@ function sanitizeChallenge(challenge: MppChallengeSnapshot) {
 function buildStoredMarketplaceRequest(
   serviceId: string,
   payload: Record<string, unknown>,
+  query?: Record<string, string | number | boolean>,
 ): MarketplaceCallInput {
-  return { serviceId, payload }
+  return { serviceId, payload, ...(query ? { query } : {}) }
 }
 
 function getStoredMarketplaceRequest(metadata: unknown): MarketplaceCallInput | null {
@@ -629,5 +743,8 @@ function getStoredMarketplaceRequest(metadata: unknown): MarketplaceCallInput | 
     payload: record['payload'] && typeof record['payload'] === 'object'
       ? record['payload'] as Record<string, unknown>
       : {},
+    query: record['query'] && typeof record['query'] === 'object'
+      ? record['query'] as Record<string, string | number | boolean>
+      : undefined,
   }
 }

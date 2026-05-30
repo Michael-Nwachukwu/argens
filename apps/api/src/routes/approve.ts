@@ -25,6 +25,14 @@ import { submitPayment } from '../services/payment.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { sendApprovalActedEmail } from '../services/email.js'
 import { executeApprovedMarketplaceTransaction } from '../services/marketplace.js'
+import { isEvmAddress } from '../services/stellar.js'
+import {
+  burnUsdcOnStellar,
+  encodeEvmRecipient,
+  pollAttestation,
+  relayOnBase,
+  BASE_DOMAIN,
+} from '../services/cctp.js'
 
 export const approveRouter: Router = ExpressRouter()
 
@@ -69,6 +77,9 @@ approveRouter.get('/approve/:token', async (req, res, next) => {
         memo: tx.memo,
         service_id: tx.serviceId,
         cost_paid: tx.costPaid?.toFixed(7) ?? null,
+        destination_chain: tx.destinationChain,
+        destination_tx_hash: tx.destinationTxHash,
+        cross_chain: tx.crossChain,
         created_at: tx.createdAt,
       },
       approval: {
@@ -181,55 +192,135 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
       return
     }
 
-    // Execute Stellar payment
-    try {
-      const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
-        senderSecretKey: secretKey,
-        recipientPublicKey: transaction.recipientAddress,
-        amount,
-        memo: transaction.memo ?? null,
-      })
+    const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
 
-      await prisma.transaction.update({
-        where: { id: transaction.id },
-        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-      })
+    if (isEvmAddress(transaction.recipientAddress)) {
+      // ── CCTP cross-chain: burn on Stellar, fire-and-forget relay to Base ────
+      try {
+        const mintRecipient32 = encodeEvmRecipient(transaction.recipientAddress)
+        const { stellarTxHash } = await burnUsdcOnStellar(
+          secretKey,
+          amount,
+          BASE_DOMAIN,
+          mintRecipient32,
+        )
 
-      await incrementTotalSpent(userId, amount)
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            stellarTxHash,
+            crossChain: true,
+            destinationChain: 'base',
+          },
+        })
 
-      void sendApprovalActedEmail(userId, transaction.id, 'approved', amount).catch(
-        (e: unknown) =>
-          logger.error('Failed to send approval acted email', {
-            userId,
-            error: (e as Error).message,
-          }),
-      )
+        void sendApprovalActedEmail(userId, transaction.id, 'approved', amount).catch(
+          (e: unknown) =>
+            logger.error('Failed to send approval acted email', { userId, error: (e as Error).message }),
+        )
 
-      sendSuccess(res, {
-        status: 'approved',
-        transaction_id: transaction.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount,
-      })
-    } catch (stellarErr) {
-      logger.error('Stellar payment failed on approval', {
-        userId,
-        transactionId: transaction.id,
-        error: (stellarErr as Error).message,
-      })
+        sendSuccess(res, {
+          status: 'cross_chain_pending',
+          transaction_id: transaction.id,
+          stellar_tx_hash: stellarTxHash,
+          destination_chain: 'base',
+          message: 'USDC burned on Stellar. Relay to Base is in progress.',
+          poll_url: `/v1/transactions/${transaction.id}`,
+        })
 
-      await prisma.transaction.update({
-        where: { id: transaction.id },
-        data: {
-          status: 'FAILED',
-          blockedReason: (stellarErr as Error).message,
-        },
-      })
+        void (async () => {
+          try {
+            const { message, attestation } = await pollAttestation(stellarTxHash)
+            const { baseTxHash } = await relayOnBase(message, attestation)
+            await prisma.transaction.update({
+              where: { id: transaction.id },
+              data: { status: 'SUCCESS', destinationTxHash: baseTxHash },
+            })
+            await incrementTotalSpent(userId, amount)
+            logger.info('CCTP relay complete (approved path)', { txId: transaction.id, baseTxHash })
+          } catch (relayErr) {
+            await prisma.transaction.update({
+              where: { id: transaction.id },
+              data: { status: 'FAILED', blockedReason: (relayErr as Error).message },
+            })
+            logger.error('CCTP relay failed (approved path)', {
+              txId: transaction.id,
+              error: (relayErr as Error).message,
+            })
+          }
+        })()
+      } catch (burnErr) {
+        const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
+        const errStr = String(burnErr)
+        const errJson = (() => { try { return JSON.stringify(burnErr) } catch { return null } })()
+        logger.error('CCTP burn failed on approval', {
+          userId,
+          transactionId: transaction.id,
+          error: errMsg,
+          raw: errStr,
+          json: errJson,
+        })
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: { status: 'FAILED', blockedReason: errMsg || errStr },
+        })
+        sendError(res, 'Cross-chain payment failed during burn on Stellar.', 'CCTP_BURN_FAILED', 502, {
+          transaction_id: transaction.id,
+          error: errMsg,
+          raw: errStr,
+          json: errJson,
+        })
+      }
+    } else {
+      // ── Stellar direct payment ───────────────────────────────────────────────
+      try {
+        const stellarResult = await submitPayment({
+          senderSecretKey: secretKey,
+          recipientPublicKey: transaction.recipientAddress,
+          amount,
+          memo: transaction.memo ?? null,
+        })
 
-      sendError(res, 'Payment failed after approval due to Stellar error.', 'STELLAR_PAYMENT_FAILED', 502, {
-        transaction_id: transaction.id,
-      })
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
+        })
+
+        await incrementTotalSpent(userId, amount)
+
+        void sendApprovalActedEmail(userId, transaction.id, 'approved', amount).catch(
+          (e: unknown) =>
+            logger.error('Failed to send approval acted email', {
+              userId,
+              error: (e as Error).message,
+            }),
+        )
+
+        sendSuccess(res, {
+          status: 'approved',
+          transaction_id: transaction.id,
+          stellar_tx_hash: stellarResult.hash,
+          amount,
+        })
+      } catch (stellarErr) {
+        logger.error('Stellar payment failed on approval', {
+          userId,
+          transactionId: transaction.id,
+          error: (stellarErr as Error).message,
+        })
+
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: (stellarErr as Error).message,
+          },
+        })
+
+        sendError(res, 'Payment failed after approval due to Stellar error.', 'STELLAR_PAYMENT_FAILED', 502, {
+          transaction_id: transaction.id,
+        })
+      }
     }
   } catch (err) {
     next(err)
