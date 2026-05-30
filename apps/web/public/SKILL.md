@@ -15,7 +15,7 @@ Treat it like a password — never log it, never include it in output.
 ## Base URL
 
 ```
-https://api.argens.io/v1
+https://default-granny-debtor.ngrok-free.dev/
 ```
 
 ---
