@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { TopBar } from '@/components/dashboard/TopBar'
 import { wallet as walletApi, isError } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { SUPPORT_WHATSAPP_URL } from '@/lib/constants'
+import { FundingHelpCard } from '@/components/dashboard/FundingHelpCard'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import type { WalletBalance } from '@/lib/api'
 
 const BACKUP_ACK_KEY = (userId: string) => `argens_key_acked_${userId}`
@@ -48,19 +49,7 @@ function AddFundsModal({ address, onClose }: { address: string; onClose: () => v
           <span style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>stellar mainnet · USDC only</span>
           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
         </div>
-        <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
-          <div style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 6, lineHeight: 1.5 }}>
-            Having trouble funding? Not sure how to fund?
-          </div>
-          <a
-            href={SUPPORT_WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}
-          >
-            Reach out on WhatsApp →
-          </a>
-        </div>
+        <FundingHelpCard />
         <button onClick={onClose} style={{ width: '100%', padding: 10, background: 'transparent', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
           Done
         </button>
@@ -315,14 +304,13 @@ export default function WalletPage() {
                     {keyError}
                   </div>
                 )}
-                <input
-                  type="password"
+                <PasswordInput
                   value={keyPassword}
-                  onChange={e => { setKeyPassword(e.target.value); setKeyError('') }}
+                  onChange={value => { setKeyPassword(value); setKeyError('') }}
                   placeholder="Your account password"
                   autoFocus
                   onKeyDown={e => { if (e.key === 'Enter') void downloadKey() }}
-                  style={{ background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, padding: '10px 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                  fontFamily="var(--font-body)"
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => { setKeyStep('idle'); setKeyPassword(''); setKeyError('') }} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
@@ -423,14 +411,15 @@ export default function WalletPage() {
                   </div>
                 )}
                 <div style={{ marginBottom: 20 }}>
-                  <input
-                    type="password"
+                  <PasswordInput
                     maxLength={4}
                     value={sendForm.pin}
-                    onChange={e => { setSendForm({ ...sendForm, pin: e.target.value.replace(/\D/g, '') }); setSendError('') }}
+                    onChange={value => { setSendForm({ ...sendForm, pin: value.replace(/\D/g, '') }); setSendError('') }}
                     placeholder="••••"
                     autoFocus
-                    style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--text)', textAlign: 'center', outline: 'none', boxSizing: 'border-box' }}
+                    inputMode="numeric"
+                    fontSize={16}
+                    textAlign="center"
                   />
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>

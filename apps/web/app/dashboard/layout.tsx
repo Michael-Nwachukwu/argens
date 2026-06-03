@@ -5,18 +5,34 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { wallet as walletApi, isError } from '@/lib/api'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 
 const BACKUP_ACK_KEY = (userId: string) => `argens_key_acked_${userId}`
+const ONBOARDING_API_KEY = 'argens_onboarding_api_key'
 
 function PrivateKeyBackupModal({ userId, onClose }: { userId: string; onClose: () => void }) {
   const [step, setStep] = useState<'prompt' | 'confirm' | 'done'>('prompt')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [apiKeyCopied, setApiKeyCopied] = useState(false)
+
+  useEffect(() => {
+    try { setApiKey(sessionStorage.getItem(ONBOARDING_API_KEY)) } catch { /* ignore */ }
+  }, [])
 
   const markAcknowledged = () => {
     try { localStorage.setItem(BACKUP_ACK_KEY(userId), '1') } catch { /* ignore */ }
+    try { sessionStorage.removeItem(ONBOARDING_API_KEY) } catch { /* ignore */ }
     onClose()
+  }
+
+  const copyApiKey = () => {
+    if (!apiKey) return
+    navigator.clipboard?.writeText(apiKey).catch(() => {})
+    setApiKeyCopied(true)
+    setTimeout(() => setApiKeyCopied(false), 1800)
   }
 
   const downloadKey = async () => {
@@ -43,6 +59,7 @@ function PrivateKeyBackupModal({ userId, onClose }: { userId: string; onClose: (
       `Network:    ${network}`,
       `Public key: ${public_key}`,
       `Secret key: ${secret_key}`,
+      ...(apiKey ? ['', 'ARGENS API KEY — SHOWN ONCE', '===========================', '', `API key: ${apiKey}`] : []),
       '',
       `Exported: ${new Date().toISOString()}`,
     ].join('\n')
@@ -73,7 +90,7 @@ function PrivateKeyBackupModal({ userId, onClose }: { userId: string; onClose: (
               Key downloaded
             </h2>
             <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 24px', textAlign: 'center' }}>
-              Store your backup file somewhere safe and offline. You can export again any time from the Wallet page.
+              Store your backup file somewhere safe and offline. You can export your wallet key again from the Wallet page, but this API key will not be shown again.
             </p>
             <button
               onClick={markAcknowledged}
@@ -103,17 +120,16 @@ function PrivateKeyBackupModal({ userId, onClose }: { userId: string; onClose: (
               </div>
             )}
 
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={e => { setPassword(e.target.value); setError('') }}
+              onChange={value => { setPassword(value); setError('') }}
               placeholder="Your account password"
               autoFocus
               onKeyDown={e => { if (e.key === 'Enter') void downloadKey() }}
-              style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, padding: '10px 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box', marginBottom: 16 }}
+              fontFamily="var(--font-body)"
             />
 
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
               <button
                 onClick={() => { setStep('prompt'); setPassword(''); setError('') }}
                 style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: 13, cursor: 'pointer' }}
@@ -143,6 +159,21 @@ function PrivateKeyBackupModal({ userId, onClose }: { userId: string; onClose: (
             <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65, margin: '0 0 16px' }}>
               Your Argens wallet was just created. Download your private key and store it somewhere safe — this is your only way to self-custody or recover your wallet outside of Argens.
             </p>
+
+            {apiKey && (
+              <div style={{ background: 'rgba(110,168,255,0.08)', border: '1px solid rgba(110,168,255,0.25)', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: '#6EA8FF', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Agent API key</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', wordBreak: 'break-all', lineHeight: 1.7, marginBottom: 10 }}>
+                  {apiKey}
+                </div>
+                <button
+                  onClick={copyApiKey}
+                  style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(110,168,255,0.35)', borderRadius: 6, color: apiKeyCopied ? 'var(--success)' : '#8DBBFF', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer' }}
+                >
+                  {apiKeyCopied ? '✓ Copied' : 'Copy API key'}
+                </button>
+              </div>
+            )}
 
             <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', marginBottom: 24 }}>
               {[

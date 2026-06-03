@@ -165,6 +165,7 @@ authRouter.get('/verify/:token', async (req, res) => {
 
     // Bootstrap wallet — this hits Stellar network so may take a few seconds.
     const { publicKey } = await bootstrapWallet(user.id)
+    const apiKey = await createApiKey(user.id)
 
     sendWalletReadyEmail(user.email, publicKey).catch((e) =>
       logger.error('Failed to send wallet ready email', { userId: user.id, error: (e as Error).message }),
@@ -174,6 +175,9 @@ authRouter.get('/verify/:token', async (req, res) => {
     sendSuccess(res, {
       message: 'Email verified. Your wallet is ready.',
       wallet_address: publicKey,
+      api_key: apiKey.key,
+      api_key_prefix: apiKey.prefix,
+      api_key_message: 'Store this API key securely. It will not be shown again.',
     })
   } catch (e) {
     if (e instanceof AppError) {

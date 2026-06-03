@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Logo } from '@/components/ui/Logo'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import { auth, isError } from '@/lib/api'
 
 type Stage = 'form' | 'verify' | 'resend'
@@ -155,10 +156,10 @@ export default function SignupPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {([
-            { label: 'Access code', type: 'text', value: accessCode, set: setAccessCode, placeholder: 'argns_beta_xxxxxxxx', ac: 'off' },
-            { label: 'Email', type: 'email', value: email, set: setEmail, placeholder: 'you@example.com', ac: 'email' },
-            { label: 'Password', type: 'password', value: password, set: setPassword, placeholder: '••••••••', ac: 'new-password' },
-            { label: 'Confirm password', type: 'password', value: confirm, set: setConfirm, placeholder: '••••••••', ac: 'new-password' },
+            { label: 'Access code', type: 'text', value: accessCode, set: setAccessCode, placeholder: 'argns_beta_xxxxxxxx', ac: 'off', password: false },
+            { label: 'Email', type: 'email', value: email, set: setEmail, placeholder: 'you@example.com', ac: 'email', password: false },
+            { label: 'Password', type: 'password', value: password, set: setPassword, placeholder: '••••••••', ac: 'new-password', password: true },
+            { label: 'Confirm password', type: 'password', value: confirm, set: setConfirm, placeholder: '••••••••', ac: 'new-password', password: true },
           ] as const).map(f => (
             <div key={f.label}>
               <label style={{
@@ -170,29 +171,39 @@ export default function SignupPage() {
                 textTransform: 'uppercase',
                 marginBottom: 6,
               }}>{f.label}</label>
-              <input
-                type={f.type}
-                required
-                value={f.value}
-                onChange={e => f.set(e.target.value)}
-                placeholder={f.placeholder}
-                autoComplete={f.ac}
-                style={{
-                  width: '100%',
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border2)',
-                  borderRadius: 7,
-                  padding: '10px 12px',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 13,
-                  color: 'var(--text)',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.15s',
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-                onBlur={e => e.currentTarget.style.borderColor = 'var(--border2)'}
-              />
+              {f.password ? (
+                <PasswordInput
+                  required
+                  value={f.value}
+                  onChange={f.set}
+                  placeholder={f.placeholder}
+                  autoComplete={f.ac}
+                />
+              ) : (
+                <input
+                  type={f.type}
+                  required
+                  value={f.value}
+                  onChange={e => f.set(e.target.value)}
+                  placeholder={f.placeholder}
+                  autoComplete={f.ac}
+                  style={{
+                    width: '100%',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border2)',
+                    borderRadius: 7,
+                    padding: '10px 12px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 13,
+                    color: 'var(--text)',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.15s',
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'var(--border2)'}
+                />
+              )}
             </div>
           ))}
 

@@ -78,7 +78,7 @@ export const auth = {
     }),
 
   verify: (token: string) =>
-    apiFetch<{ message: string; walletAddress: string }>(`/auth/verify/${token}`),
+    apiFetch<{ message: string; wallet_address: string; api_key?: string; api_key_prefix?: string; api_key_message?: string }>(`/auth/verify/${token}`),
 
   resendVerification: (email: string) =>
     apiFetch<{ message: string }>('/auth/resend-verification', {
