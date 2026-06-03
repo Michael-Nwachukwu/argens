@@ -71,10 +71,10 @@ export const auth = {
       body: JSON.stringify({ email, password }),
     }),
 
-  signup: (email: string, password: string) =>
+  signup: (email: string, password: string, accessCode: string) =>
     apiFetch<SignupResponse>('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, accessCode }),
     }),
 
   verify: (token: string) =>
@@ -95,6 +95,7 @@ export interface WalletBalance {
   balance: string
   currency: string
   xlm_balance: string
+  credits_balance: string
   wallet_address: string
   cached_at: string
 }

@@ -1,39 +1,51 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Logo } from '@/components/ui/Logo'
 import { auth, isError } from '@/lib/api'
 
 type Stage = 'form' | 'verify' | 'resend'
 
 export default function SignupPage() {
-  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [stage, setStage] = useState<Stage>('form')
+  const [accessCode, setAccessCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendDone, setResendDone] = useState(false)
 
+  // Prefill access code from query string (?code=argns_beta_xxx) — invite links pass it here.
+  useEffect(() => {
+    const code = searchParams?.get('code')
+    if (code) setAccessCode(code)
+  }, [searchParams])
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    setError(''); setErrorCode('')
+    if (!accessCode.trim()) { setError('An access code is required during beta'); return }
     if (password !== confirm) { setError('Passwords do not match'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     setLoading(true)
-    const res = await auth.signup(email, password)
+    const res = await auth.signup(email, password, accessCode.trim())
     setLoading(false)
     if (isError(res)) {
       setError(res.error)
+      setErrorCode(res.code ?? '')
     } else {
       setStage('verify')
     }
   }
+
+  const isAccessCodeError = errorCode.startsWith('ACCESS_CODE_')
 
   const handleResend = async () => {
     setResendLoading(true)
@@ -123,15 +135,27 @@ export default function SignupPage() {
             borderRadius: 7,
             color: 'var(--error)',
             fontSize: 13,
-            marginBottom: 20,
+            marginBottom: 12,
             fontFamily: 'var(--font-mono)',
           }}>
             {error}
+            {isAccessCodeError && (
+              <div style={{ marginTop: 8, fontSize: 12 }}>
+                <a href="https://tally.so/r/xX9AxG" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  Join the waitlist instead →
+                </a>
+              </div>
+            )}
           </div>
         )}
 
+        <div style={{ background: 'var(--accent-low)', border: '1px solid var(--accent-mid)', borderRadius: 7, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+          Argens is in private beta. An access code is required to sign up.
+        </div>
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {([
+            { label: 'Access code', type: 'text', value: accessCode, set: setAccessCode, placeholder: 'argns_beta_xxxxxxxx', ac: 'off' },
             { label: 'Email', type: 'email', value: email, set: setEmail, placeholder: 'you@example.com', ac: 'email' },
             { label: 'Password', type: 'password', value: password, set: setPassword, placeholder: '••••••••', ac: 'new-password' },
             { label: 'Confirm password', type: 'password', value: confirm, set: setConfirm, placeholder: '••••••••', ac: 'new-password' },
@@ -201,6 +225,12 @@ export default function SignupPage() {
         <Link href="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
           Sign in →
         </Link>
+      </p>
+      <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--faint)', marginTop: 10 }}>
+        No access code?{' '}
+        <a href="https://tally.so/r/xX9AxG" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
+          Join the waitlist →
+        </a>
       </p>
     </div>
   )

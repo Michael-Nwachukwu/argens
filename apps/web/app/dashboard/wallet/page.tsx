@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { TopBar } from '@/components/dashboard/TopBar'
 import { wallet as walletApi, isError } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { SUPPORT_WHATSAPP_URL } from '@/lib/constants'
 import type { WalletBalance } from '@/lib/api'
 
 const BACKUP_ACK_KEY = (userId: string) => `argens_key_acked_${userId}`
@@ -46,6 +47,19 @@ function AddFundsModal({ address, onClose }: { address: string; onClose: () => v
           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           <span style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>stellar mainnet · USDC only</span>
           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        </div>
+        <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 6, lineHeight: 1.5 }}>
+            Having trouble funding? Not sure how to fund?
+          </div>
+          <a
+            href={SUPPORT_WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}
+          >
+            Reach out on WhatsApp →
+          </a>
         </div>
         <button onClick={onClose} style={{ width: '100%', padding: 10, background: 'transparent', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
           Done
@@ -219,6 +233,22 @@ export default function WalletPage() {
               </div>
             </div>
           </div>
+
+          {/* Credits — only shown when user has been granted credits */}
+          {!loading && parseFloat(walletData?.credits_balance ?? '0') > 0 && (
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--accent-mid)', borderRadius: 8, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-low)', border: '1px solid var(--accent-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 16, flexShrink: 0 }}>◈</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Argens credits</div>
+                <div style={{ fontFamily: 'var(--font-head)', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1 }}>
+                  ${parseFloat(walletData!.credits_balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
+                  Prepaid marketplace budget · non-withdrawable · used before USDC on marketplace calls
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Address */}
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '20px 22px' }}>

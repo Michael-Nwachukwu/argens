@@ -24,6 +24,7 @@ import {
   type MppRouterService,
 } from './mpp-router.js'
 import { sendBlockedEmail, sendPendingApprovalEmail } from './email.js'
+import { consumeCredits, getActiveCreditsBalance } from './credits.js'
 
 const MARKUP_RATE = new Decimal('0.20')
 const MPP_USDC_BASE_UNITS = new Decimal('10000000')
@@ -330,17 +331,33 @@ async function executeMarketplaceCallInternal(
   const url = buildMppRouterUrl(service, input.query)
   const payload = input.payload ?? {}
 
+  // Credit path: if the user has any active credits AND the credit-pool wallet is configured,
+  // route the on-chain MPP Router payment through the pool wallet and decrement credits in DB.
+  // Falls back transparently to the USDC path if either condition fails.
+  // Credits only apply to immediately-approved calls; PENDING_APPROVAL calls use USDC at execution.
+  const activeCredits = options.approvedTransaction
+    ? new Decimal(0)
+    : await getActiveCreditsBalance(userId)
+  const creditPoolSecret = process.env['ARGENS_CREDIT_POOL_SECRET']
+  const creditPathEligible = activeCredits.greaterThan(0) && Boolean(creditPoolSecret)
+  if (activeCredits.greaterThan(0) && !creditPoolSecret) {
+    logger.warn('User has active credits but ARGENS_CREDIT_POOL_SECRET is not configured — falling back to USDC', { userId })
+  }
+  const fundingSecret = creditPathEligible ? creditPoolSecret! : secretKey
+
   const state: {
     txId: string | null
     cost?: CostBreakdown
     challengeSnapshot?: MppChallengeSnapshot
     policyResultForTx?: PolicyResult
-  } = { txId: options.approvedTransaction?.id ?? null }
+    paidWithCredits: boolean
+    creditDeductions?: Array<{ grantId: string; deducted: string }>
+  } = { txId: options.approvedTransaction?.id ?? null, paidWithCredits: false }
 
   let mppResult: MppRequestResult
   try {
     mppResult = await performMppRequest({
-      secretKey,
+      secretKey: fundingSecret,
       url,
       method: service.method,
       headers: { 'Content-Type': 'application/json' },
@@ -425,6 +442,22 @@ async function executeMarketplaceCallInternal(
           throw new MarketplacePendingApprovalError(tx.id)
         }
 
+        // If eligible, deduct credits BEFORE mpp commits the payment from the pool wallet.
+        // If credits no longer cover the cost (race) consumeCredits throws → mpp never pays.
+        if (creditPathEligible) {
+          if (activeCredits.lessThan(challengeCost.total)) {
+            throw new AppError(
+              'Insufficient credits for this marketplace call.',
+              'INSUFFICIENT_CREDITS',
+              402,
+              { requested: challengeCost.totalString, available: activeCredits.toFixed(7) },
+            )
+          }
+          const consumption = await consumeCredits(userId, challengeCost.totalString)
+          state.paidWithCredits = true
+          state.creditDeductions = consumption.grants
+        }
+
         const tx = await createMarketplaceTransaction({
           userId,
           walletId: wallet.id,
@@ -482,12 +515,18 @@ async function executeMarketplaceCallInternal(
     })
   }
 
-  const markupResult = await submitPayment({
-    senderSecretKey: secretKey,
-    recipientPublicKey: feeWallet,
-    amount: finalCost.markupString,
-    memo: `Argens ${finalTxId.slice(0, 12)}`,
-  })
+  // On credit path Argens funded the MPP Router payment from the pool wallet — no markup.
+  // On USDC path the user paid MPP Router; Argens now collects markup into the fee wallet.
+  let markupHash: string | null = null
+  if (!state.paidWithCredits) {
+    const markupResult = await submitPayment({
+      senderSecretKey: secretKey,
+      recipientPublicKey: feeWallet,
+      amount: finalCost.markupString,
+      memo: `Argens ${finalTxId.slice(0, 12)}`,
+    })
+    markupHash = markupResult.hash
+  }
 
   const mppHash = mppResult.receipt?.reference ?? getProgressHash(mppResult)
 
@@ -505,11 +544,20 @@ async function executeMarketplaceCallInternal(
           receipt: mppResult.receipt,
           progress: mppResult.progress,
         },
-        markup: {
-          rate: MARKUP_RATE.toString(),
-          amount: finalCost.markupString,
-          stellar_tx_hash: markupResult.hash,
-        },
+        ...(state.paidWithCredits
+          ? {
+              credits: {
+                total: finalCost.totalString,
+                grants: state.creditDeductions ?? [],
+              },
+            }
+          : {
+              markup: {
+                rate: MARKUP_RATE.toString(),
+                amount: finalCost.markupString,
+                stellar_tx_hash: markupHash,
+              },
+            }),
       } as unknown as Prisma.InputJsonValue,
     },
   })

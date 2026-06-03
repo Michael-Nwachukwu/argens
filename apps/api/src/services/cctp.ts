@@ -24,6 +24,7 @@ import {
 import { createWalletClient, http } from 'viem'
 import { base, baseSepolia } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
+import { Decimal } from '@prisma/client/runtime/library'
 import { logger } from '../lib/logger.js'
 import { AppError } from '../lib/errors.js'
 
@@ -65,6 +66,23 @@ const BASE_MESSAGE_TRANSMITTER =
 
 export const STELLAR_DOMAIN = 27
 export const BASE_DOMAIN = 6
+
+// ─── Cross-chain fee (Argens revenue on CCTP transfers) ───────────────────────
+
+export const CCTP_FEE_RATE = new Decimal('0.005') // 0.5%
+export const CCTP_FEE_MIN  = new Decimal('0.05')  // $0.05 floor
+export const CCTP_FEE_MAX  = new Decimal('2.00')  // $2.00 ceiling
+
+/**
+ * Returns the Argens fee for a CCTP cross-chain transfer of `amount` USDC.
+ * Hybrid model: `clamp(amount * 0.005, 0.05, 2.00)`.
+ * Result is a Stellar-formatted amount string (7 decimals).
+ */
+export function computeCctpFee(amount: string): string {
+  const raw = new Decimal(amount).mul(CCTP_FEE_RATE)
+  const clamped = Decimal.min(Decimal.max(raw, CCTP_FEE_MIN), CCTP_FEE_MAX)
+  return clamped.toFixed(7)
+}
 
 // ─── Error ────────────────────────────────────────────────────────────────────
 

@@ -10,6 +10,7 @@ import { policiesRouter } from './routes/policies.js'
 import { approveRouter } from './routes/approve.js'
 import { x402Router } from './routes/x402.js'
 import { marketplaceRouter } from './routes/marketplace.js'
+import { adminRouter } from './routes/admin.js'
 import { apiLimiter } from './middleware/ratelimit.js'
 import { sendError } from './lib/response.js'
 import { AppError } from './lib/errors.js'
@@ -43,6 +44,7 @@ app.use('/v1', policiesRouter)
 app.use('/v1', approveRouter)
 app.use('/v1', x402Router)
 app.use('/v1', marketplaceRouter)
+app.use('/v1/admin', adminRouter)
 
 // ─── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
