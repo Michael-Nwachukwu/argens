@@ -25,6 +25,8 @@ import { generateSecureToken } from '../lib/crypto.js'
 import { sendSuccess, sendError, sendPaginated } from '../lib/response.js'
 import { validate } from '../middleware/validate.js'
 import { CREDIT_DEFAULT_EXPIRY_DAYS } from '../services/credits.js'
+import { getWalletBalancesReport } from '../services/admin-balances.js'
+import { sendCreditsGrantedEmail } from '../services/email.js'
 
 export const adminRouter: Router = ExpressRouter()
 
@@ -169,15 +171,278 @@ adminRouter.post('/users/:userId/credits', validate(grantCreditsSchema), async (
       return grant
     })
 
+    const notification = await sendCreditGrantNotification(userId, amountDec.toFixed(7), expiry, reason ?? null)
+
     logger.info('Admin granted credits', { userId, grantId: result.id, amount: amountDec.toFixed(7), expiresAt: expiry.toISOString() })
     sendSuccess(res, {
       grant_id: result.id,
       user_id: userId,
       amount: amountDec.toFixed(7),
       expires_at: expiry.toISOString(),
+      notification,
     }, 201)
   } catch (e) {
     logger.error('Admin credit grant failed', { userId, error: (e as Error).message })
     sendError(res, 'Could not grant credits.', 'INTERNAL_ERROR', 500)
   }
 })
+
+// Convenience: grant credits by email instead of user ID, so admin doesn't need to look up the ID first.
+const grantByEmailSchema = grantCreditsSchema.extend({
+  email: z.string().email(),
+})
+
+adminRouter.post('/credits/grant-by-email', validate(grantByEmailSchema), async (req, res) => {
+  const { email, amount, reason, expiresInDays, expiresAt } = req.body as z.infer<typeof grantByEmailSchema>
+  try {
+    const amountDec = new Decimal(amount)
+    if (amountDec.lessThanOrEqualTo(0)) {
+      sendError(res, 'Amount must be greater than 0.', 'INVALID_AMOUNT', 400)
+      return
+    }
+    const user = await prisma.user.findUnique({ where: { email }, include: { wallet: true } })
+    if (!user) {
+      sendError(res, 'No user with that email.', 'NOT_FOUND', 404)
+      return
+    }
+    if (!user.wallet) {
+      sendError(res, 'User has no wallet (email not verified yet).', 'WALLET_NOT_READY', 400)
+      return
+    }
+    const expiry = expiresAt
+      ? new Date(expiresAt)
+      : new Date(Date.now() + (expiresInDays ?? CREDIT_DEFAULT_EXPIRY_DAYS) * 24 * 60 * 60 * 1000)
+
+    const result = await prisma.$transaction(async (tx) => {
+      const grant = await tx.creditGrant.create({
+        data: { userId: user.id, amount: amountDec, amountRemaining: amountDec, reason: reason ?? null, expiresAt: expiry },
+      })
+      await tx.wallet.update({
+        where: { id: user.wallet!.id },
+        data: { creditsGranted: { increment: amountDec } },
+      })
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          eventType: 'CREDITS_GRANTED',
+          eventData: { grantId: grant.id, amount: amountDec.toFixed(7), reason: reason ?? null, expiresAt: expiry.toISOString(), via: 'email' },
+        },
+      })
+      return grant
+    })
+
+    const notification = await sendCreditGrantNotification(user.id, amountDec.toFixed(7), expiry, reason ?? null)
+
+    logger.info('Admin granted credits by email', { email, userId: user.id, grantId: result.id, amount: amountDec.toFixed(7) })
+    sendSuccess(res, {
+      grant_id: result.id,
+      user_id: user.id,
+      email,
+      amount: amountDec.toFixed(7),
+      expires_at: expiry.toISOString(),
+      notification,
+    }, 201)
+  } catch (e) {
+    logger.error('Admin credit grant-by-email failed', { email, error: (e as Error).message })
+    sendError(res, 'Could not grant credits.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// ─── Dashboard read endpoints ──────────────────────────────────────────────────
+
+// GET /admin/stats — top-level counts for the dashboard summary cards.
+adminRouter.get('/stats', async (_req, res) => {
+  try {
+    const [
+      usersTotal,
+      usersVerified,
+      codesTotal,
+      codesRedeemed,
+      grantsActive,
+      grantsActiveSum,
+      txTotal,
+      txFailed,
+      txPendingApproval,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { emailVerified: true } }),
+      prisma.accessCode.count(),
+      prisma.accessCode.count({ where: { redeemedBy: { not: null } } }),
+      prisma.creditGrant.count({
+        where: {
+          amountRemaining: { gt: 0 },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      }),
+      prisma.creditGrant.aggregate({
+        where: {
+          amountRemaining: { gt: 0 },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        _sum: { amountRemaining: true },
+      }),
+      prisma.transaction.count(),
+      prisma.transaction.count({ where: { status: 'FAILED' } }),
+      prisma.transaction.count({ where: { status: 'PENDING_APPROVAL' } }),
+    ])
+    sendSuccess(res, {
+      users: { total: usersTotal, verified: usersVerified },
+      access_codes: { total: codesTotal, redeemed: codesRedeemed, unredeemed: codesTotal - codesRedeemed },
+      credits: {
+        active_grants: grantsActive,
+        outstanding_total: (grantsActiveSum._sum.amountRemaining ?? new Decimal(0)).toFixed(7),
+      },
+      transactions: { total: txTotal, failed: txFailed, pending_approval: txPendingApproval },
+    })
+  } catch (e) {
+    logger.error('Admin stats failed', { error: (e as Error).message })
+    sendError(res, 'Could not load stats.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// GET /admin/wallets — live balances for ops/fee/pool Stellar wallets + Base relayer ETH.
+adminRouter.get('/wallets', async (_req, res) => {
+  try {
+    const report = await getWalletBalancesReport()
+    sendSuccess(res, report)
+  } catch (e) {
+    logger.error('Admin wallet balances failed', { error: (e as Error).message })
+    sendError(res, 'Could not load wallet balances.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// GET /admin/users — paginated list with optional ?email= filter (partial match).
+adminRouter.get('/users', async (req, res) => {
+  const page  = Math.max(1, parseInt(String(req.query['page']  ?? '1'),  10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '50'), 10) || 50))
+  const skip  = (page - 1) * limit
+  const emailFilter = typeof req.query['email'] === 'string' ? req.query['email'].trim() : ''
+  const where = emailFilter ? { email: { contains: emailFilter, mode: 'insensitive' as const } } : {}
+
+  try {
+    const [items, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip, take: limit,
+        select: {
+          id: true,
+          email: true,
+          emailVerified: true,
+          accessCodeId: true,
+          createdAt: true,
+          wallet: { select: { stellarPublicKey: true, status: true, balanceCache: true, creditsGranted: true } },
+          _count: { select: { transactions: true } },
+        },
+      }),
+      prisma.user.count({ where }),
+    ])
+    sendPaginated(res, items, { page, total, pages: Math.max(1, Math.ceil(total / limit)) })
+  } catch (e) {
+    logger.error('Admin users list failed', { error: (e as Error).message })
+    sendError(res, 'Could not list users.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// GET /admin/users/:userId — detail view: wallet, active credits, recent grants, transaction summary.
+adminRouter.get('/users/:userId', async (req, res) => {
+  const { userId } = req.params as { userId: string }
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        wallet: true,
+        policies: true,
+        creditGrants: { orderBy: [{ createdAt: 'desc' }], take: 20 },
+        _count: { select: { transactions: true } },
+      },
+    })
+    if (!user) {
+      sendError(res, 'User not found.', 'NOT_FOUND', 404)
+      return
+    }
+    const activeCredits = await prisma.creditGrant.aggregate({
+      where: {
+        userId,
+        amountRemaining: { gt: 0 },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      _sum: { amountRemaining: true },
+    })
+    const txByStatus = await prisma.transaction.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: { _all: true },
+    })
+    sendSuccess(res, {
+      ...user,
+      passwordHash: undefined,
+      emailVerificationToken: undefined,
+      transferPinHash: undefined,
+      active_credits_balance: (activeCredits._sum.amountRemaining ?? new Decimal(0)).toFixed(7),
+      tx_by_status: txByStatus.map((r) => ({ status: r.status, count: r._count._all })),
+    })
+  } catch (e) {
+    logger.error('Admin user detail failed', { userId, error: (e as Error).message })
+    sendError(res, 'Could not load user.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// GET /admin/credit-grants — paginated list of all grants across users.
+adminRouter.get('/credit-grants', async (req, res) => {
+  const page  = Math.max(1, parseInt(String(req.query['page']  ?? '1'),  10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '50'), 10) || 50))
+  const skip  = (page - 1) * limit
+  try {
+    const [items, total] = await Promise.all([
+      prisma.creditGrant.findMany({
+        orderBy: [{ createdAt: 'desc' }],
+        skip, take: limit,
+        include: { user: { select: { email: true } } },
+      }),
+      prisma.creditGrant.count(),
+    ])
+    sendPaginated(res, items, { page, total, pages: Math.max(1, Math.ceil(total / limit)) })
+  } catch (e) {
+    logger.error('Admin credit-grants list failed', { error: (e as Error).message })
+    sendError(res, 'Could not list credit grants.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// GET /admin/transactions/failed — paginated list of FAILED transactions (manual reconciliation queue).
+adminRouter.get('/transactions/failed', async (req, res) => {
+  const page  = Math.max(1, parseInt(String(req.query['page']  ?? '1'),  10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '50'), 10) || 50))
+  const skip  = (page - 1) * limit
+  try {
+    const [items, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { status: 'FAILED' },
+        orderBy: [{ createdAt: 'desc' }],
+        skip, take: limit,
+        include: { user: { select: { email: true } } },
+      }),
+      prisma.transaction.count({ where: { status: 'FAILED' } }),
+    ])
+    sendPaginated(res, items, { page, total, pages: Math.max(1, Math.ceil(total / limit)) })
+  } catch (e) {
+    logger.error('Admin failed-tx list failed', { error: (e as Error).message })
+    sendError(res, 'Could not list failed transactions.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+async function sendCreditGrantNotification(
+  userId: string,
+  amount: string,
+  expiresAt: Date,
+  reason: string | null,
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    await sendCreditsGrantedEmail(userId, amount, expiresAt, reason)
+    return { sent: true }
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e)
+    logger.error('Failed to send credit grant email', { userId, error })
+    return { sent: false, error }
+  }
+}

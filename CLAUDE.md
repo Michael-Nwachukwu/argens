@@ -8,17 +8,20 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
-## Status — 2026-05-26
+## Status — 2026-06-03
 
 - **Network: Stellar MAINNET.** Live on mainnet. Testnet code paths exist for local-dev parity only.
 - **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` accessible at `argens.xyz/SKILL.md`. Vercel root directory set to `apps/web` for GitHub-triggered deployments.
 - **API: local only.** Railway deployment is the next infrastructure task. The live dashboard cannot call the API for external users until this is done.
-- **Cross-chain / CCTP V2: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. A 0.0100000 USDC mainnet Stellar → Base transfer completed burn, Iris attestation, Base relay, and transaction-history update on 2026-05-26. Approval-token CCTP path compiles but still needs live approval-path verification.
+- **Cross-chain / CCTP V2: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. A 0.0100000 USDC mainnet Stellar → Base transfer completed burn, Iris attestation, Base relay, and transaction-history update on 2026-05-27. Direct and approval-token CCTP paths now share a fail-closed preflight: verify live USDC balance >= amount + Argens CCTP fee before sending the fee. Approval-token CCTP path compiles but still needs live approval-path verification.
 - **Marketplace: LIVE on mainnet.** 86 providers / 493 endpoints via MPP Router (`apiserver.mpprouter.dev`). Provider-level enablement toggles. Search/filter on `GET /marketplace/services`. All policy paths verified E2E. ~20% markup to `ARGENS_FEE_WALLET`.
-- **SKILL.md: v3 local.** v2 is deployed; v3 documents CCTP response shapes and Base recipient rules. Deploy v3 after the current CCTP repair is reviewed.
+- **Marketplace credits: implemented locally.** Admin can grant expirable credits. Marketplace calls can consume credits via the credit-pool wallet, refund deductions on no-payment failure paths, and re-check credits at approval execution. Credit-pool env keys exist, but the credit-pool Stellar account is not created/funded on mainnet yet.
+- **Credit-grant emails: implemented locally.** Admin credit grants send an immediate user notification with amount, expiry, reason, and dashboard link after the DB transaction commits.
+- **Admin ops console: implemented locally.** Backend admin balance route was repaired on 2026-06-03. Ops wallet, fee wallet, and Base relayer balances read successfully; credit-pool wallet correctly reports account-not-found until it is bootstrapped/funded.
+- **SKILL.md: v5 local.** Documents CCTP response shapes, Base recipient rules, fee behavior, per-service skill discovery, `/docs`, and `/llms.txt`.
 - **Approval flow: fixed.** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
 - **Email validation: live.** Signup rejects disposable domains and addresses that fail DNS MX check.
-- **What is NOT done yet:** Railway API deploy, example payloads, docs page, per-service skill files, demo Loom, error audit.
+- **What is NOT done yet:** Railway API deploy, credit-pool wallet bootstrap/funding, approval-token CCTP live verification, example payloads, demo Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E.
 
 ---
 

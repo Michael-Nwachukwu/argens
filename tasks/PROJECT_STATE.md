@@ -1,7 +1,7 @@
 # Argens — Project State
 
-> Last updated: 2026-05-27
-> Current phase: **Phase 4 complete → Phase 5 (Polish & Demo) + approval-token CCTP verification**
+> Last updated: 2026-06-03
+> Current phase: **Phase 4 complete → Phase 5 / beta rollout hardening**
 
 ---
 
@@ -12,13 +12,13 @@
 | Network | ✅ Mainnet live | STELLAR_NETWORK=mainnet |
 | Web app | ✅ Live on Vercel | argens.xyz — landing + full dashboard |
 | API | ⚠️ Local only | Railway deploy is the next infrastructure task |
-| SKILL.md | ✅ v4 local | v4 adds per-service skill discovery, docs, and llms.txt guidance |
+| SKILL.md | ✅ v5 local | v5 adds CCTP fee guidance on top of per-service skill discovery, docs, and llms.txt |
 | Phase 1 — Foundation | ✅ Complete | Auth, wallet bootstrap, API keys |
 | Phase 2 — Core API | ✅ Complete | All payment/policy/transaction endpoints |
 | Phase 3 — Dashboard | ✅ Complete | All pages built and functional |
 | Phase 4 — Marketplace | ✅ Complete | 86 providers, E2E verified on mainnet |
 | Phase 5 — Polish & Demo | 🔄 In progress | Partially done; see below |
-| CCTP Stellar → Base | ✅ Direct path verified twice | Latest 0.0100000 USDC mainnet burn + Base relay succeeded locally on 2026-05-27 |
+| CCTP Stellar → Base | ✅ Direct path verified twice; preflight hardened | Latest 0.0100000 USDC mainnet burn + Base relay succeeded locally on 2026-05-27. On 2026-06-03, direct and approval-token paths were patched to fail closed before fee payment when live `amount + fee` balance cannot be verified. |
 | Phase 6 — Mainnet infra | ⚠️ Partial | Mainnet code is live; Railway + alerting pending |
 
 ---
@@ -62,6 +62,7 @@
 - [x] Zod validation on all endpoints
 - [x] All 10 test scenarios verified E2E on mainnet ✅
 - [x] POST /pay — Base/CCTP V2 direct-approved path verified on mainnet
+- [x] POST /pay + POST /approve/:token CCTP preflight — shared helper verifies live USDC balance >= amount + fee before fee transfer
 - [ ] POST /approve/:token — Base/CCTP approval path compiles but still needs live approval-path verification
 - [ ] Wallet-funded SSE watcher — code exists, never E2E tested
 - [ ] XLM balance alerting on ops wallet — not implemented
@@ -127,6 +128,7 @@
 - [x] STELLAR_NETWORK=mainnet
 - [x] Mainnet ops wallet funded + in use
 - [x] Fee wallet — USDC trustline verified, receives marketplace markup
+- [ ] Credit pool wallet — env keys exist, but the public account is not created/funded on mainnet yet
 - [x] argens.xyz live (Vercel)
 - [ ] **Railway API deployment** — #1 blocker for external users
 - [ ] XLM balance alerting on ops wallet
@@ -141,9 +143,9 @@
 | Priority | Task | Blocks |
 |---|---|---|
 | 1 | **Railway API deploy** | Everything for external users |
-| 2 | **Approval-token CCTP live verification** | Accurate CCTP claims for approval flow |
-| 3 | **Example payloads** | Marketplace UX usable by agents |
-| 4 | **Full endpoint-by-endpoint error audit** | Phase 5 gate, SCF demo quality |
+| 2 | **Bootstrap/fund credit pool wallet** | Credit-funded marketplace calls |
+| 3 | **Approval-token CCTP live verification** | Accurate CCTP claims for approval flow |
+| 4 | **Example payloads** | Marketplace UX usable by agents |
 | 5 | **Loom demo** | SCF submission |
 | 6 | **Demo script** | SCF submission |
 
@@ -196,3 +198,10 @@
 - Stellar burn tx: `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044`
 - Base relay tx: `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`
 - Status: `SUCCESS`
+
+## Latest Beta Hardening Verification — 2026-06-03
+
+- `GET /v1/admin/wallets` now returns partial-success balance data instead of generic card failures. Ops wallet, fee wallet, and Base relayer read successfully on mainnet; credit-pool wallet reports `Account not found on the active Stellar network`.
+- CCTP preflight read-only checks returned `402 INSUFFICIENT_FUNDS_PLUS_FEES` for an underfunded wallet and `503 CCTP_PREFLIGHT_UNAVAILABLE` for an uncreated wallet. No fee or burn transaction was submitted in either check.
+- Admin endpoints smoke-tested: missing `x-admin-secret` returns `401 UNAUTHORIZED`; `/v1/admin/stats` and `/v1/admin/credit-grants?limit=1` return 200 with the expected response envelopes.
+- API build passed with `pnpm --filter @argens/api build`.

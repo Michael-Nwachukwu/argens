@@ -294,6 +294,51 @@ export async function sendWalletFundedEmail(
 }
 
 /**
+ * Sent when an admin grants marketplace credits to a user.
+ */
+export async function sendCreditsGrantedEmail(
+  userId: string,
+  amount: string,
+  expiresAt: Date,
+  reason?: string | null,
+): Promise<void> {
+  const to = await getUserEmail(userId)
+  const dashboardUrl = `${FRONTEND_URL}/marketplace`
+  const expiryText = expiresAt.toISOString()
+  const cleanReason = reason?.trim() ?? ''
+  const escapedReason = escapeHtml(cleanReason)
+  const reasonText = cleanReason ? `\n\nReason: ${cleanReason}` : ''
+  const reasonRow = cleanReason
+    ? `<tr><td style="padding:4px 8px;color:#888">Reason</td><td style="padding:4px 8px">${escapedReason}</td></tr>`
+    : ''
+
+  return sendEmail({
+    to,
+    subject: `Argens: ${amount} USDC in marketplace credits added`,
+    text: `You received ${amount} USDC in Argens marketplace credits.${reasonText}\n\nCredits expire at: ${expiryText}\n\nUse them from your dashboard: ${dashboardUrl}`,
+    html: `
+      <p><strong>You received ${amount} USDC in Argens marketplace credits.</strong></p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 8px;color:#888">Amount</td><td style="padding:4px 8px">${amount} USDC</td></tr>
+        <tr><td style="padding:4px 8px;color:#888">Expires</td><td style="padding:4px 8px">${expiryText}</td></tr>
+        ${reasonRow}
+      </table>
+      <p>Credits apply to Argens marketplace service calls. They are not withdrawable and do not apply to direct wallet transfers.</p>
+      <p><a href="${dashboardUrl}" style="background:#000;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block">Open dashboard</a></p>
+    `,
+  })
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+/**
  * sendPolicyChangedEmail — called from routes/policies.ts after a policy update.
  */
 export async function sendPolicyChangedEmail(

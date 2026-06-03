@@ -18,6 +18,7 @@
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { sendSuccess, sendError } from '../lib/response.js'
+import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey } from '../lib/crypto.js'
@@ -32,6 +33,7 @@ import {
   pollAttestation,
   relayOnBase,
   computeCctpFee,
+  verifyCctpPreflightBalance,
   CCTP_FEE_RATE,
   BASE_DOMAIN,
 } from '../services/cctp.js'
@@ -210,6 +212,33 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
         })
         sendError(res, 'Service misconfiguration. Try again later.', 'FEE_WALLET_NOT_CONFIGURED', 500)
         return
+      }
+
+      try {
+        await verifyCctpPreflightBalance(wallet.stellarPublicKey, amount, feeAmount)
+      } catch (preflightErr) {
+        const err = preflightErr as AppError
+        logger.warn('CCTP preflight blocked approved transfer before fee payment', {
+          userId,
+          transactionId: transaction.id,
+          code: err.code,
+          error: err.message,
+        })
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: err.message,
+          },
+        })
+        if (preflightErr instanceof AppError) {
+          sendError(res, preflightErr.message, preflightErr.code, preflightErr.statusCode, {
+            ...(preflightErr.details as Record<string, unknown> | undefined),
+            transaction_id: transaction.id,
+          })
+          return
+        }
+        throw preflightErr
       }
 
       let feeTxHash: string

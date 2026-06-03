@@ -27,6 +27,7 @@ app.use(helmet())
 app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret'],
 }))
 
 // ─── Body parsing ──────────────────────────────────────────────────────────────

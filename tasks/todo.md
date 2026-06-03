@@ -1,7 +1,32 @@
 # Current Task
 
-> Last updated: 2026-05-27
-> Phase 4 complete. Phase 5 in progress. Active: CCTP verification, service skill files, docs, and error audit.
+> Last updated: 2026-06-03
+> Phase 5 / beta rollout in progress. Active: admin balance repair, CCTP preflight verification, credit-grant emails, and endpoint audit after credits/CCTP/admin changes.
+
+---
+
+## Active 2026-06-03 — Credits, CCTP, Admin Hardening
+
+**Goal:** Finish the beta rollout repair cleanly: make admin balances reliable, fail CCTP safely before non-atomic fee/burn execution, notify users when credits are granted, and audit every endpoint touched by credits/CCTP/admin work.
+**Files affected:** `apps/api/src/routes/admin.ts`, `apps/api/src/routes/transactions.ts`, `apps/api/src/routes/approve.ts`, `apps/api/src/services/admin-balances.ts`, `apps/api/src/services/cctp.ts`, `apps/api/src/services/credits.ts`, `apps/api/src/services/email.ts`, `apps/web/app/x/console-a3f9k2p7/page.tsx`, docs/status files.
+**Steps:**
+- [x] Reproduce `/v1/admin/wallets` locally and identify the root cause of Stellar/Base balance failures.
+- [x] Fix admin balance fetching/reporting while preserving partial success for wallets that can be read.
+- [x] Audit and patch CCTP preflight verification so direct and approval-token paths fail before sending the CCTP fee when `amount + fee` is unavailable or unverifiable.
+- [x] Add immediate credit-grant emails with amount/details and a dashboard link for both user-id and email grant endpoints.
+- [x] Audit changed endpoints end-to-end: access codes/signup, admin routes, wallet balance/credits, marketplace call/approval credits, `/pay`, `/approve`, transaction details, docs/SKILL discoverability.
+- [x] Run focused typechecks/builds and local smoke tests for the changed flows.
+- [x] Update status docs with what was verified and any remaining risks.
+**Verification:**
+- `pnpm --filter @argens/api build` passed.
+- `GET /v1/admin/wallets` returned 200 on current code. Ops wallet, fee wallet, and Base relayer balances read successfully; credit-pool wallet is configured but not created/funded on mainnet, so it now reports `Account not found on the active Stellar network.`
+- `verifyCctpPreflightBalance(ARGENS_FEE_WALLET, 10.0000000, 0.0500000)` returned `402 INSUFFICIENT_FUNDS_PLUS_FEES` without sending funds.
+- `verifyCctpPreflightBalance(ARGENS_CREDIT_POOL_PUBLIC, 0.0100000, 0.0500000)` returned `503 CCTP_PREFLIGHT_UNAVAILABLE` without sending funds.
+- Admin route smoke: missing `x-admin-secret` returns `401 UNAUTHORIZED`; `/v1/admin/stats` and `/v1/admin/credit-grants?limit=1` return 200 with expected envelopes.
+**Audit notes:** Access-code signup is transactional; admin credit grants are transactional and now notify after commit; wallet balance includes credits and falls back to cached USDC on Horizon outage; marketplace credit path refunds deductions on pre-payment/no-receipt failure paths; direct and approval CCTP paths now share fail-closed preflight; transaction detail/list response shapes include CCTP and approval metadata.
+**Remaining risks:** Credit-grant email was typechecked but not sent via a real grant in this pass to avoid mutating user credits. Approval-token CCTP still needs a small live end-to-end payment. Credit-pool wallet must be bootstrapped/funded on mainnet before credit-funded marketplace calls can work.
+**Risks:** Mainnet CCTP testing spends real funds; Horizon/Base RPC errors must not be hidden behind generic messages; admin tools must stay private and auditable before production exposure.
+**Done when:** Admin balance cards return useful data or precise errors, CCTP preflight fails closed before fee execution, credit grants send user notifications, endpoint audit findings are fixed or documented, and verification commands pass.
 
 ---
 

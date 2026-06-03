@@ -16,7 +16,7 @@ import { z } from 'zod'
 import { requireApiKey, requireJwtOrApiKey } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError, sendPaginated } from '../lib/response.js'
-import { NotFoundError } from '../lib/errors.js'
+import { AppError, NotFoundError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
@@ -29,6 +29,7 @@ import {
   pollAttestation,
   relayOnBase,
   computeCctpFee,
+  verifyCctpPreflightBalance,
   CCTP_FEE_RATE,
   BASE_DOMAIN,
 } from '../services/cctp.js'
@@ -251,6 +252,33 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         })
         sendError(res, 'Service misconfiguration. Try again later.', 'FEE_WALLET_NOT_CONFIGURED', 500)
         return
+      }
+
+      try {
+        await verifyCctpPreflightBalance(wallet.stellarPublicKey, amount, feeAmount)
+      } catch (preflightErr) {
+        const err = preflightErr as AppError
+        logger.warn('CCTP preflight blocked transfer before fee payment', {
+          userId,
+          transactionId: tx.id,
+          code: err.code,
+          error: err.message,
+        })
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: err.message,
+          },
+        })
+        if (preflightErr instanceof AppError) {
+          sendError(res, preflightErr.message, preflightErr.code, preflightErr.statusCode, {
+            ...(preflightErr.details as Record<string, unknown> | undefined),
+            transaction_id: tx.id,
+          })
+          return
+        }
+        throw preflightErr
       }
 
       // Step 1 — Submit Argens fee to fee wallet. If this fails, no burn happens.

@@ -100,5 +100,32 @@ export async function consumeCredits(
   return tx ? exec(tx) : prisma.$transaction(exec)
 }
 
+/**
+ * Reverse a previous `consumeCredits` by re-crediting each grant by the exact amount that
+ * was deducted. Used when an on-chain payment fails *after* credits were debited from DB —
+ * we keep the user whole. All updates run inside a single transaction.
+ *
+ * Idempotency: if a grant has been deleted (we never delete, but defensively), or if the
+ * caller passes an empty array, we no-op gracefully.
+ */
+export async function refundCredits(
+  deductions: Array<{ grantId: string; deducted: string }>,
+  tx?: Prisma.TransactionClient,
+): Promise<void> {
+  if (deductions.length === 0) return
+
+  const exec = async (client: Prisma.TransactionClient): Promise<void> => {
+    for (const d of deductions) {
+      await client.creditGrant.update({
+        where: { id: d.grantId },
+        data: { amountRemaining: { increment: new Decimal(d.deducted) } },
+      })
+    }
+  }
+
+  if (tx) await exec(tx)
+  else await prisma.$transaction(exec)
+}
+
 /** Default expiry window for new credit grants when admin doesn't override. */
 export const CREDIT_DEFAULT_EXPIRY_DAYS = 60
