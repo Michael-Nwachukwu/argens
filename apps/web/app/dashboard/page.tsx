@@ -5,31 +5,47 @@ import { useRouter } from 'next/navigation'
 import { TopBar } from '@/components/dashboard/TopBar'
 import { Icon, Icons } from '@/components/dashboard/Icon'
 import { StatusBadge } from '@/components/ui/Badge'
+import { FundingHelpCard } from '@/components/dashboard/FundingHelpCard'
 import { transactions as txApi, wallet as walletApi, policies as policyApi, isError } from '@/lib/api'
 import type { Transaction, WalletBalance, Policy } from '@/lib/api'
 
 // ─── Stat Card ─────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, subColor }: {
-  label: string; value: string; sub?: string; subColor?: string
+function StatCard({ label, value, sub, subColor, side }: {
+  label: string; value: string; sub?: string; subColor?: string; side?: { label: string; value: string; sub?: string }
 }) {
   return (
     <div style={{
       background: 'var(--bg2)', border: '1px solid var(--border)',
       borderRadius: 8, padding: '20px 22px',
     }}>
-      <div style={{
-        fontSize: 12, color: 'var(--muted)', marginBottom: 8,
-        fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', textTransform: 'uppercase',
-      }}>{label}</div>
-      <div style={{
-        fontFamily: 'var(--font-head)', fontSize: 26, fontWeight: 700,
-        letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1,
-      }}>{value}</div>
-      {sub && (
-        <div style={{ fontSize: 12, color: subColor ?? 'var(--muted)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>
-          {sub}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 12, color: 'var(--muted)', marginBottom: 8,
+            fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', textTransform: 'uppercase',
+          }}>{label}</div>
+          <div style={{
+            fontFamily: 'var(--font-head)', fontSize: 26, fontWeight: 700,
+            letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1,
+          }}>{value}</div>
+          {sub && (
+            <div style={{ fontSize: 12, color: subColor ?? 'var(--muted)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>
+              {sub}
+            </div>
+          )}
         </div>
-      )}
+        {side && (
+          <div style={{ minWidth: 82, textAlign: 'right', paddingTop: 1 }}>
+            <div style={{ fontSize: 10, color: '#6EA8FF', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Credits</div>
+            <div style={{ fontFamily: 'var(--font-head)', fontSize: 17, fontWeight: 700, color: '#8DBBFF', lineHeight: 1 }}>
+              {side.value}
+            </div>
+            <div style={{ fontSize: 10, color: '#6EA8FF', fontFamily: 'var(--font-mono)', marginTop: 5 }}>
+              {side.sub ?? side.label}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -113,6 +129,13 @@ function AddFundsModal({ address, onClose }: { address: string; onClose: () => v
             </div>
           ))}
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          <span style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>stellar mainnet · USDC only</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        </div>
+        <FundingHelpCard />
 
         <button
           onClick={onClose}
@@ -219,6 +242,7 @@ export default function OverviewPage() {
 
   const balance = walletData?.balance ?? '0.0000000'
   const balanceNum = parseFloat(balance)
+  const creditsNum = parseFloat(walletData?.credits_balance ?? '0')
   const allowance = policyData?.allowance_limit ? parseFloat(policyData.allowance_limit) : null
   const totalSpent = policyData?.total_spent ? parseFloat(policyData.total_spent) : 0
   const remaining = allowance !== null ? allowance - totalSpent : null
@@ -254,6 +278,11 @@ export default function OverviewPage() {
             label="Wallet Balance"
             value={`$${balanceNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             sub={`${balance} USDC`}
+            side={creditsNum > 0 ? {
+              label: 'Argens credits',
+              value: `$${creditsNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              sub: 'marketplace',
+            } : undefined}
           />
           <StatCard
             label="Today's Spend"

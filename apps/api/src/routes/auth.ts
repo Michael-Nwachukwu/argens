@@ -21,6 +21,7 @@ export const authRouter: Router = ExpressRouter()
 const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  accessCode: z.string().min(1, 'Access code is required during beta'),
 })
 
 const loginSchema = z.object({
@@ -43,7 +44,7 @@ const pinRemoveSchema = z.object({
 
 // ─── POST /auth/signup ─────────────────────────────────────────────────────────
 authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res) => {
-  const { email, password } = req.body as z.infer<typeof signupSchema>
+  const { email, password, accessCode } = req.body as z.infer<typeof signupSchema>
 
   try {
     // Only valid, deliverable, non-disposable emails get an account.
@@ -57,6 +58,21 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
       throw e
     }
 
+    // Validate the beta access code BEFORE checking for existing email or hashing password.
+    const code = await prisma.accessCode.findUnique({ where: { code: accessCode } })
+    if (!code) {
+      sendError(res, 'Access code is invalid.', 'ACCESS_CODE_INVALID', 422)
+      return
+    }
+    if (code.redeemedBy) {
+      sendError(res, 'This access code has already been used.', 'ACCESS_CODE_ALREADY_REDEEMED', 422)
+      return
+    }
+    if (code.expiresAt && code.expiresAt < new Date()) {
+      sendError(res, 'This access code has expired.', 'ACCESS_CODE_EXPIRED', 422)
+      return
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
       sendError(res, 'An account with this email already exists.', 'CONFLICT', 409)
@@ -67,8 +83,26 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
     const emailVerificationToken = generateSecureToken()
     const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
 
-    const user = await prisma.user.create({
-      data: { email, passwordHash, emailVerificationToken, emailVerificationExpiry },
+    // Atomic: create user + redeem code + flip matching waitlist row + audit log
+    const user = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.create({
+        data: { email, passwordHash, emailVerificationToken, emailVerificationExpiry, accessCodeId: code.id },
+      })
+      // Mark the code redeemed. Use the unique constraint on redeemedBy + the previous
+      // null check above as a soft race guard. If two requests race for the same code,
+      // the unique constraint on redeemedBy will reject the second.
+      await tx.accessCode.update({
+        where: { id: code.id },
+        data: { redeemedBy: u.id, redeemedAt: new Date() },
+      })
+      await tx.auditLog.create({
+        data: {
+          userId: u.id,
+          eventType: 'ACCESS_CODE_REDEEMED',
+          eventData: { code: code.code, codeId: code.id, note: code.note ?? null },
+        },
+      })
+      return u
     })
 
     // Fire-and-forget — don't block signup response on email delivery.
@@ -79,12 +113,19 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
     const isDev = process.env['NODE_ENV'] !== 'production'
     const frontendUrl = process.env['FRONTEND_URL'] ?? 'http://localhost:3000'
 
-    logger.info('User signed up', { userId: user.id })
+    logger.info('User signed up', { userId: user.id, accessCodeId: code.id })
     sendSuccess(res, {
       message: 'Account created. Check your email to verify and activate your wallet.',
       ...(isDev && { dev_verify_url: `${frontendUrl}/auth/verify?token=${emailVerificationToken}` }),
     }, 201)
   } catch (e) {
+    // Unique constraint race on AccessCode.redeemedBy → code was taken between check and update
+    const msg = (e as { code?: string }).code
+    if (msg === 'P2002') {
+      logger.warn('Access code race detected on signup', { error: (e as Error).message })
+      sendError(res, 'This access code has already been used.', 'ACCESS_CODE_ALREADY_REDEEMED', 422)
+      return
+    }
     logger.error('Signup error', { error: (e as Error).message })
     sendError(res, 'Signup failed. Please try again.', 'INTERNAL_ERROR', 500)
   }
@@ -124,6 +165,7 @@ authRouter.get('/verify/:token', async (req, res) => {
 
     // Bootstrap wallet — this hits Stellar network so may take a few seconds.
     const { publicKey } = await bootstrapWallet(user.id)
+    const apiKey = await createApiKey(user.id)
 
     sendWalletReadyEmail(user.email, publicKey).catch((e) =>
       logger.error('Failed to send wallet ready email', { userId: user.id, error: (e as Error).message }),
@@ -133,6 +175,9 @@ authRouter.get('/verify/:token', async (req, res) => {
     sendSuccess(res, {
       message: 'Email verified. Your wallet is ready.',
       wallet_address: publicKey,
+      api_key: apiKey.key,
+      api_key_prefix: apiKey.prefix,
+      api_key_message: 'Store this API key securely. It will not be shown again.',
     })
   } catch (e) {
     if (e instanceof AppError) {

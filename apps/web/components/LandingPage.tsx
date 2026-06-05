@@ -126,8 +126,9 @@ function Nav() {
   const links: [string, string][] = [
     ['#how', 'How it works'],
     ['#marketplace', 'Marketplace'],
+    ['/services', 'Services'],
     ['#policies', 'Policies'],
-    ['#pricing', 'Pricing'],
+    ['/docs', 'Docs'],
   ]
 
   return (
@@ -721,7 +722,7 @@ function Marketplace() {
               <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, marginBottom: 22 }}>
                 Your agent calls any provider — AI models, search engines, code sandboxes, data APIs — paying per use from its Argens wallet. No separate accounts. No API keys to manage per service. No rate-limit negotiations.
               </p>
-              <a href="#" style={{ fontSize: 14, color: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 500 }}>Browse all services →</a>
+              <a href="/services" style={{ fontSize: 14, color: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 500 }}>Browse all services →</a>
             </div>
           </FadeUp>
         </div>
@@ -811,7 +812,7 @@ function TwoWays() {
                   <span style={{ color: t.faint }}>// → 200 CONFIRMED · hash: abc…xyz</span>
                 </div>
               </div>
-              <a href="#" style={{ fontSize: 13, color: t.accent, textDecoration: 'none', marginTop: 'auto' }}>View API docs →</a>
+              <a href="/docs" style={{ fontSize: 13, color: t.accent, textDecoration: 'none', marginTop: 'auto' }}>View API docs →</a>
             </div>
           </FadeUp>
 
@@ -956,6 +957,199 @@ function Policies() {
   )
 }
 
+// ─── Chain Logos (inline SVG) ─────────────────────────────────────────────────
+function StellarSVG({ size = 56 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <circle cx="28" cy="28" r="28" fill="#000"/>
+      <line x1="28" y1="11" x2="28" y2="45" stroke="white" strokeWidth="3.5" strokeLinecap="round"/>
+      <line x1="12.8" y1="19.5" x2="43.2" y2="36.5" stroke="white" strokeWidth="3.5" strokeLinecap="round"/>
+      <line x1="43.2" y1="19.5" x2="12.8" y2="36.5" stroke="white" strokeWidth="3.5" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function UsdcSVG({ size = 56 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <circle cx="28" cy="28" r="28" fill="#2775CA"/>
+      <circle cx="28" cy="28" r="15" stroke="white" strokeWidth="2.5" fill="none"/>
+      <text x="28" y="34" textAnchor="middle" fill="white" fontSize="16" fontWeight="700" fontFamily="Inter, Arial, sans-serif">$</text>
+    </svg>
+  )
+}
+
+function BaseSVG({ size = 56 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <circle cx="28" cy="28" r="28" fill="#0052FF"/>
+      <path d="M38 18 A 14 14 0 1 0 38 38" stroke="white" strokeWidth="6" fill="none" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+// ─── Cross-Chain ──────────────────────────────────────────────────────────────
+function CrossChain() {
+  const [animated, setAnimated] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setAnimated(true); obs.disconnect() }
+    }, { threshold: 0.15 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  const feats = [
+    { icon: '◈', title: 'No bridges', desc: 'Circle CCTP V2 burns on Stellar and mints on Base. Native USDC only — no synthetic assets, no wrapped tokens.' },
+    { icon: '⌘', title: 'Zero config', desc: 'Pass any 0x... address to POST /pay. Chain detection is automatic — no extra params needed.' },
+    { icon: '◇', title: '~8–20 seconds', desc: 'Fast Transfer on CCTP V2. Argens uses Fast Transfer by default for near-instant cross-chain settlement.' },
+    { icon: '◎', title: '0.5% fee · capped', desc: 'Cross-chain fee is 0.5% of amount, min $0.05, max $2.00 USDC. Direct Stellar payments remain $0 fee.' },
+  ]
+
+  const nodeCss = (delay: number, glow?: string): React.CSSProperties => ({
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+    background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 16,
+    padding: '22px 20px', minWidth: 130, textAlign: 'center',
+    opacity: animated ? 1 : 0,
+    transform: animated ? 'translateY(0)' : 'translateY(20px)',
+    transition: `opacity 0.7s ${delay}s cubic-bezier(0.16,1,0.3,1), transform 0.7s ${delay}s cubic-bezier(0.16,1,0.3,1)`,
+    boxShadow: (glow && animated) ? `0 0 32px ${glow}` : undefined,
+  })
+
+  const arrowCss = (delay: number): React.CSSProperties => ({
+    opacity: animated ? 1 : 0,
+    transition: `opacity 0.6s ${delay}s ease`,
+    padding: '0 8px', display: 'flex', alignItems: 'center', flexShrink: 0,
+  })
+
+  return (
+    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}`, background: t.bg, position: 'relative', overflow: 'hidden' }} id="cross-chain">
+      <div style={{ position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)', width: 800, height: 400, background: 'radial-gradient(ellipse at 50% 50%, rgba(0,82,255,0.04) 0%, transparent 70%)', pointerEvents: 'none' }}/>
+
+      <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
+
+        {/* Header */}
+        <FadeUp>
+          <div style={{ textAlign: 'center', maxWidth: 580, margin: '0 auto 64px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0052FF', display: 'inline-block', animation: 'glow 2s infinite alternate' }}/>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: '#5B8EFF', background: 'rgba(0,82,255,0.08)', border: '1px solid rgba(0,82,255,0.2)', padding: '4px 12px', borderRadius: 20, letterSpacing: '0.04em' }}>CCTP V2 · LIVE ON MAINNET</span>
+            </div>
+            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,4vw,52px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 16, color: t.text }}>
+              Pay any Base address.<br/>From Stellar, in one call.
+            </h2>
+            <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, maxWidth: 480, margin: '0 auto' }}>
+              Argens auto-routes <code style={{ fontFamily: 'monospace', color: t.text2 }}>0x...</code> recipients via Circle CCTP V2. Burn on Stellar, mint natively on Base — no bridge, no wrapping, one API call. <span style={{ color: t.text2 }}>0.5% fee · min $0.05 · max $2.</span>
+            </p>
+          </div>
+        </FadeUp>
+
+        {/* Flow diagram */}
+        <div ref={ref} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 72 }} className="lp-cctp-flow">
+
+          <div style={nodeCss(0)}>
+            <div style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+              <StellarSVG size={64} />
+            </div>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Stellar</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted }}>Burn USDC</div>
+          </div>
+
+          <div style={arrowCss(0.2)} className="lp-cctp-arrow">
+            <svg width="52" height="20" viewBox="0 0 52 20" fill="none">
+              <line x1="0" y1="10" x2="42" y2="10" stroke={t.border2} strokeWidth="1.5" strokeDasharray="3 3"/>
+              <path d="M42 5 L52 10 L42 15" stroke={t.border2} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+
+          <div style={nodeCss(0.2, 'rgba(39,117,202,0.15)')}>
+            <div style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+              <UsdcSVG size={64} />
+            </div>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Circle CCTP V2</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted }}>Iris Attestation</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.accent }}>~8–20 seconds</div>
+          </div>
+
+          <div style={arrowCss(0.4)} className="lp-cctp-arrow">
+            <svg width="52" height="20" viewBox="0 0 52 20" fill="none">
+              <line x1="0" y1="10" x2="42" y2="10" stroke={t.border2} strokeWidth="1.5" strokeDasharray="3 3"/>
+              <path d="M42 5 L52 10 L42 15" stroke={t.border2} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+
+          <div style={nodeCss(0.4, 'rgba(0,82,255,0.12)')}>
+            <div style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,82,255,0.3)' }}>
+              <BaseSVG size={64} />
+            </div>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Base</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted }}>Mint USDC</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#5B8EFF' }}>native USDC</div>
+          </div>
+
+        </div>
+
+        {/* Code + Features */}
+        <div className="lp-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 52, alignItems: 'start' }}>
+
+          <FadeUp delay={0.06}>
+            <div>
+              <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, marginBottom: 14, color: t.text }}>One request. Argens handles the rest.</div>
+              <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.border}`, background: t.bg, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {[0,1,2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#3A3733' }}/>)}
+                  <span style={{ marginLeft: 8, fontFamily: 'monospace', fontSize: 11, color: t.muted }}>POST /v1/pay → Base via CCTP</span>
+                </div>
+                <div style={{ padding: '16px 20px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, lineHeight: 1.9 }}>
+                  <pre style={{ margin: 0 }}><code>
+{SYN.cmt('// G... = Stellar  ·  0x... = Base (auto)')}{'\n'}
+{SYN.kw('await')} {SYN.fn('fetch')}({SYN.str("'/v1/pay'")}, {'{'}{'\n'}
+{'  '}body: {SYN.fn('JSON.stringify')}({'{'}{'\n'}
+{'    '}recipient: {SYN.str('"0xABC...Base"')},{'\n'}
+{'    '}amount:    {SYN.str('"25.0000000"')},{'\n'}
+{'  }'}{')'}
+{'\n'}{'}'}{');'}
+                  </code></pre>
+                </div>
+                <div style={{ padding: '12px 20px', borderTop: `1px solid ${t.border}`, background: t.bg, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted, lineHeight: 1.7 }}>
+                  <span style={{ color: t.success }}>200</span>{' { status: '}<span style={{ color: '#7DB88A' }}>&quot;cross_chain_pending&quot;</span>,{'\n'}
+                  {'     stellar_tx_hash: '}<span style={{ color: '#7DB88A' }}>&quot;a3f9...&quot;</span>,{'\n'}
+                  {'     poll_url: '}<span style={{ color: '#7DB88A' }}>&quot;/v1/transactions/...&quot;</span>{' }'}
+                </div>
+              </div>
+            </div>
+          </FadeUp>
+
+          <FadeUp delay={0.14}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+              {feats.map((f) => (
+                <div key={f.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                    background: 'rgba(0,82,255,0.08)',
+                    border: '1px solid rgba(0,82,255,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#5B8EFF', fontSize: 15,
+                  }}>{f.icon}</div>
+                  <div>
+                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, marginBottom: 4, color: t.text }}>{f.title}</div>
+                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.65 }}>{f.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </FadeUp>
+
+        </div>
+
+      </div>
+    </section>
+  )
+}
+
 // ─── CTA + Footer ─────────────────────────────────────────────────────────────
 function CtaFooter() {
   return (
@@ -995,8 +1189,8 @@ function CtaFooter() {
           <div className="lp-footer-inner" style={{ borderTop: `1px solid ${t.border}`, paddingTop: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 24 }}>
             <Logo />
             <div className="lp-footer-links" style={{ display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' as const }}>
-              {['Docs', 'GitHub', 'Twitter / X', 'Privacy', 'Terms'].map(l => (
-                <a key={l} href="#" style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{l}</a>
+              {([['Services', '/services'], ['Docs', '/docs'], ['GitHub', '#'], ['Twitter / X', '#'], ['Privacy', '#'], ['Terms', '#']] as [string, string][]).map(([l, href]) => (
+                <a key={l} href={href} style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{l}</a>
               ))}
             </div>
             <div style={{ fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>© 2026 Argens Inc.</div>
@@ -1023,6 +1217,10 @@ export function LandingPage() {
         .lp-ticker-track { animation: ticker-scroll 50s linear infinite; }
         .lp-ticker-track:hover { animation-play-state: paused; }
 
+        /* CCTP flow diagram */
+        .lp-cctp-flow  { flex-wrap: nowrap; }
+        .lp-cctp-arrow { flex-shrink: 0; }
+
         /* Tablet: 3-col → 2-col */
         @media (max-width: 1023px) {
           .lp-3col    { grid-template-columns: repeat(2, 1fr) !important; }
@@ -1031,6 +1229,8 @@ export function LandingPage() {
 
         /* Mobile */
         @media (max-width: 767px) {
+          .lp-cctp-flow  { flex-direction: column !important; align-items: center !important; gap: 12px !important; }
+          .lp-cctp-arrow { transform: rotate(90deg); padding: 4px 0 !important; }
           .lp-pad         { padding-left: 20px !important; padding-right: 20px !important; }
           .lp-hero        { padding-top: 96px !important; padding-bottom: 52px !important; }
           .lp-hero-grid   { grid-template-columns: 1fr !important; gap: 40px !important; }
@@ -1057,6 +1257,7 @@ export function LandingPage() {
         <Problem />
         <HowItWorks />
         <Marketplace />
+        <CrossChain />
         <TwoWays />
         <Policies />
         <CtaFooter />

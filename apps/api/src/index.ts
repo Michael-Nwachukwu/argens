@@ -10,12 +10,14 @@ import { policiesRouter } from './routes/policies.js'
 import { approveRouter } from './routes/approve.js'
 import { x402Router } from './routes/x402.js'
 import { marketplaceRouter } from './routes/marketplace.js'
+import { adminRouter } from './routes/admin.js'
 import { apiLimiter } from './middleware/ratelimit.js'
 import { sendError } from './lib/response.js'
 import { AppError } from './lib/errors.js'
 import { logger } from './lib/logger.js'
 import { prisma } from './lib/prisma.js'
 import { startWatcher } from './services/watcher.js'
+import { startBalanceAlerting } from './services/alerting.js'
 
 const app = express()
 const PORT = Number(process.env['API_PORT'] ?? 3001)
@@ -26,6 +28,7 @@ app.use(helmet())
 app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret'],
 }))
 
 // ─── Body parsing ──────────────────────────────────────────────────────────────
@@ -43,6 +46,7 @@ app.use('/v1', policiesRouter)
 app.use('/v1', approveRouter)
 app.use('/v1', x402Router)
 app.use('/v1', marketplaceRouter)
+app.use('/v1/admin', adminRouter)
 
 // ─── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
@@ -71,6 +75,7 @@ async function start(): Promise<void> {
     await prisma.$connect()
     logger.info('Database connected')
     startWatcher()
+    startBalanceAlerting()
     app.listen(PORT, () => {
       logger.info(`Argens API running`, { port: PORT, network: process.env['STELLAR_NETWORK'] ?? 'testnet' })
     })

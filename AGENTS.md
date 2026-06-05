@@ -8,18 +8,24 @@ This file is the **single source of truth** for the Codex agent building Argens.
 
 ---
 
-## Status — 2026-05-27
+## Status — 2026-06-03
 
 - **Network: Stellar MAINNET.** Live on mainnet. Testnet paths exist only for local-dev parity.
 - **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` is accessible at `argens.xyz/SKILL.md`. Vercel GitHub deployments must use root directory `apps/web`.
 - **API: local only.** Railway deployment is the #1 external-user blocker. The live dashboard cannot serve external users until the API is deployed.
+- **Current branch: `beta_rollout`.** Claude Code has uncommitted work in progress. Do not revert or overwrite it.
 - **Marketplace: Phase 4 complete.** MPP Router mainnet integration is live locally: 86 providers / 493 endpoints, provider-level enablement toggles, search/filter endpoints, mainnet policy paths verified E2E, marketplace revenue routed to `ARGENS_FEE_WALLET`.
-- **SKILL.md: v4 local.** v4 covers CCTP / `0x...` recipient guidance, per-provider skill files, `/docs`, and `/llms.txt`.
+- **Beta access codes: implemented locally.** `AccessCode` schema + migrations exist. Signup requires an access code, supports `?code=...` autofill, and points invalid/missing-code users to the Tally waitlist. Admin can generate/list codes.
+- **Marketplace credits: implemented locally.** `CreditGrant` schema + expirable FIFO credit accounting exist. Marketplace calls can use credits through `ARGENS_CREDIT_POOL_SECRET`; approved marketplace calls re-check credits at execution and fall back to USDC if credits are insufficient. Credit deductions are refunded on pre-payment/on-chain MPP failure paths. Credit-pool env keys exist, but the credit-pool Stellar account is not yet created/funded on mainnet.
+- **Credit-grant emails: implemented locally.** Admin credit grants now send users an immediate marketplace-credit notification after the grant transaction commits. The admin response includes `notification.sent` so operators can see delivery failures without rolling back the grant.
+- **CCTP fee model: implemented locally and preflight hardened.** Stellar → Base CCTP direct/approval paths apply an Argens fee via `computeCctpFee()` using 0.5% with $0.05 min and $2 max, then preflight live USDC balance for `amount + fee`. If insufficient, return `402 INSUFFICIENT_FUNDS_PLUS_FEES`; if live balance cannot be verified, return `503 CCTP_PREFLIGHT_UNAVAILABLE`. No fee is sent before this check passes.
+- **SKILL.md: v5 local.** v4 covered CCTP / `0x...` recipient guidance, per-provider skill files, `/docs`, and `/llms.txt`; v5 adds CCTP fee documentation.
 - **Docs and discoverability: implemented locally.** `/docs`, `/llms.txt`, API provider skill markdown, and web `/SKILL/<provider>.md` proxy all build and smoke-test locally. Deploy still depends on normal Vercel flow.
 - **CCTP V2 / Base settlement: direct path verified twice.** `POST /pay` accepts Base `0x...` addresses and routes Stellar → Base via Circle CCTP V2. Latest 0.0100000 USDC mainnet verification: transaction `cmpn8yh5900011uqzobaa94qn`, Stellar burn `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044`, Base relay `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`. Approval-token CCTP path builds but still needs live approval-path verification.
 - **Approval flow: fixed for public token reads.** `GET /approve/:token` is public, magic-link based, and the token is the bearer credential. Cross-chain approval execution is wired but still needs live approval-path verification.
-- **Current CCTP follow-up:** verify the approval-token CCTP path with a small pending transaction, then deploy SKILL.md v4 after review.
-- **What is NOT done yet:** Railway API deploy, approval-token CCTP live verification, example payloads, full endpoint-by-endpoint error audit, demo script/Loom, ops XLM alerting, wallet-funded SSE E2E, low-balance email E2E.
+- **Admin ops console: implemented locally, backend balance route fixed.** Obscure route `/x/console-a3f9k2p7` uses `ADMIN_SECRET` in `x-admin-secret`; backend endpoints include stats, wallet balances, users, access codes, credit grants, failed transactions, and grant-by-email. `GET /v1/admin/wallets` now reads each Stellar account once, preserves partial success, and verified ops/fee/Base balances on 2026-06-03. The only remaining balance issue is real state: `ARGENS_CREDIT_POOL_PUBLIC` is not created/funded on mainnet.
+- **Current follow-up:** bootstrap/fund the credit-pool wallet before relying on credit-funded marketplace calls; then run a real credit grant to verify email delivery and a credit-funded marketplace call.
+- **What is NOT done yet:** Railway API deploy, approval-token CCTP live verification, credit pool wallet bootstrap/funding, example payloads, demo script/Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E.
 
 ---
 

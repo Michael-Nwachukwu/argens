@@ -14,6 +14,7 @@ import { prisma } from '../lib/prisma.js'
 import { getUsdcBalance, getXlmBalance, isStellarAddress, validateMemo } from '../services/stellar.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
+import { getActiveCreditsBalance } from '../services/credits.js'
 import { decryptSecretKey } from '../lib/crypto.js'
 import { validate } from '../middleware/validate.js'
 import { authLimiter, checkPinAttempt, resetPinAttempts } from '../middleware/ratelimit.js'
@@ -108,11 +109,13 @@ walletRouter.get('/wallet/balance', requireJwtOrApiKey, async (req, res, next) =
     }
 
     const xlmBalance = await getXlmBalance(wallet.stellarPublicKey).catch(() => null)
+    const credits = await getActiveCreditsBalance(userId).catch(() => null)
 
     sendSuccess(res, {
       balance,
       currency: 'USDC',
       xlm_balance: xlmBalance ?? '0.0000000',
+      credits_balance: credits ? credits.toFixed(7) : '0.0000000',
       wallet_address: wallet.stellarPublicKey,
       cached_at: cachedAt,
     })

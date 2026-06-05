@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { TopBar } from '@/components/dashboard/TopBar'
 import { wallet as walletApi, isError } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { FundingHelpCard } from '@/components/dashboard/FundingHelpCard'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import type { WalletBalance } from '@/lib/api'
 
 const BACKUP_ACK_KEY = (userId: string) => `argens_key_acked_${userId}`
@@ -47,6 +49,7 @@ function AddFundsModal({ address, onClose }: { address: string; onClose: () => v
           <span style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>stellar mainnet · USDC only</span>
           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
         </div>
+        <FundingHelpCard />
         <button onClick={onClose} style={{ width: '100%', padding: 10, background: 'transparent', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
           Done
         </button>
@@ -220,6 +223,22 @@ export default function WalletPage() {
             </div>
           </div>
 
+          {/* Credits — only shown when user has been granted credits */}
+          {!loading && parseFloat(walletData?.credits_balance ?? '0') > 0 && (
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--accent-mid)', borderRadius: 8, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-low)', border: '1px solid var(--accent-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 16, flexShrink: 0 }}>◈</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Argens credits</div>
+                <div style={{ fontFamily: 'var(--font-head)', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1 }}>
+                  ${parseFloat(walletData!.credits_balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
+                  Prepaid marketplace budget · non-withdrawable · used before USDC on marketplace calls
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Address */}
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '20px 22px' }}>
             <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Wallet address</div>
@@ -285,14 +304,13 @@ export default function WalletPage() {
                     {keyError}
                   </div>
                 )}
-                <input
-                  type="password"
+                <PasswordInput
                   value={keyPassword}
-                  onChange={e => { setKeyPassword(e.target.value); setKeyError('') }}
+                  onChange={value => { setKeyPassword(value); setKeyError('') }}
                   placeholder="Your account password"
                   autoFocus
                   onKeyDown={e => { if (e.key === 'Enter') void downloadKey() }}
-                  style={{ background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, padding: '10px 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                  fontFamily="var(--font-body)"
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => { setKeyStep('idle'); setKeyPassword(''); setKeyError('') }} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
@@ -393,14 +411,15 @@ export default function WalletPage() {
                   </div>
                 )}
                 <div style={{ marginBottom: 20 }}>
-                  <input
-                    type="password"
+                  <PasswordInput
                     maxLength={4}
                     value={sendForm.pin}
-                    onChange={e => { setSendForm({ ...sendForm, pin: e.target.value.replace(/\D/g, '') }); setSendError('') }}
+                    onChange={value => { setSendForm({ ...sendForm, pin: value.replace(/\D/g, '') }); setSendError('') }}
                     placeholder="••••"
                     autoFocus
-                    style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--text)', textAlign: 'center', outline: 'none', boxSizing: 'border-box' }}
+                    inputMode="numeric"
+                    fontSize={16}
+                    textAlign="center"
                   />
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>

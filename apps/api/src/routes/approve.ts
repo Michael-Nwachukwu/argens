@@ -18,6 +18,7 @@
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { sendSuccess, sendError } from '../lib/response.js'
+import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey } from '../lib/crypto.js'
@@ -31,6 +32,9 @@ import {
   encodeEvmRecipient,
   pollAttestation,
   relayOnBase,
+  computeCctpFee,
+  verifyCctpPreflightBalance,
+  CCTP_FEE_RATE,
   BASE_DOMAIN,
 } from '../services/cctp.js'
 
@@ -195,9 +199,72 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
     const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
 
     if (isEvmAddress(transaction.recipientAddress)) {
-      // ── CCTP cross-chain: burn on Stellar, fire-and-forget relay to Base ────
+      // ── CCTP cross-chain (approved path): fee → burn → fire-and-forget relay ─
+      const mintRecipient32 = encodeEvmRecipient(transaction.recipientAddress)
+      const feeAmount = computeCctpFee(amount)
+      const feeWallet = process.env['ARGENS_FEE_WALLET']
+
+      if (!feeWallet) {
+        logger.error('ARGENS_FEE_WALLET not configured for CCTP fee (approved path)', { userId, transactionId: transaction.id })
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: { status: 'FAILED', blockedReason: 'Fee wallet not configured' },
+        })
+        sendError(res, 'Service misconfiguration. Try again later.', 'FEE_WALLET_NOT_CONFIGURED', 500)
+        return
+      }
+
       try {
-        const mintRecipient32 = encodeEvmRecipient(transaction.recipientAddress)
+        await verifyCctpPreflightBalance(wallet.stellarPublicKey, amount, feeAmount)
+      } catch (preflightErr) {
+        const err = preflightErr as AppError
+        logger.warn('CCTP preflight blocked approved transfer before fee payment', {
+          userId,
+          transactionId: transaction.id,
+          code: err.code,
+          error: err.message,
+        })
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: err.message,
+          },
+        })
+        if (preflightErr instanceof AppError) {
+          sendError(res, preflightErr.message, preflightErr.code, preflightErr.statusCode, {
+            ...(preflightErr.details as Record<string, unknown> | undefined),
+            transaction_id: transaction.id,
+          })
+          return
+        }
+        throw preflightErr
+      }
+
+      let feeTxHash: string
+      try {
+        const feeResult = await submitPayment({
+          senderSecretKey: secretKey,
+          recipientPublicKey: feeWallet,
+          amount: feeAmount,
+          memo: `CCTP fee ${transaction.id.slice(0, 12)}`,
+        })
+        feeTxHash = feeResult.hash
+      } catch (feeErr) {
+        const errMsg = feeErr instanceof Error ? feeErr.message : String(feeErr)
+        logger.error('CCTP fee payment failed (approved path)', { userId, transactionId: transaction.id, error: errMsg })
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: { status: 'FAILED', blockedReason: `Fee payment failed: ${errMsg}` },
+        })
+        sendError(res, 'Cross-chain payment failed during fee step. No funds taken.', 'CCTP_FEE_FAILED', 502, {
+          error: errMsg,
+          transaction_id: transaction.id,
+        })
+        return
+      }
+
+      try {
         const { stellarTxHash } = await burnUsdcOnStellar(
           secretKey,
           amount,
@@ -211,6 +278,13 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
             stellarTxHash,
             crossChain: true,
             destinationChain: 'base',
+            metadata: {
+              cctpFee: {
+                rate: CCTP_FEE_RATE.toString(),
+                amount: feeAmount,
+                stellar_tx_hash: feeTxHash,
+              },
+            },
           },
         })
 
@@ -224,6 +298,8 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
           transaction_id: transaction.id,
           stellar_tx_hash: stellarTxHash,
           destination_chain: 'base',
+          argens_fee: feeAmount,
+          fee_tx_hash: feeTxHash,
           message: 'USDC burned on Stellar. Relay to Base is in progress.',
           poll_url: `/v1/transactions/${transaction.id}`,
         })
@@ -253,22 +329,30 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
         const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
         const errStr = String(burnErr)
         const errJson = (() => { try { return JSON.stringify(burnErr) } catch { return null } })()
-        logger.error('CCTP burn failed on approval', {
-          userId,
-          transactionId: transaction.id,
-          error: errMsg,
-          raw: errStr,
-          json: errJson,
+        logger.error('CCTP burn failed after fee was taken (approved path)', {
+          userId, transactionId: transaction.id, error: errMsg, raw: errStr, json: errJson, feeTxHash, feeAmount,
         })
         await prisma.transaction.update({
           where: { id: transaction.id },
-          data: { status: 'FAILED', blockedReason: errMsg || errStr },
+          data: {
+            status: 'FAILED',
+            blockedReason: errMsg || errStr,
+            metadata: {
+              cctpFee: {
+                rate: CCTP_FEE_RATE.toString(),
+                amount: feeAmount,
+                stellar_tx_hash: feeTxHash,
+              },
+              failureReason: 'cctp_burn_failed_after_fee',
+            },
+          },
         })
-        sendError(res, 'Cross-chain payment failed during burn on Stellar.', 'CCTP_BURN_FAILED', 502, {
+        sendError(res, 'Cross-chain payment failed during burn on Stellar. Fee will be reconciled manually.', 'CCTP_BURN_FAILED', 502, {
           transaction_id: transaction.id,
           error: errMsg,
           raw: errStr,
           json: errJson,
+          fee_tx_hash: feeTxHash,
         })
       }
     } else {

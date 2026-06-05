@@ -1,4 +1,4 @@
-# Argens Skill — v4 — updated 2026-05-27
+# Argens Skill — v5 — updated 2026-06-01
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -125,7 +125,7 @@ Same body as `/pay`. No payment made, no record created. Use this before large p
 
 **Stellar (direct):** Send USDC to a Stellar address (`G...`, 56 chars). **$0 Argens fee** — wallet debited exactly `amount`.
 
-**Base (cross-chain via CCTP):** Send USDC to a Base EVM address (`0x...`, 42 chars). Argens burns on Stellar and mints on Base via Circle CCTP V2. No Argens direct-payment fee is added; any Circle protocol fee is handled inside the CCTP burn/mint path. Response returns immediately after the burn; poll `poll_url` for the Base `destination_tx_hash`.
+**Base (cross-chain via CCTP):** Send USDC to a Base EVM address (`0x...`, 42 chars). Argens burns on Stellar and mints on Base via Circle CCTP V2. **Argens fee: 0.5% of amount, min $0.05, max $2.00 USDC** — debited from the user's wallet on top of `amount` and routed to the Argens fee wallet. The Base recipient receives the full `amount`. Response returns immediately after the burn (includes `argens_fee` + `fee_tx_hash`); poll `poll_url` for the Base `destination_tx_hash`. Direct Stellar payments remain $0 fee.
 
 **Request:**
 ```json
@@ -189,11 +189,15 @@ Poll `GET /v1/transactions/{id}` and check `data.status`. It will become `SUCCES
     "transaction_id": "clxyz126",
     "stellar_tx_hash": "abc...xyz",
     "destination_chain": "base",
+    "argens_fee": "0.0500000",
+    "fee_tx_hash": "def...123",
     "message": "USDC burned on Stellar. Relay to Base is in progress.",
     "poll_url": "/v1/transactions/clxyz126"
   }
 }
 ```
+
+The `argens_fee` is 0.5% of `amount`, clamped to `[0.05, 2.00]` USDC. The user's wallet was debited `amount + argens_fee` total; the Base recipient receives the full `amount`.
 
 Poll until `data.status` is `SUCCESS` and `data.destination_tx_hash` is set — that hash is the Base mint transaction.
 

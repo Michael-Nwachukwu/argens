@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/v1'
+const ONBOARDING_API_KEY = 'argens_onboarding_api_key'
 
 function VerifyContent() {
   const params = useSearchParams()
@@ -32,6 +33,9 @@ function VerifyContent() {
       .then(r => r.json())
       .then(body => {
         if (body.data) {
+          if (body.data.api_key) {
+            try { sessionStorage.setItem(ONBOARDING_API_KEY, body.data.api_key) } catch { /* ignore */ }
+          }
           setStatus('success')
           setMessage(body.data.message ?? 'Email verified.')
           setTimeout(() => router.push('/login'), 2500)

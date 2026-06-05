@@ -24,6 +24,7 @@ import {
   type MppRouterService,
 } from './mpp-router.js'
 import { sendBlockedEmail, sendPendingApprovalEmail } from './email.js'
+import { consumeCredits, getActiveCreditsBalance, refundCredits } from './credits.js'
 
 const MARKUP_RATE = new Decimal('0.20')
 const MPP_USDC_BASE_UNITS = new Decimal('10000000')
@@ -330,17 +331,48 @@ async function executeMarketplaceCallInternal(
   const url = buildMppRouterUrl(service, input.query)
   const payload = input.payload ?? {}
 
+  // Credit path: if the user has any active credits AND the credit-pool wallet is configured,
+  // route the on-chain MPP Router payment through the pool wallet and decrement credits in DB.
+  // Falls back transparently to the USDC path if either condition fails.
+  //
+  // Applies to both immediately-approved calls and approval-execution. For approval-execution
+  // we know the exact cost (stored on the transaction at PENDING_APPROVAL time) and can
+  // pre-check that credits actually cover it before committing to the pool wallet as funder.
+  // If credits were used elsewhere between approval and execution, we transparently fall
+  // back to the user's USDC wallet.
+  const activeCredits = await getActiveCreditsBalance(userId)
+  const creditPoolSecret = process.env['ARGENS_CREDIT_POOL_SECRET']
+  let creditPathEligible = activeCredits.greaterThan(0) && Boolean(creditPoolSecret)
+  if (creditPathEligible && options.approvedTransaction) {
+    const approvedCost = options.approvedTransaction.costPaid
+    if (!approvedCost || activeCredits.lessThan(approvedCost)) {
+      creditPathEligible = false
+      logger.info('Approval execution: credits insufficient for approved cost — falling back to USDC', {
+        userId,
+        transactionId: options.approvedTransaction.id,
+        activeCredits: activeCredits.toFixed(7),
+        approvedCost: approvedCost?.toFixed(7) ?? null,
+      })
+    }
+  }
+  if (activeCredits.greaterThan(0) && !creditPoolSecret) {
+    logger.warn('User has active credits but ARGENS_CREDIT_POOL_SECRET is not configured — falling back to USDC', { userId })
+  }
+  const fundingSecret = creditPathEligible ? creditPoolSecret! : secretKey
+
   const state: {
     txId: string | null
     cost?: CostBreakdown
     challengeSnapshot?: MppChallengeSnapshot
     policyResultForTx?: PolicyResult
-  } = { txId: options.approvedTransaction?.id ?? null }
+    paidWithCredits: boolean
+    creditDeductions?: Array<{ grantId: string; deducted: string }>
+  } = { txId: options.approvedTransaction?.id ?? null, paidWithCredits: false }
 
   let mppResult: MppRequestResult
   try {
     mppResult = await performMppRequest({
-      secretKey,
+      secretKey: fundingSecret,
       url,
       method: service.method,
       headers: { 'Content-Type': 'application/json' },
@@ -362,6 +394,16 @@ async function executeMarketplaceCallInternal(
                 attempted_cost: challengeCost.totalString,
               },
             )
+          }
+
+          // Approval execution: if we elected the credit path before performMppRequest,
+          // deduct credits now (before MPP commits payment from the pool wallet).
+          // The pre-check above confirmed sufficient credits, but a concurrent call
+          // could have depleted them — consumeCredits will throw if so.
+          if (creditPathEligible) {
+            const consumption = await consumeCredits(userId, challengeCost.totalString)
+            state.paidWithCredits = true
+            state.creditDeductions = consumption.grants
           }
 
           await prisma.transaction.update({
@@ -425,6 +467,22 @@ async function executeMarketplaceCallInternal(
           throw new MarketplacePendingApprovalError(tx.id)
         }
 
+        // If eligible, deduct credits BEFORE mpp commits the payment from the pool wallet.
+        // If credits no longer cover the cost (race) consumeCredits throws → mpp never pays.
+        if (creditPathEligible) {
+          if (activeCredits.lessThan(challengeCost.total)) {
+            throw new AppError(
+              'Insufficient credits for this marketplace call.',
+              'INSUFFICIENT_CREDITS',
+              402,
+              { requested: challengeCost.totalString, available: activeCredits.toFixed(7) },
+            )
+          }
+          const consumption = await consumeCredits(userId, challengeCost.totalString)
+          state.paidWithCredits = true
+          state.creditDeductions = consumption.grants
+        }
+
         const tx = await createMarketplaceTransaction({
           userId,
           walletId: wallet.id,
@@ -440,6 +498,22 @@ async function executeMarketplaceCallInternal(
       },
     })
   } catch (e) {
+    // If credits were deducted before MPP Router commit, refund them — the on-chain
+    // payment didn't complete so the user should be made whole. AppError throws inside
+    // onChallenge (BLOCKED, PENDING_APPROVAL, INSUFFICIENT_CREDITS) happen before the
+    // deduction, so state.creditDeductions is undefined and refundCredits is a no-op.
+    if (state.paidWithCredits && state.creditDeductions?.length) {
+      await refundCredits(state.creditDeductions).catch((refundErr) =>
+        logger.error('Credit refund failed after MPP Router failure — manual reconciliation needed', {
+          userId,
+          serviceId: service.id,
+          deductions: state.creditDeductions,
+          error: (refundErr as Error).message,
+        }),
+      )
+      state.paidWithCredits = false
+      state.creditDeductions = undefined
+    }
     if (e instanceof AppError) throw e
     logger.error('Marketplace MPP Router request failed', {
       userId,
@@ -474,6 +548,22 @@ async function executeMarketplaceCallInternal(
   const finalChallenge = state.challengeSnapshot
 
   if (!mppResult.ok) {
+    // Credits were deducted before MPP Router was called, and the on-chain Stellar
+    // payment may or may not have committed. If the receipt indicates success but the
+    // upstream service returned non-2xx, the user paid but didn't get value — that's
+    // an upstream-service issue (handled by markMarketplaceFailed). If no receipt
+    // exists, the payment likely never went through — refund credits.
+    const paymentCommitted = Boolean(mppResult.receipt)
+    if (state.paidWithCredits && state.creditDeductions?.length && !paymentCommitted) {
+      await refundCredits(state.creditDeductions).catch((refundErr) =>
+        logger.error('Credit refund failed after MPP upstream failure — manual reconciliation needed', {
+          userId,
+          transactionId: finalTxId,
+          deductions: state.creditDeductions,
+          error: (refundErr as Error).message,
+        }),
+      )
+    }
     await markMarketplaceFailed(finalTxId, `MPP Router returned HTTP ${mppResult.status}`, mppResult)
     throw new AppError('Marketplace service call failed after payment attempt.', 'MARKETPLACE_UPSTREAM_FAILED', 502, {
       transaction_id: finalTxId,
@@ -482,12 +572,18 @@ async function executeMarketplaceCallInternal(
     })
   }
 
-  const markupResult = await submitPayment({
-    senderSecretKey: secretKey,
-    recipientPublicKey: feeWallet,
-    amount: finalCost.markupString,
-    memo: `Argens ${finalTxId.slice(0, 12)}`,
-  })
+  // On credit path Argens funded the MPP Router payment from the pool wallet — no markup.
+  // On USDC path the user paid MPP Router; Argens now collects markup into the fee wallet.
+  let markupHash: string | null = null
+  if (!state.paidWithCredits) {
+    const markupResult = await submitPayment({
+      senderSecretKey: secretKey,
+      recipientPublicKey: feeWallet,
+      amount: finalCost.markupString,
+      memo: `Argens ${finalTxId.slice(0, 12)}`,
+    })
+    markupHash = markupResult.hash
+  }
 
   const mppHash = mppResult.receipt?.reference ?? getProgressHash(mppResult)
 
@@ -505,11 +601,20 @@ async function executeMarketplaceCallInternal(
           receipt: mppResult.receipt,
           progress: mppResult.progress,
         },
-        markup: {
-          rate: MARKUP_RATE.toString(),
-          amount: finalCost.markupString,
-          stellar_tx_hash: markupResult.hash,
-        },
+        ...(state.paidWithCredits
+          ? {
+              credits: {
+                total: finalCost.totalString,
+                grants: state.creditDeductions ?? [],
+              },
+            }
+          : {
+              markup: {
+                rate: MARKUP_RATE.toString(),
+                amount: finalCost.markupString,
+                stellar_tx_hash: markupHash,
+              },
+            }),
       } as unknown as Prisma.InputJsonValue,
     },
   })

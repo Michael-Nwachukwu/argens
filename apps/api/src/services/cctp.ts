@@ -24,8 +24,10 @@ import {
 import { createWalletClient, http } from 'viem'
 import { base, baseSepolia } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
+import { Decimal } from '@prisma/client/runtime/library'
 import { logger } from '../lib/logger.js'
 import { AppError } from '../lib/errors.js'
+import { getUsdcBalance } from './stellar.js'
 
 // ─── Network config ────────────────────────────────────────────────────────────
 
@@ -65,6 +67,98 @@ const BASE_MESSAGE_TRANSMITTER =
 
 export const STELLAR_DOMAIN = 27
 export const BASE_DOMAIN = 6
+
+// ─── Cross-chain fee (Argens revenue on CCTP transfers) ───────────────────────
+
+export const CCTP_FEE_RATE = new Decimal('0.005') // 0.5%
+export const CCTP_FEE_MIN  = new Decimal('0.05')  // $0.05 floor
+export const CCTP_FEE_MAX  = new Decimal('2.00')  // $2.00 ceiling
+
+/**
+ * Returns the Argens fee for a CCTP cross-chain transfer of `amount` USDC.
+ * Hybrid model: `clamp(amount * 0.005, 0.05, 2.00)`.
+ * Result is a Stellar-formatted amount string (7 decimals).
+ */
+export function computeCctpFee(amount: string): string {
+  const raw = new Decimal(amount).mul(CCTP_FEE_RATE)
+  const clamped = Decimal.min(Decimal.max(raw, CCTP_FEE_MIN), CCTP_FEE_MAX)
+  return clamped.toFixed(7)
+}
+
+export interface CctpPreflightResult {
+  amount: string
+  argens_fee: string
+  required_total: string
+  available: string
+}
+
+/**
+ * CCTP is not atomic in Argens V1: the Argens fee is a Stellar payment and the
+ * CCTP burn is a separate Soroban call. This preflight must run before the fee
+ * transfer so we do not take a fee from a wallet that cannot fund amount + fee.
+ */
+export async function verifyCctpPreflightBalance(
+  walletPublicKey: string,
+  amount: string,
+  feeAmount: string,
+): Promise<CctpPreflightResult> {
+  const requiredTotal = new Decimal(amount).plus(feeAmount)
+
+  let liveUsdcBalance: string | null
+  try {
+    liveUsdcBalance = await getUsdcBalance(walletPublicKey)
+  } catch (e) {
+    throw new AppError(
+      'Could not verify wallet balance before cross-chain payment. No fee was taken.',
+      'CCTP_PREFLIGHT_UNAVAILABLE',
+      503,
+      {
+        amount,
+        argens_fee: feeAmount,
+        required_total: requiredTotal.toFixed(7),
+        wallet_public_key: walletPublicKey,
+        verification_error: e instanceof Error ? e.message : String(e),
+      },
+    )
+  }
+
+  if (liveUsdcBalance === null) {
+    throw new AppError(
+      'Could not verify wallet balance before cross-chain payment. No fee was taken.',
+      'CCTP_PREFLIGHT_UNAVAILABLE',
+      503,
+      {
+        amount,
+        argens_fee: feeAmount,
+        required_total: requiredTotal.toFixed(7),
+        wallet_public_key: walletPublicKey,
+        verification_error: 'Wallet account was not found on the active Stellar network.',
+      },
+    )
+  }
+
+  const liveBal = new Decimal(liveUsdcBalance)
+  if (liveBal.lessThan(requiredTotal)) {
+    throw new AppError(
+      `Insufficient USDC. Cross-chain transfers require amount + Argens fee. Need ${requiredTotal.toFixed(7)} USDC; wallet has ${liveBal.toFixed(7)}.`,
+      'INSUFFICIENT_FUNDS_PLUS_FEES',
+      402,
+      {
+        amount,
+        argens_fee: feeAmount,
+        required_total: requiredTotal.toFixed(7),
+        available: liveBal.toFixed(7),
+      },
+    )
+  }
+
+  return {
+    amount,
+    argens_fee: feeAmount,
+    required_total: requiredTotal.toFixed(7),
+    available: liveBal.toFixed(7),
+  }
+}
 
 // ─── Error ────────────────────────────────────────────────────────────────────
 
