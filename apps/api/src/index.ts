@@ -21,12 +21,16 @@ import { startBalanceAlerting } from './services/alerting.js'
 
 const app = express()
 const PORT = Number(process.env['API_PORT'] ?? 3001)
-const FRONTEND_URL = process.env['FRONTEND_URL'] ?? 'http://localhost:3000'
+const ALLOWED_ORIGINS = (process.env['FRONTEND_URL'] ?? 'http://localhost:3000')
+  .split(',').map(o => o.trim())
 
 // ─── Security ──────────────────────────────────────────────────────────────────
 app.use(helmet())
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true)
+    else cb(new Error('Not allowed by CORS'))
+  },
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret'],
 }))
