@@ -38,4 +38,4 @@ EXPOSE 3001
 # On startup:
 #   1. Run pending migrations (idempotent, safe on restarts)
 #   2. Start the server
-CMD ["sh", "-c", "../../node_modules/.bin/prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/index.js"]
