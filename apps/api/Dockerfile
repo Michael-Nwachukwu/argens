@@ -10,6 +10,9 @@
 
 FROM node:22-alpine
 
+# Prisma requires OpenSSL; Alpine doesn't ship it by default
+RUN apk add --no-cache openssl
+
 # pnpm via corepack (ships with Node 22)
 RUN corepack enable && corepack prepare pnpm@10 --activate
 
