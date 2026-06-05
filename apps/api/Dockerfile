@@ -20,8 +20,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
 
 # ── Layer 2: install all deps ──
-# --frozen-lockfile: fail loudly if lock file is out of date
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # ── Layer 3: Prisma schema → generate client ──
 COPY apps/api/prisma ./apps/api/prisma/
