@@ -14,8 +14,17 @@ import { logger } from '../lib/logger.js'
 import { checkPolicy, incrementTotalSpent, type PolicyResult } from './policy.js'
 import { submitPayment } from './payment.js'
 import { performMppRequest, type MppChallengeSnapshot, type MppRequestResult } from './mpp-client.js'
-import { buildMppRouterUrl, findMppRouterService, listMppRouterServices, type MppRouterService } from './mpp-router.js'
+import {
+  buildMppRouterUrl,
+  findMppRouterService,
+  listMppRouterServices,
+  operationLabel,
+  providerDisplayName,
+  providerKey,
+  type MppRouterService,
+} from './mpp-router.js'
 import { sendBlockedEmail, sendPendingApprovalEmail } from './email.js'
+import { consumeCredits, getActiveCreditsBalance, refundCredits } from './credits.js'
 
 const MARKUP_RATE = new Decimal('0.20')
 const MPP_USDC_BASE_UNITS = new Decimal('10000000')
@@ -64,57 +73,198 @@ interface ApprovedMarketplaceTransaction {
   metadata: unknown
 }
 
+/**
+ * Returns the marketplace catalog grouped into PROVIDERS (one card per provider, e.g.
+ * "AgentMail", "OpenAI"), each with its child endpoints. Enablement is per-provider —
+ * a `MarketplaceServiceSetting` row is keyed by the provider key, not the operation id.
+ */
 export async function getMarketplaceServicesForResponse(userId: string) {
   const [services, settings] = await Promise.all([
     listMppRouterServices(),
     prisma.marketplaceServiceSetting.findMany({ where: { userId } }),
   ])
-  const enabledByService = new Map(settings.map((setting) => [setting.serviceId, setting.enabled]))
+  const enabledByProvider = new Map(settings.map((s) => [s.serviceId, s.enabled]))
 
-  return services.map((service) => ({
-    id: service.id,
-    name: service.name,
-    service_url: buildMppRouterUrl(service),
-    description: service.description,
-    categories: normalizeCategories(service),
-    display_price: service.price,
-    is_available: true,
-    is_enabled: enabledByService.get(service.id) ?? false,
-    availability_note: service.status === 'limited' ? service.status_note ?? 'Limited service metadata.' : null,
-    payment_rail: 'stellar-mainnet',
-    status: service.status,
-    docs_url: service.docs_url ?? service.docs?.homepage ?? null,
-    endpoints: [
-      {
-        id: service.id,
-        label: service.name,
-        method: service.method,
-        path: service.public_path,
-        description: service.description,
-        example_payload: {},
-      },
-    ],
-  }))
+  const groups = new Map<string, MppRouterService[]>()
+  for (const svc of services) {
+    const key = providerKey(svc)
+    const arr = groups.get(key)
+    if (arr) arr.push(svc)
+    else groups.set(key, [svc])
+  }
+
+  const providers = [...groups.entries()].map(([id, ops]) => {
+    const name = providerDisplayName(ops[0]!)
+    const descs = ops.map((o) => o.description).filter(Boolean).sort((a, b) => a.length - b.length)
+    const description = descs[0] ?? `${ops.length} ${name} endpoints`
+
+    const categories = new Set<string>()
+    ops.forEach((o) => normalizeCategories(o).forEach((c) => categories.add(c)))
+
+    const limited = ops.some((o) => o.status === 'limited')
+    const docsUrl =
+      ops.find((o) => o.docs?.homepage)?.docs?.homepage ?? ops.find((o) => o.docs_url)?.docs_url ?? null
+
+    return {
+      id,
+      name,
+      description,
+      categories: [...categories],
+      display_price: priceRangeLabel(ops.map((o) => o.price)),
+      is_enabled: enabledByProvider.get(id) ?? false,
+      status: limited ? ('limited' as const) : ('active' as const),
+      availability_note: limited ? 'Some endpoints have limited metadata.' : null,
+      payment_rail: 'stellar-mainnet',
+      docs_url: docsUrl,
+      skill_url: `${publicWebBaseUrl()}/SKILL/${id}.md`,
+      api_skill_url: `/v1/marketplace/services/${id}/skill.md`,
+      endpoint_count: ops.length,
+      endpoints: ops
+        .map((o) => ({
+          id: o.id,
+          label: operationLabel(o),
+          method: o.method,
+          path: o.public_path,
+          description: o.description,
+          price: o.price,
+          example_payload: null as Record<string, unknown> | null,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    }
+  })
+
+  return providers.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+export async function getMarketplaceProviderSkillMarkdown(providerId: string): Promise<string | null> {
+  const services = await listMppRouterServices()
+  const ops = services
+    .filter((service) => providerKey(service) === providerId)
+    .sort((a, b) => operationLabel(a).localeCompare(operationLabel(b)))
+
+  if (ops.length === 0) return null
+
+  const name = providerDisplayName(ops[0]!)
+  const description = `${ops.length} ${name} endpoints available through the Argens marketplace.`
+  const categories = [...new Set(ops.flatMap(normalizeCategories))].sort()
+  const docs = collectProviderDocs(ops)
+  const first = ops[0]!
+
+  return [
+    `# Argens Marketplace Skill — ${name}`,
+    '',
+    `Provider id: \`${providerId}\``,
+    `Payment rail: Stellar mainnet USDC through Argens marketplace`,
+    `Status: ${ops.some((o) => o.status === 'limited') ? 'limited metadata' : 'active'}`,
+    categories.length ? `Categories: ${categories.map((c) => `\`${c}\``).join(', ')}` : null,
+    '',
+    description,
+    '',
+    '## How agents should use this provider',
+    '',
+    '1. Ask the user for their Argens API key and set `Authorization: Bearer <ARGENS_KEY>`.',
+    '2. Check `GET /v1/agent/status` for wallet balance and policy limits.',
+    `3. Confirm this provider is enabled with \`GET /v1/marketplace/services/${providerId}\`.`,
+    '4. Pick an endpoint from this file and pass its endpoint id as `service_id` to `POST /v1/marketplace/call`.',
+    '5. Explain the service, expected cost, and purpose to the user before making the call.',
+    '',
+    'If the provider is disabled, `POST /v1/marketplace/call` returns `403 SERVICE_DISABLED`. Do not retry; tell the user to enable the provider in the Argens dashboard.',
+    '',
+    '## Call shape',
+    '',
+    '```http',
+    'POST https://api.argens.io/v1/marketplace/call',
+    'Authorization: Bearer <ARGENS_KEY>',
+    'Content-Type: application/json',
+    '```',
+    '',
+    '```json',
+    JSON.stringify(
+      {
+        service_id: first.id,
+        payload: {},
+        query: {},
+      },
+      null,
+      2,
+    ),
+    '```',
+    '',
+    'Use `payload` for the upstream JSON body and `query` for URL query parameters. Omit either field when the endpoint does not need it.',
+    '',
+    '## Endpoints',
+    '',
+    ...ops.flatMap((op) => [
+      `### ${operationLabel(op)}`,
+      '',
+      `- Endpoint id: \`${op.id}\``,
+      `- Method: \`${op.method}\``,
+      `- Upstream path: \`${op.public_path}\``,
+      `- Price shown by provider: ${op.price}`,
+      op.description ? `- Description: ${op.description}` : null,
+      op.docs_url ? `- Docs: ${op.docs_url}` : null,
+      '',
+    ]),
+    docs.length ? '## Upstream Docs' : null,
+    '',
+    ...docs.map((url) => `- ${url}`),
+    '',
+    '## Response handling',
+    '',
+    '- `200` with `data.status: "success"` means the marketplace call completed. Read `data.result` for the upstream response.',
+    '- `202` means the transaction needs human approval. Poll `data.poll_url` until the transaction resolves.',
+    '- `402 POLICY_BLOCKED` means policy blocked the spend. Do not retry automatically.',
+    '- `403 SERVICE_DISABLED` means the user must enable this provider in the dashboard.',
+    '- `502 MARKETPLACE_NOT_MPP` means the upstream service rejected the request before payment. No USDC was charged; fix the request payload or query.',
+    '',
+    '## More Argens context',
+    '',
+    `- Argens skill: ${publicWebBaseUrl()}/SKILL.md`,
+    `- Argens docs: ${publicWebBaseUrl()}/docs`,
+    `- Provider skill URL: ${publicWebBaseUrl()}/SKILL/${providerId}.md`,
+    '',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n')
+}
+
+/** Enable or disable a whole provider (all of its endpoints) for a user. */
 export async function setMarketplaceServiceEnabled(
   userId: string,
-  serviceId: string,
+  providerId: string,
   enabled: boolean,
 ) {
-  const service = await findMppRouterService(serviceId)
-  if (!service) throw new AppError('Marketplace service not found', 'SERVICE_NOT_FOUND', 404)
+  const services = await listMppRouterServices()
+  const exists = services.some((s) => providerKey(s) === providerId)
+  if (!exists) throw new AppError('Marketplace provider not found', 'SERVICE_NOT_FOUND', 404)
 
   const setting = await prisma.marketplaceServiceSetting.upsert({
-    where: { userId_serviceId: { userId, serviceId } },
+    where: { userId_serviceId: { userId, serviceId: providerId } },
     update: { enabled },
-    create: { userId, serviceId, enabled },
+    create: { userId, serviceId: providerId, enabled },
   })
 
   return {
-    service_id: setting.serviceId,
+    provider_id: setting.serviceId,
     enabled: setting.enabled,
   }
+}
+
+function parsePrice(p: string): number | null {
+  if (/free/i.test(p)) return 0
+  const m = String(p).match(/\$\s*([0-9]*\.?[0-9]+)/)
+  return m ? parseFloat(m[1]!) : null
+}
+
+function priceRangeLabel(priceStrings: string[]): string {
+  const nums = priceStrings.map(parsePrice).filter((n): n is number => n != null)
+  if (nums.length === 0) return priceStrings[0] ?? 'see endpoints'
+  const min = Math.min(...nums)
+  const max = Math.max(...nums)
+  const fmt = (n: number) => (n === 0 ? 'free' : `$${n}`)
+  if (min === max) return `${fmt(min)}/request`
+  if (min === 0) return `free – ${fmt(max)}/request`
+  return `${fmt(min)} – ${fmt(max)}/request`
 }
 
 export async function executeMarketplaceCall(
@@ -164,7 +314,7 @@ async function executeMarketplaceCallInternal(
   const service = await findMppRouterService(input.serviceId)
   if (!service) throw new AppError('Marketplace service not found', 'SERVICE_NOT_FOUND', 404)
 
-  await assertServiceEnabled(userId, service.id)
+  await assertServiceEnabled(userId, service)
 
   const wallet = await prisma.wallet.findUnique({ where: { userId } })
   if (!wallet) throw new AppError('Wallet not found.', 'WALLET_NOT_FOUND', 404)
@@ -181,17 +331,48 @@ async function executeMarketplaceCallInternal(
   const url = buildMppRouterUrl(service, input.query)
   const payload = input.payload ?? {}
 
+  // Credit path: if the user has any active credits AND the credit-pool wallet is configured,
+  // route the on-chain MPP Router payment through the pool wallet and decrement credits in DB.
+  // Falls back transparently to the USDC path if either condition fails.
+  //
+  // Applies to both immediately-approved calls and approval-execution. For approval-execution
+  // we know the exact cost (stored on the transaction at PENDING_APPROVAL time) and can
+  // pre-check that credits actually cover it before committing to the pool wallet as funder.
+  // If credits were used elsewhere between approval and execution, we transparently fall
+  // back to the user's USDC wallet.
+  const activeCredits = await getActiveCreditsBalance(userId)
+  const creditPoolSecret = process.env['ARGENS_CREDIT_POOL_SECRET']
+  let creditPathEligible = activeCredits.greaterThan(0) && Boolean(creditPoolSecret)
+  if (creditPathEligible && options.approvedTransaction) {
+    const approvedCost = options.approvedTransaction.costPaid
+    if (!approvedCost || activeCredits.lessThan(approvedCost)) {
+      creditPathEligible = false
+      logger.info('Approval execution: credits insufficient for approved cost — falling back to USDC', {
+        userId,
+        transactionId: options.approvedTransaction.id,
+        activeCredits: activeCredits.toFixed(7),
+        approvedCost: approvedCost?.toFixed(7) ?? null,
+      })
+    }
+  }
+  if (activeCredits.greaterThan(0) && !creditPoolSecret) {
+    logger.warn('User has active credits but ARGENS_CREDIT_POOL_SECRET is not configured — falling back to USDC', { userId })
+  }
+  const fundingSecret = creditPathEligible ? creditPoolSecret! : secretKey
+
   const state: {
     txId: string | null
     cost?: CostBreakdown
     challengeSnapshot?: MppChallengeSnapshot
     policyResultForTx?: PolicyResult
-  } = { txId: options.approvedTransaction?.id ?? null }
+    paidWithCredits: boolean
+    creditDeductions?: Array<{ grantId: string; deducted: string }>
+  } = { txId: options.approvedTransaction?.id ?? null, paidWithCredits: false }
 
   let mppResult: MppRequestResult
   try {
     mppResult = await performMppRequest({
-      secretKey,
+      secretKey: fundingSecret,
       url,
       method: service.method,
       headers: { 'Content-Type': 'application/json' },
@@ -215,6 +396,16 @@ async function executeMarketplaceCallInternal(
             )
           }
 
+          // Approval execution: if we elected the credit path before performMppRequest,
+          // deduct credits now (before MPP commits payment from the pool wallet).
+          // The pre-check above confirmed sufficient credits, but a concurrent call
+          // could have depleted them — consumeCredits will throw if so.
+          if (creditPathEligible) {
+            const consumption = await consumeCredits(userId, challengeCost.totalString)
+            state.paidWithCredits = true
+            state.creditDeductions = consumption.grants
+          }
+
           await prisma.transaction.update({
             where: { id: options.approvedTransaction.id },
             data: { status: 'APPROVED' },
@@ -232,6 +423,7 @@ async function executeMarketplaceCallInternal(
             walletId: wallet.id,
             service,
             payload,
+            query: input.query,
             cost: challengeCost,
             status: 'BLOCKED',
             policyResult,
@@ -260,6 +452,7 @@ async function executeMarketplaceCallInternal(
             walletId: wallet.id,
             service,
             payload,
+            query: input.query,
             cost: challengeCost,
             status: 'PENDING_APPROVAL',
             policyResult,
@@ -274,11 +467,28 @@ async function executeMarketplaceCallInternal(
           throw new MarketplacePendingApprovalError(tx.id)
         }
 
+        // If eligible, deduct credits BEFORE mpp commits the payment from the pool wallet.
+        // If credits no longer cover the cost (race) consumeCredits throws → mpp never pays.
+        if (creditPathEligible) {
+          if (activeCredits.lessThan(challengeCost.total)) {
+            throw new AppError(
+              'Insufficient credits for this marketplace call.',
+              'INSUFFICIENT_CREDITS',
+              402,
+              { requested: challengeCost.totalString, available: activeCredits.toFixed(7) },
+            )
+          }
+          const consumption = await consumeCredits(userId, challengeCost.totalString)
+          state.paidWithCredits = true
+          state.creditDeductions = consumption.grants
+        }
+
         const tx = await createMarketplaceTransaction({
           userId,
           walletId: wallet.id,
           service,
           payload,
+          query: input.query,
           cost: challengeCost,
           status: 'APPROVED',
           policyResult,
@@ -288,6 +498,22 @@ async function executeMarketplaceCallInternal(
       },
     })
   } catch (e) {
+    // If credits were deducted before MPP Router commit, refund them — the on-chain
+    // payment didn't complete so the user should be made whole. AppError throws inside
+    // onChallenge (BLOCKED, PENDING_APPROVAL, INSUFFICIENT_CREDITS) happen before the
+    // deduction, so state.creditDeductions is undefined and refundCredits is a no-op.
+    if (state.paidWithCredits && state.creditDeductions?.length) {
+      await refundCredits(state.creditDeductions).catch((refundErr) =>
+        logger.error('Credit refund failed after MPP Router failure — manual reconciliation needed', {
+          userId,
+          serviceId: service.id,
+          deductions: state.creditDeductions,
+          error: (refundErr as Error).message,
+        }),
+      )
+      state.paidWithCredits = false
+      state.creditDeductions = undefined
+    }
     if (e instanceof AppError) throw e
     logger.error('Marketplace MPP Router request failed', {
       userId,
@@ -322,6 +548,22 @@ async function executeMarketplaceCallInternal(
   const finalChallenge = state.challengeSnapshot
 
   if (!mppResult.ok) {
+    // Credits were deducted before MPP Router was called, and the on-chain Stellar
+    // payment may or may not have committed. If the receipt indicates success but the
+    // upstream service returned non-2xx, the user paid but didn't get value — that's
+    // an upstream-service issue (handled by markMarketplaceFailed). If no receipt
+    // exists, the payment likely never went through — refund credits.
+    const paymentCommitted = Boolean(mppResult.receipt)
+    if (state.paidWithCredits && state.creditDeductions?.length && !paymentCommitted) {
+      await refundCredits(state.creditDeductions).catch((refundErr) =>
+        logger.error('Credit refund failed after MPP upstream failure — manual reconciliation needed', {
+          userId,
+          transactionId: finalTxId,
+          deductions: state.creditDeductions,
+          error: (refundErr as Error).message,
+        }),
+      )
+    }
     await markMarketplaceFailed(finalTxId, `MPP Router returned HTTP ${mppResult.status}`, mppResult)
     throw new AppError('Marketplace service call failed after payment attempt.', 'MARKETPLACE_UPSTREAM_FAILED', 502, {
       transaction_id: finalTxId,
@@ -330,12 +572,18 @@ async function executeMarketplaceCallInternal(
     })
   }
 
-  const markupResult = await submitPayment({
-    senderSecretKey: secretKey,
-    recipientPublicKey: feeWallet,
-    amount: finalCost.markupString,
-    memo: `Argens ${finalTxId.slice(0, 12)}`,
-  })
+  // On credit path Argens funded the MPP Router payment from the pool wallet — no markup.
+  // On USDC path the user paid MPP Router; Argens now collects markup into the fee wallet.
+  let markupHash: string | null = null
+  if (!state.paidWithCredits) {
+    const markupResult = await submitPayment({
+      senderSecretKey: secretKey,
+      recipientPublicKey: feeWallet,
+      amount: finalCost.markupString,
+      memo: `Argens ${finalTxId.slice(0, 12)}`,
+    })
+    markupHash = markupResult.hash
+  }
 
   const mppHash = mppResult.receipt?.reference ?? getProgressHash(mppResult)
 
@@ -346,18 +594,27 @@ async function executeMarketplaceCallInternal(
       stellarTxHash: mppHash,
       policyResult: state.policyResultForTx as unknown as object | undefined,
       metadata: {
-        marketplace: buildStoredMarketplaceRequest(service.id, payload),
+        marketplace: buildStoredMarketplaceRequest(service.id, payload, input.query),
         mpp_router: {
           public_path: service.public_path,
           challenge: sanitizeChallenge(finalChallenge),
           receipt: mppResult.receipt,
           progress: mppResult.progress,
         },
-        markup: {
-          rate: MARKUP_RATE.toString(),
-          amount: finalCost.markupString,
-          stellar_tx_hash: markupResult.hash,
-        },
+        ...(state.paidWithCredits
+          ? {
+              credits: {
+                total: finalCost.totalString,
+                grants: state.creditDeductions ?? [],
+              },
+            }
+          : {
+              markup: {
+                rate: MARKUP_RATE.toString(),
+                amount: finalCost.markupString,
+                stellar_tx_hash: markupHash,
+              },
+            }),
       } as unknown as Prisma.InputJsonValue,
     },
   })
@@ -376,9 +633,10 @@ async function executeMarketplaceCallInternal(
   }
 }
 
-async function assertServiceEnabled(userId: string, serviceId: string): Promise<void> {
+async function assertServiceEnabled(userId: string, service: MppRouterService): Promise<void> {
+  const provider = providerKey(service)
   const setting = await prisma.marketplaceServiceSetting.findUnique({
-    where: { userId_serviceId: { userId, serviceId } },
+    where: { userId_serviceId: { userId, serviceId: provider } },
   })
 
   if (!setting?.enabled) {
@@ -387,8 +645,9 @@ async function assertServiceEnabled(userId: string, serviceId: string): Promise<
       'SERVICE_DISABLED',
       403,
       {
-        service_id: serviceId,
-        message: 'Enable this service from the dashboard before agents can call it.',
+        service_id: service.id,
+        provider,
+        message: `Enable "${providerDisplayName(service)}" from the dashboard before agents can call it.`,
       },
     )
   }
@@ -458,6 +717,7 @@ async function createMarketplaceTransaction(params: {
   walletId: string
   service: MppRouterService
   payload: Record<string, unknown>
+  query?: Record<string, string | number | boolean>
   cost: CostBreakdown
   status: 'APPROVED' | 'BLOCKED' | 'PENDING_APPROVAL'
   policyResult: PolicyResult
@@ -475,11 +735,11 @@ async function createMarketplaceTransaction(params: {
       status: params.status,
       type: 'marketplace',
       serviceId: params.service.id,
-      serviceEndpoint: buildMppRouterUrl(params.service),
+      serviceEndpoint: buildMppRouterUrl(params.service, params.query),
       costPaid: params.cost.totalString,
       memo: `MPP ${params.service.id}`.slice(0, 28),
       metadata: {
-        marketplace: buildStoredMarketplaceRequest(params.service.id, params.payload),
+        marketplace: buildStoredMarketplaceRequest(params.service.id, params.payload, params.query),
         mpp_router: {
           public_path: params.service.public_path,
           challenge: sanitizeChallenge(params.challenge),
@@ -529,6 +789,21 @@ function normalizeCategories(service: MppRouterService): string[] {
     .map((category) => category.toLowerCase())
 }
 
+function publicWebBaseUrl(): string {
+  return (process.env['ARGENS_WEB_URL'] ?? process.env['WEB_URL'] ?? 'https://argens.xyz').replace(/\/$/, '')
+}
+
+function collectProviderDocs(services: MppRouterService[]): string[] {
+  const docs = new Set<string>()
+  for (const service of services) {
+    if (service.docs_url) docs.add(service.docs_url)
+    if (service.docs?.homepage) docs.add(service.docs.homepage)
+    if (service.docs?.llms_txt) docs.add(service.docs.llms_txt)
+    if (service.docs?.api_reference) docs.add(service.docs.api_reference)
+  }
+  return [...docs].sort()
+}
+
 function formatAmount(amount: Decimal): string {
   return amount.toDecimalPlaces(7).toFixed(7)
 }
@@ -555,8 +830,9 @@ function sanitizeChallenge(challenge: MppChallengeSnapshot) {
 function buildStoredMarketplaceRequest(
   serviceId: string,
   payload: Record<string, unknown>,
+  query?: Record<string, string | number | boolean>,
 ): MarketplaceCallInput {
-  return { serviceId, payload }
+  return { serviceId, payload, ...(query ? { query } : {}) }
 }
 
 function getStoredMarketplaceRequest(metadata: unknown): MarketplaceCallInput | null {
@@ -572,5 +848,8 @@ function getStoredMarketplaceRequest(metadata: unknown): MarketplaceCallInput | 
     payload: record['payload'] && typeof record['payload'] === 'object'
       ? record['payload'] as Record<string, unknown>
       : {},
+    query: record['query'] && typeof record['query'] === 'object'
+      ? record['query'] as Record<string, string | number | boolean>
+      : undefined,
   }
 }

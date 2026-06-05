@@ -16,13 +16,23 @@ import { z } from 'zod'
 import { requireApiKey, requireJwtOrApiKey } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError, sendPaginated } from '../lib/response.js'
-import { NotFoundError } from '../lib/errors.js'
+import { AppError, NotFoundError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
-import { isStellarAddress, validateMemo, getUsdcBalance } from '../services/stellar.js'
+import { isStellarAddress, isEvmAddress, validateMemo, getUsdcBalance } from '../services/stellar.js'
+import {
+  burnUsdcOnStellar,
+  encodeEvmRecipient,
+  pollAttestation,
+  relayOnBase,
+  computeCctpFee,
+  verifyCctpPreflightBalance,
+  CCTP_FEE_RATE,
+  BASE_DOMAIN,
+} from '../services/cctp.js'
 import {
   sendBlockedEmail,
   sendPendingApprovalEmail,
@@ -72,10 +82,13 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
   const { recipient, amount, memo, metadata } = req.body as z.infer<typeof PaySchema>
 
   try {
-    if (!isStellarAddress(recipient)) {
+    const isStellar = isStellarAddress(recipient)
+    const isEvm = isEvmAddress(recipient)
+
+    if (!isStellar && !isEvm) {
       sendError(
         res,
-        'Invalid recipient address. Only Stellar addresses (G... 56 chars) are supported in V1.',
+        'Invalid recipient. Provide a Stellar address (G… 56 chars) or a Base EVM address (0x… 42 chars).',
         'INVALID_RECIPIENT',
         400,
       )
@@ -147,6 +160,8 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           memo,
           metadata: metadata as object | undefined,
           policyResult: policyResult as unknown as object,
+          crossChain: isEvm,
+          destinationChain: isEvm ? 'base' : null,
           approvalQueue: { create: { userId, token, expiresAt } },
         },
         include: { approvalQueue: true },
@@ -165,7 +180,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
       return
     }
 
-    // ── APPROVED — submit Stellar tx ─────────────────────────────────────────
+    // ── APPROVED — route to Stellar or CCTP ─────────────────────────────────
     const tx = await prisma.transaction.create({
       data: {
         userId,
@@ -178,49 +193,199 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         memo,
         metadata: metadata as object | undefined,
         policyResult: policyResult as unknown as object,
+        crossChain: isEvm,
+        destinationChain: isEvm ? 'base' : null,
       },
     })
 
-    try {
+    if (isStellar) {
+      // ── Stellar direct payment ──────────────────────────────────────────────
+      try {
+        const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
+        const stellarResult = await submitPayment({
+          senderSecretKey: secretKey,
+          recipientPublicKey: recipient,
+          amount,
+          memo: memo ?? null,
+        })
+
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
+        })
+
+        void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
+        void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
+
+        sendSuccess(res, {
+          status: 'success',
+          transaction_id: tx.id,
+          stellar_tx_hash: stellarResult.hash,
+          amount,
+          recipient,
+          timestamp: new Date().toISOString(),
+          policy_check: buildPolicyCheckResponse(policyResult.detail),
+        })
+      } catch (stellarErr) {
+        logger.error('Stellar payment failed', { userId, transactionId: tx.id, error: (stellarErr as Error).message })
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: { status: 'FAILED', blockedReason: (stellarErr as Error).message },
+        })
+        sendError(res, 'Payment failed due to a Stellar network error.', 'STELLAR_PAYMENT_FAILED', 502, {
+          error: (stellarErr as Error).message,
+          transaction_id: tx.id,
+        })
+      }
+    } else {
+      // ── CCTP cross-chain: fee → burn on Stellar → fire-and-forget relay ─────
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
-        senderSecretKey: secretKey,
-        recipientPublicKey: recipient,
-        amount,
-        memo: memo ?? null,
-      })
+      const mintRecipient32 = encodeEvmRecipient(recipient)
+      const feeAmount = computeCctpFee(amount)
+      const feeWallet = process.env['ARGENS_FEE_WALLET']
 
-      await prisma.transaction.update({
-        where: { id: tx.id },
-        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-      })
+      if (!feeWallet) {
+        logger.error('ARGENS_FEE_WALLET not configured for CCTP fee', { userId, transactionId: tx.id })
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: { status: 'FAILED', blockedReason: 'Fee wallet not configured' },
+        })
+        sendError(res, 'Service misconfiguration. Try again later.', 'FEE_WALLET_NOT_CONFIGURED', 500)
+        return
+      }
 
-      await incrementTotalSpent(userId, amount)
+      try {
+        await verifyCctpPreflightBalance(wallet.stellarPublicKey, amount, feeAmount)
+      } catch (preflightErr) {
+        const err = preflightErr as AppError
+        logger.warn('CCTP preflight blocked transfer before fee payment', {
+          userId,
+          transactionId: tx.id,
+          code: err.code,
+          error: err.message,
+        })
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: err.message,
+          },
+        })
+        if (preflightErr instanceof AppError) {
+          sendError(res, preflightErr.message, preflightErr.code, preflightErr.statusCode, {
+            ...(preflightErr.details as Record<string, unknown> | undefined),
+            transaction_id: tx.id,
+          })
+          return
+        }
+        throw preflightErr
+      }
 
-      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
-      void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
+      // Step 1 — Submit Argens fee to fee wallet. If this fails, no burn happens.
+      let feeTxHash: string
+      try {
+        const feeResult = await submitPayment({
+          senderSecretKey: secretKey,
+          recipientPublicKey: feeWallet,
+          amount: feeAmount,
+          memo: `CCTP fee ${tx.id.slice(0, 12)}`,
+        })
+        feeTxHash = feeResult.hash
+      } catch (feeErr) {
+        const errMsg = feeErr instanceof Error ? feeErr.message : String(feeErr)
+        logger.error('CCTP fee payment failed', { userId, transactionId: tx.id, error: errMsg })
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: { status: 'FAILED', blockedReason: `Fee payment failed: ${errMsg}` },
+        })
+        sendError(res, 'Cross-chain payment failed during fee step. No funds taken.', 'CCTP_FEE_FAILED', 502, {
+          error: errMsg,
+          transaction_id: tx.id,
+        })
+        return
+      }
 
-      sendSuccess(res, {
-        status: 'success',
-        transaction_id: tx.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount,
-        recipient,
-        timestamp: new Date().toISOString(),
-        policy_check: buildPolicyCheckResponse(policyResult.detail),
-      })
-    } catch (stellarErr) {
-      logger.error('Stellar payment failed', { userId, transactionId: tx.id, error: (stellarErr as Error).message })
+      // Step 2 — Burn USDC on Stellar for CCTP. If burn fails, fee is logged for manual reconciliation.
+      try {
+        const { stellarTxHash } = await burnUsdcOnStellar(secretKey, amount, BASE_DOMAIN, mintRecipient32)
 
-      await prisma.transaction.update({
-        where: { id: tx.id },
-        data: { status: 'FAILED', blockedReason: (stellarErr as Error).message },
-      })
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: {
+            stellarTxHash,
+            metadata: {
+              cctpFee: {
+                rate: CCTP_FEE_RATE.toString(),
+                amount: feeAmount,
+                stellar_tx_hash: feeTxHash,
+              },
+            },
+          },
+        })
 
-      sendError(res, 'Payment failed due to a Stellar network error.', 'STELLAR_PAYMENT_FAILED', 502, {
-        error: (stellarErr as Error).message,
-        transaction_id: tx.id,
-      })
+        void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
+        void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
+
+        sendSuccess(res, {
+          status: 'cross_chain_pending',
+          transaction_id: tx.id,
+          stellar_tx_hash: stellarTxHash,
+          destination_chain: 'base',
+          argens_fee: feeAmount,
+          fee_tx_hash: feeTxHash,
+          message: 'USDC burned on Stellar. Relay to Base is in progress.',
+          poll_url: `/v1/transactions/${tx.id}`,
+        })
+
+        // Fire-and-forget: attest + relay. Updates transaction record when done.
+        void (async () => {
+          try {
+            const { message, attestation } = await pollAttestation(stellarTxHash)
+            const { baseTxHash } = await relayOnBase(message, attestation)
+            await prisma.transaction.update({
+              where: { id: tx.id },
+              data: { status: 'SUCCESS', destinationTxHash: baseTxHash },
+            })
+            await incrementTotalSpent(userId, amount)
+            logger.info('CCTP relay complete', { txId: tx.id, baseTxHash })
+          } catch (relayErr) {
+            await prisma.transaction.update({
+              where: { id: tx.id },
+              data: { status: 'FAILED', blockedReason: (relayErr as Error).message },
+            })
+            logger.error('CCTP relay failed', { txId: tx.id, error: (relayErr as Error).message })
+          }
+        })()
+      } catch (burnErr) {
+        const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
+        const errStr = String(burnErr)
+        const errJson = (() => { try { return JSON.stringify(burnErr) } catch { return null } })()
+        logger.error('CCTP burn failed after fee was taken — manual reconciliation needed', {
+          userId, transactionId: tx.id, error: errMsg, raw: errStr, json: errJson, feeTxHash, feeAmount,
+        })
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: errMsg || errStr,
+            metadata: {
+              cctpFee: {
+                rate: CCTP_FEE_RATE.toString(),
+                amount: feeAmount,
+                stellar_tx_hash: feeTxHash,
+              },
+              failureReason: 'cctp_burn_failed_after_fee',
+            },
+          },
+        })
+        sendError(res, 'Cross-chain payment failed during burn on Stellar. Fee will be reconciled manually.', 'CCTP_BURN_FAILED', 502, {
+          error: errMsg,
+          raw: errStr,
+          json: errJson,
+          transaction_id: tx.id,
+          fee_tx_hash: feeTxHash,
+        })
+      }
     }
   } catch (err) {
     next(err)
@@ -234,8 +399,16 @@ transactionsRouter.post('/quote', requireApiKey, validate(PaySchema), async (req
   const { recipient, amount } = req.body as z.infer<typeof PaySchema>
 
   try {
-    if (!isStellarAddress(recipient)) {
-      sendError(res, 'Invalid recipient address.', 'INVALID_RECIPIENT', 400)
+    const isStellar = isStellarAddress(recipient)
+    const isEvm = isEvmAddress(recipient)
+
+    if (!isStellar && !isEvm) {
+      sendError(
+        res,
+        'Invalid recipient. Provide a Stellar address (G… 56 chars) or a Base EVM address (0x… 42 chars).',
+        'INVALID_RECIPIENT',
+        400,
+      )
       return
     }
 
@@ -245,6 +418,9 @@ transactionsRouter.post('/quote', requireApiKey, validate(PaySchema), async (req
       sendSuccess(res, {
         status: 'would_be_blocked',
         amount,
+        recipient,
+        destination_chain: isEvm ? 'base' : 'stellar',
+        cross_chain: isEvm,
         policy_check: buildQuotePolicyCheck(policyResult),
         reason: policyResult.reason,
       })
@@ -255,6 +431,9 @@ transactionsRouter.post('/quote', requireApiKey, validate(PaySchema), async (req
       sendSuccess(res, {
         status: 'would_require_approval',
         amount,
+        recipient,
+        destination_chain: isEvm ? 'base' : 'stellar',
+        cross_chain: isEvm,
         policy_check: buildQuotePolicyCheck(policyResult),
       })
       return
@@ -263,6 +442,9 @@ transactionsRouter.post('/quote', requireApiKey, validate(PaySchema), async (req
     sendSuccess(res, {
       status: 'would_succeed',
       amount,
+      recipient,
+      destination_chain: isEvm ? 'base' : 'stellar',
+      cross_chain: isEvm,
       policy_check: buildQuotePolicyCheck(policyResult),
     })
   } catch (err) {
@@ -281,7 +463,7 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       where: { id: transaction_id, userId },
     })
 
-    if (!original) throw new NotFoundError('Transaction not found')
+    if (!original) throw new NotFoundError('Transaction')
 
     if (original.status !== 'SUCCESS') {
       sendError(res, 'Only transactions with SUCCESS status can be refunded.', 'REFUND_NOT_ELIGIBLE', 400, {
@@ -390,7 +572,7 @@ transactionsRouter.get('/transactions', requireJwtOrApiKey, async (req, res, nex
         : {}),
     }
 
-    const [total, transactions] = await Promise.all([
+    const [total, rows] = await Promise.all([
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
         where,
@@ -407,12 +589,23 @@ transactionsRouter.get('/transactions', requireJwtOrApiKey, async (req, res, nex
           type: true,
           serviceId: true,
           costPaid: true,
+          destinationChain: true,
+          destinationTxHash: true,
+          crossChain: true,
           memo: true,
           blockedReason: true,
           createdAt: true,
+          approvalQueue: { select: { token: true, status: true } },
         },
       }),
     ])
+
+    // Expose the approval token only while a transaction is still awaiting action — it is
+    // the owner's own data and lets the dashboard link straight to the confirmation page.
+    const transactions = rows.map(({ approvalQueue, ...t }) => ({
+      ...t,
+      approvalToken: approvalQueue?.status === 'PENDING' ? approvalQueue.token : null,
+    }))
 
     const pages = Math.ceil(total / limit)
     sendPaginated(res, transactions, { page, total, pages })
@@ -433,10 +626,10 @@ transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res,
       where: { id, userId },
       include: { approvalQueue: true },
     }) as Awaited<ReturnType<typeof prisma.transaction.findFirst>> & {
-      approvalQueue: { status: string; expiresAt: Date; actedAt: Date | null } | null
+      approvalQueue: { status: string; token: string; expiresAt: Date; actedAt: Date | null } | null
     } | null
 
-    if (!tx) throw new NotFoundError('Transaction not found')
+    if (!tx) throw new NotFoundError('Transaction')
 
     const horizonBase =
       process.env['STELLAR_NETWORK'] === 'mainnet'
@@ -449,6 +642,9 @@ transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res,
       type: tx.type,
       stellar_tx_hash: tx.stellarTxHash,
       stellar_explorer_url: tx.stellarTxHash ? `${horizonBase}/${tx.stellarTxHash}` : null,
+      destination_chain: tx.destinationChain,
+      destination_tx_hash: tx.destinationTxHash,
+      cross_chain: tx.crossChain,
       recipient: tx.recipientAddress,
       amount: tx.amount.toFixed(7),
       currency: tx.currency,
@@ -462,6 +658,7 @@ transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res,
       approval: tx.approvalQueue
         ? {
             status: tx.approvalQueue.status,
+            token: tx.approvalQueue.status === 'PENDING' ? tx.approvalQueue.token : null,
             expires_at: tx.approvalQueue.expiresAt,
             acted_at: tx.approvalQueue.actedAt,
           }
@@ -534,6 +731,8 @@ async function checkAndNotifyLowBalance(userId: string, walletId: string): Promi
   }
 
   if (wallet.balanceCache.lessThan(threshold)) {
-    void sendLowBalanceEmail(userId, wallet.balanceCache.toFixed(7), String(threshold)).catch(() => undefined)
+    void sendLowBalanceEmail(userId, wallet.balanceCache.toFixed(7), String(threshold)).catch((e: unknown) =>
+      logger.error('Failed to send low-balance email', { userId, error: (e as Error).message }),
+    )
   }
 }

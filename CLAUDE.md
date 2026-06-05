@@ -8,6 +8,23 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
+## Status — 2026-06-03
+
+- **Network: Stellar MAINNET.** Live on mainnet. Testnet code paths exist for local-dev parity only.
+- **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` accessible at `argens.xyz/SKILL.md`. Vercel root directory set to `apps/web` for GitHub-triggered deployments.
+- **API: local only.** Railway deployment is the next infrastructure task. The live dashboard cannot call the API for external users until this is done.
+- **Cross-chain / CCTP V2: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. A 0.0100000 USDC mainnet Stellar → Base transfer completed burn, Iris attestation, Base relay, and transaction-history update on 2026-05-27. Direct and approval-token CCTP paths now share a fail-closed preflight: verify live USDC balance >= amount + Argens CCTP fee before sending the fee. Approval-token CCTP path compiles but still needs live approval-path verification.
+- **Marketplace: LIVE on mainnet.** 86 providers / 493 endpoints via MPP Router (`apiserver.mpprouter.dev`). Provider-level enablement toggles. Search/filter on `GET /marketplace/services`. All policy paths verified E2E. ~20% markup to `ARGENS_FEE_WALLET`.
+- **Marketplace credits: implemented locally.** Admin can grant expirable credits. Marketplace calls can consume credits via the credit-pool wallet, refund deductions on no-payment failure paths, and re-check credits at approval execution. Credit-pool env keys exist, but the credit-pool Stellar account is not created/funded on mainnet yet.
+- **Credit-grant emails: implemented locally.** Admin credit grants send an immediate user notification with amount, expiry, reason, and dashboard link after the DB transaction commits.
+- **Admin ops console: implemented locally.** Backend admin balance route was repaired on 2026-06-03. Ops wallet, fee wallet, and Base relayer balances read successfully; credit-pool wallet correctly reports account-not-found until it is bootstrapped/funded.
+- **SKILL.md: v5 local.** Documents CCTP response shapes, Base recipient rules, fee behavior, per-service skill discovery, `/docs`, and `/llms.txt`.
+- **Approval flow: fixed.** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
+- **Email validation: live.** Signup rejects disposable domains and addresses that fail DNS MX check.
+- **What is NOT done yet:** Railway API deploy, credit-pool wallet bootstrap/funding, approval-token CCTP live verification, example payloads, demo Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E.
+
+---
+
 ## Table of Contents
 
 1. [What Is Argens](#what-is-argens)
@@ -296,7 +313,7 @@ tasks/
 | Backend | Node.js, Express, TypeScript | Separate service from frontend |
 | Database | PostgreSQL via Prisma ORM | See schema below |
 | Smart Contracts | Soroban (Rust) | Policy enforcement on-chain |
-| Blockchain | Stellar — testnet first, mainnet later | USDC only in V1 |
+| Blockchain | Stellar **mainnet** (live) | USDC only in V1; `STELLAR_NETWORK=mainnet` |
 | Auth | Custom JWT + bcrypt | No third-party auth in V1 |
 | Email | Resend | Transactional emails only |
 | Hosting | Vercel (frontend), Railway (backend) | |
@@ -1087,6 +1104,8 @@ export function decryptSecretKey(enc: string): string {
 
 ## CCTP V2 — Cross-Chain Payments
 
+> **STATUS — 2026-05-26: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. Direct-approved Stellar → Base CCTP completed on mainnet with burn + Iris attestation + Base relay. Approval-token CCTP path is implemented and builds, but still needs live approval-path verification before calling it fully done.
+
 CCTP V2 allows USDC to move natively between Stellar and 15+ chains via Circle's burn-and-mint mechanism. No bridges. No wrapped tokens. No wrapped USDC.
 
 ### V1 scope — Base settlement only
@@ -1129,12 +1148,11 @@ function detectChain(recipient: string): 'stellar' | 'base' {
 
 ### Fee handling for cross-chain payments
 
-Circle's CCTP V2 Fast Transfer charges a small protocol fee. In V1, Argens absorbs this within its 0.5% fee — the user sees one clean number. The agent is debited `amount + 0.5%` as normal. Do not pass Circle's protocol fee through as a separate line item in V1.
+Circle's CCTP V2 can charge a protocol fee depending on route and amount. V1 does **not** add an Argens direct-payment fee to CCTP payments. Marketplace markup remains marketplace-only.
 
 ```
-total_debited = amount + argens_fee (0.5%)
-Argens pays CCTP protocol fee from its own cut
-// On testnet: CCTP fees are not charged — works free for demo
+total_debited = amount
+// Any CCTP protocol fee is handled inside the burn/mint path via max_fee.
 ```
 
 ### Cross-chain success response
@@ -1142,13 +1160,25 @@ Argens pays CCTP protocol fee from its own cut
 ```json
 {
   "data": {
-    "status": "success",
+    "status": "cross_chain_pending",
     "transaction_id": "txn_abc123",
+    "stellar_tx_hash": "abc...xyz",
+    "destination_chain": "base",
+    "message": "USDC burned on Stellar. Relay to Base is in progress.",
+    "poll_url": "/v1/transactions/txn_abc123"
+  }
+}
+```
+
+After the relay completes, `GET /transactions/:id` returns:
+
+```json
+{
+  "data": {
+    "status": "SUCCESS",
     "stellar_tx_hash": "abc...xyz",
     "destination_tx_hash": "0xdef...456",
     "amount": "25.0000000",
-    "fee": "0.1250000",
-    "total_debited": "25.1250000",
     "recipient": "0xABC...123",
     "destination_chain": "base",
     "cross_chain": true,
@@ -1237,9 +1267,11 @@ DATABASE_URL="postgresql://user:pass@localhost:5432/argens"
 JWT_SECRET="minimum-32-character-random-string"
 JWT_EXPIRES_IN="1h"   # 1 hour — client-side tab-idle logout (5 min) is primary defense
 
-STELLAR_NETWORK="testnet"
-HORIZON_URL="https://horizon-testnet.stellar.org"
-SOROBAN_RPC_URL="https://soroban-testnet.stellar.org"
+# Live on mainnet. (Testnet values kept here as a comment for local-dev parity:
+#   STELLAR_NETWORK="testnet" / HORIZON_URL="https://horizon-testnet.stellar.org")
+STELLAR_NETWORK="mainnet"
+HORIZON_URL="https://horizon.stellar.org"
+SOROBAN_RPC_URL="https://soroban-testnet.stellar.org"   # unused in V1 — Soroban dropped
 
 ENCRYPTION_KEY="generate-with: openssl rand -hex 32"
 
@@ -1456,7 +1488,7 @@ Do not re-litigate these. They are settled.
 | Source | Closed source | Commercial product |
 | Agent-to-agent | Supported — any Stellar address is valid recipient | Core differentiator |
 | x402 | Leverage where applicable, not compete | Additive to ecosystem |
-| Cross-chain | Base USDC settlement via CCTP V2 is **V1**. Full multi-chain + hooks is V2. | Base covers x402 paywalls; one chain is manageable scope; testnet works free |
+| Cross-chain | **Deferred** to a later version (was planned as V1 Base settlement via CCTP V2). Not in the current build. | Refocused on mainnet direct payments + the MPP marketplace; cross-chain picked up later |
 | CCTP fee handling | Argens absorbs Circle's CCTP protocol fee within its 0.5% cut | Agent sees one clean number; no surprise fee line items |
 | Chain detection | Auto-detected from address format — `G...` = Stellar, `0x...` = Base. No explicit `chain:` param in V1. | Zero friction for agents |
 | CCTP V2 prep | Nullable `destinationChain`, `destinationTxHash`, `crossChain` already in schema | No migration needed when V2 adds more chains |
@@ -1476,7 +1508,7 @@ Do not re-litigate these. They are settled.
 - Not a crypto exchange
 - Not a KYC / AML compliance product
 - Not an agent creation or hosting platform
-- Not a full multi-chain router in V1 — Base USDC settlement is supported; Ethereum/Solana/Avalanche are V2
+- Not a multi-chain router — Stellar USDC only; cross-chain (Base/CCTP V2) is deferred to a later version
 - Not open source
 - Not a bridge — CCTP V2 uses burn-and-mint, not bridging
 - Not responsible for what the AI agent does with the payment capability — that is the developer's responsibility

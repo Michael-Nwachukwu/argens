@@ -4,6 +4,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/ui/Logo'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import { useAuth } from '@/lib/auth-context'
 
 export default function LoginPage() {
@@ -114,28 +115,12 @@ export default function LoginPage() {
               textTransform: 'uppercase',
               marginBottom: 6,
             }}>Password</label>
-            <input
-              type="password"
+            <PasswordInput
               required
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder="••••••••"
               autoComplete="current-password"
-              style={{
-                width: '100%',
-                background: 'var(--bg)',
-                border: '1px solid var(--border2)',
-                borderRadius: 7,
-                padding: '10px 12px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 13,
-                color: 'var(--text)',
-                outline: 'none',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.15s',
-              }}
-              onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-              onBlur={e => e.currentTarget.style.borderColor = 'var(--border2)'}
             />
           </div>
 

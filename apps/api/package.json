@@ -27,6 +27,7 @@
     "mppx": "^0.4.12",
     "nodemailer": "^6.9.16",
     "resend": "^4.0.1",
+    "viem": "^2.51.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

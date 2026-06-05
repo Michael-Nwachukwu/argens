@@ -1,39 +1,60 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, Suspense, type FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Logo } from '@/components/ui/Logo'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import { auth, isError } from '@/lib/api'
 
 type Stage = 'form' | 'verify' | 'resend'
 
 export default function SignupPage() {
-  const router = useRouter()
+  return (
+    <Suspense>
+      <SignupPageInner />
+    </Suspense>
+  )
+}
+
+function SignupPageInner() {
+  const searchParams = useSearchParams()
 
   const [stage, setStage] = useState<Stage>('form')
+  const [accessCode, setAccessCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendDone, setResendDone] = useState(false)
 
+  // Prefill access code from query string (?code=argns_beta_xxx) — invite links pass it here.
+  useEffect(() => {
+    const code = searchParams?.get('code')
+    if (code) setAccessCode(code)
+  }, [searchParams])
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    setError(''); setErrorCode('')
+    if (!accessCode.trim()) { setError('An access code is required during beta'); return }
     if (password !== confirm) { setError('Passwords do not match'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     setLoading(true)
-    const res = await auth.signup(email, password)
+    const res = await auth.signup(email, password, accessCode.trim())
     setLoading(false)
     if (isError(res)) {
       setError(res.error)
+      setErrorCode(res.code ?? '')
     } else {
       setStage('verify')
     }
   }
+
+  const isAccessCodeError = errorCode.startsWith('ACCESS_CODE_')
 
   const handleResend = async () => {
     setResendLoading(true)
@@ -123,18 +144,30 @@ export default function SignupPage() {
             borderRadius: 7,
             color: 'var(--error)',
             fontSize: 13,
-            marginBottom: 20,
+            marginBottom: 12,
             fontFamily: 'var(--font-mono)',
           }}>
             {error}
+            {isAccessCodeError && (
+              <div style={{ marginTop: 8, fontSize: 12 }}>
+                <a href="https://tally.so/r/xX9AxG" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  Join the waitlist instead →
+                </a>
+              </div>
+            )}
           </div>
         )}
 
+        <div style={{ background: 'var(--accent-low)', border: '1px solid var(--accent-mid)', borderRadius: 7, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+          Argens is in private beta. An access code is required to sign up.
+        </div>
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {([
-            { label: 'Email', type: 'email', value: email, set: setEmail, placeholder: 'you@example.com', ac: 'email' },
-            { label: 'Password', type: 'password', value: password, set: setPassword, placeholder: '••••••••', ac: 'new-password' },
-            { label: 'Confirm password', type: 'password', value: confirm, set: setConfirm, placeholder: '••••••••', ac: 'new-password' },
+            { label: 'Access code', type: 'text', value: accessCode, set: setAccessCode, placeholder: 'argns_beta_xxxxxxxx', ac: 'off', password: false },
+            { label: 'Email', type: 'email', value: email, set: setEmail, placeholder: 'you@example.com', ac: 'email', password: false },
+            { label: 'Password', type: 'password', value: password, set: setPassword, placeholder: '••••••••', ac: 'new-password', password: true },
+            { label: 'Confirm password', type: 'password', value: confirm, set: setConfirm, placeholder: '••••••••', ac: 'new-password', password: true },
           ] as const).map(f => (
             <div key={f.label}>
               <label style={{
@@ -146,29 +179,39 @@ export default function SignupPage() {
                 textTransform: 'uppercase',
                 marginBottom: 6,
               }}>{f.label}</label>
-              <input
-                type={f.type}
-                required
-                value={f.value}
-                onChange={e => f.set(e.target.value)}
-                placeholder={f.placeholder}
-                autoComplete={f.ac}
-                style={{
-                  width: '100%',
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border2)',
-                  borderRadius: 7,
-                  padding: '10px 12px',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 13,
-                  color: 'var(--text)',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.15s',
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-                onBlur={e => e.currentTarget.style.borderColor = 'var(--border2)'}
-              />
+              {f.password ? (
+                <PasswordInput
+                  required
+                  value={f.value}
+                  onChange={f.set}
+                  placeholder={f.placeholder}
+                  autoComplete={f.ac}
+                />
+              ) : (
+                <input
+                  type={f.type}
+                  required
+                  value={f.value}
+                  onChange={e => f.set(e.target.value)}
+                  placeholder={f.placeholder}
+                  autoComplete={f.ac}
+                  style={{
+                    width: '100%',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border2)',
+                    borderRadius: 7,
+                    padding: '10px 12px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 13,
+                    color: 'var(--text)',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.15s',
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'var(--border2)'}
+                />
+              )}
             </div>
           ))}
 
@@ -202,6 +245,13 @@ export default function SignupPage() {
           Sign in →
         </Link>
       </p>
+      <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--faint)', marginTop: 10 }}>
+        No access code?{' '}
+        <a href="https://tally.so/r/xX9AxG" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
+          Join the waitlist →
+        </a>
+      </p>
     </div>
   )
 }
+

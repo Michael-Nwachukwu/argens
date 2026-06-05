@@ -15,6 +15,7 @@ model User {
   emailVerificationToken  String?       @unique
   emailVerificationExpiry DateTime?
   transferPinHash         String?       // bcrypt hash of 4-digit transfer PIN; null = no PIN set
+  accessCodeId            String?       @unique // the AccessCode redeemed at signup, if any
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
   wallet                  Wallet?
@@ -23,6 +24,7 @@ model User {
   transactions            Transaction[]
   auditLogs               AuditLog[]
   marketplaceSettings     MarketplaceServiceSetting[]
+  creditGrants            CreditGrant[]
 }
 
 model Wallet {
@@ -34,6 +36,8 @@ model Wallet {
   status              WalletStatus  @default(INITIALISING)
   balanceCache        Decimal       @default(0) @db.Decimal(18, 7)
   balanceCachedAt     DateTime?
+  // Lifetime credits granted (analytics only). Active balance is computed from non-expired CreditGrant rows.
+  creditsGranted      Decimal       @default(0) @db.Decimal(18, 7)
   createdAt           DateTime      @default(now())
   transactions        Transaction[]
 }
@@ -141,4 +145,33 @@ model MarketplaceServiceSetting {
 
   @@unique([userId, serviceId])
   @@index([userId])
+}
+
+// Beta access codes — floating, single-use. Admin issues; user redeems at signup.
+model AccessCode {
+  id          String    @id @default(cuid())
+  code        String    @unique             // e.g. "argns_beta_a3f9k2"
+  note        String?                       // admin context: who it was issued to
+  expiresAt   DateTime?
+  redeemedBy  String?   @unique             // User.id once redeemed
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// Argens credit grants — prepaid marketplace budget, non-withdrawable, expirable.
+// Each grant tracks its own remaining balance. Active credits balance =
+// SUM(amountRemaining) WHERE expiresAt IS NULL OR expiresAt > now.
+// Consumption is FIFO by expiresAt ASC (soonest to expire first).
+model CreditGrant {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  amount          Decimal   @db.Decimal(18, 7) // amount originally granted
+  amountRemaining Decimal   @db.Decimal(18, 7) // unused portion
+  reason          String?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, expiresAt])
 }

@@ -1,77 +1,124 @@
 # Current Task
 
-## Task: Phase 4 Pivot — MPP Router Mainnet Marketplace
-**Goal:** Replace the stale direct-service MPP marketplace with a clean MPP Router integration on Stellar mainnet, including per-service enablement gates for API-key calls.
-**Files affected:** `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/*`, `apps/api/src/services/marketplace.ts`, `apps/api/src/services/mpp-client.ts`, `apps/api/src/routes/marketplace.ts`, `apps/web/lib/api.ts`, `apps/web/app/dashboard/marketplace/page.tsx`, package/dependency files if needed.
-**Steps:**
-- [x] Add `MarketplaceServiceSetting` persistence for per-user service enablement.
-- [x] Replace static marketplace registry usage with MPP Router catalog/search data.
-- [x] Make API-key service calls require the service to be enabled; dashboard JWT can toggle services.
-- [x] Wire marketplace calls to MPP Router mainnet Stellar charge paths and fail clearly outside mainnet.
-- [x] Remove unused direct-service registry code.
-- [x] Update dashboard marketplace UX with enable/disable toggles and disabled-call states.
-- [x] Generate Prisma client and build API/web.
-- [ ] Apply the new Prisma migration locally once the Prisma schema-engine error is resolved.
-- [ ] Run an end-to-end mainnet marketplace call from a funded mainnet wallet.
-**Risks:** MPP Router is mainnet-only; wallet must have mainnet XLM + classic USDC trustline + balance; legacy mppx signing may need SDK 15 despite local compile; service prices can change at challenge time.
-**Done when:** Dashboard lists router services, users can enable/disable services, API-key calls are blocked for disabled services, enabled calls use MPP Router Stellar mainnet challenges, builds pass, migration is applied, and one funded mainnet call is verified.
+> Last updated: 2026-06-03
+> Phase 5 / beta rollout in progress. Active: admin balance repair, CCTP preflight verification, credit-grant emails, and endpoint audit after credits/CCTP/admin changes.
 
 ---
 
-## Task: Marketplace UX + Runtime Repair
-**Goal:** Fix the dashboard 500 experience, remove public markup display, and correct MPP cost handling before testnet E2E.
-**Files affected:** `apps/api/src/services/mpp-client.ts`, `apps/api/src/services/marketplace.ts`, `apps/web/lib/api.ts`, `apps/web/app/dashboard/marketplace/page.tsx`, `tasks/lessons.md`
+## Active 2026-06-03 — Credits, CCTP, Admin Hardening
+
+**Goal:** Finish the beta rollout repair cleanly: make admin balances reliable, fail CCTP safely before non-atomic fee/burn execution, notify users when credits are granted, and audit every endpoint touched by credits/CCTP/admin work.
+**Files affected:** `apps/api/src/routes/admin.ts`, `apps/api/src/routes/transactions.ts`, `apps/api/src/routes/approve.ts`, `apps/api/src/services/admin-balances.ts`, `apps/api/src/services/cctp.ts`, `apps/api/src/services/credits.ts`, `apps/api/src/services/email.ts`, `apps/web/app/x/console-a3f9k2p7/page.tsx`, docs/status files.
 **Steps:**
-- [x] Convert Stellar MPP challenge amounts from base units to 7-decimal USDC before policy checks, transaction logging, and markup transfer.
-- [x] Wrap MPP SDK/payment failures in explicit `AppError`s so the dashboard receives actionable codes instead of `INTERNAL_ERROR`.
-- [x] Remove marketplace markup percentage/amount from service catalog and dashboard result UI.
-- [x] Mark Tempo/Base-only public services as unavailable for the current Stellar testnet marketplace path.
-- [x] Build API and web after the repair.
-**Risks:** MPP service availability and wallet funding/trustline state can still make a live call fail; that should return a specific error instead of a generic 500.
-**Done when:** Clicking Call service no longer surfaces generic `INTERNAL_ERROR` for expected MPP/payment failures, the dashboard does not display Argens markup, and local builds pass.
+- [x] Reproduce `/v1/admin/wallets` locally and identify the root cause of Stellar/Base balance failures.
+- [x] Fix admin balance fetching/reporting while preserving partial success for wallets that can be read.
+- [x] Audit and patch CCTP preflight verification so direct and approval-token paths fail before sending the CCTP fee when `amount + fee` is unavailable or unverifiable.
+- [x] Add immediate credit-grant emails with amount/details and a dashboard link for both user-id and email grant endpoints.
+- [x] Audit changed endpoints end-to-end: access codes/signup, admin routes, wallet balance/credits, marketplace call/approval credits, `/pay`, `/approve`, transaction details, docs/SKILL discoverability.
+- [x] Run focused typechecks/builds and local smoke tests for the changed flows.
+- [x] Update status docs with what was verified and any remaining risks.
+**Verification:**
+- `pnpm --filter @argens/api build` passed.
+- `GET /v1/admin/wallets` returned 200 on current code. Ops wallet, fee wallet, and Base relayer balances read successfully; credit-pool wallet is configured but not created/funded on mainnet, so it now reports `Account not found on the active Stellar network.`
+- `verifyCctpPreflightBalance(ARGENS_FEE_WALLET, 10.0000000, 0.0500000)` returned `402 INSUFFICIENT_FUNDS_PLUS_FEES` without sending funds.
+- `verifyCctpPreflightBalance(ARGENS_CREDIT_POOL_PUBLIC, 0.0100000, 0.0500000)` returned `503 CCTP_PREFLIGHT_UNAVAILABLE` without sending funds.
+- Admin route smoke: missing `x-admin-secret` returns `401 UNAUTHORIZED`; `/v1/admin/stats` and `/v1/admin/credit-grants?limit=1` return 200 with expected envelopes.
+**Audit notes:** Access-code signup is transactional; admin credit grants are transactional and now notify after commit; wallet balance includes credits and falls back to cached USDC on Horizon outage; marketplace credit path refunds deductions on pre-payment/no-receipt failure paths; direct and approval CCTP paths now share fail-closed preflight; transaction detail/list response shapes include CCTP and approval metadata.
+**Remaining risks:** Credit-grant email was typechecked but not sent via a real grant in this pass to avoid mutating user credits. Approval-token CCTP still needs a small live end-to-end payment. Credit-pool wallet must be bootstrapped/funded on mainnet before credit-funded marketplace calls can work.
+**Risks:** Mainnet CCTP testing spends real funds; Horizon/Base RPC errors must not be hidden behind generic messages; admin tools must stay private and auditable before production exposure.
+**Done when:** Admin balance cards return useful data or precise errors, CCTP preflight fails closed before fee execution, credit grants send user notifications, endpoint audit findings are fixed or documented, and verification commands pass.
 
 ---
 
-## Task: Phase 4 — MPP Marketplace
-**Goal:** Add a real MPP marketplace path where agents call Argens once, Argens enforces user policy, pays MPP services from the user's agent-custodial Stellar wallet, collects a 20% markup, logs the marketplace transaction, and returns the service response.
-**Files affected:** `apps/api/src/services/mpp-registry.ts`, `apps/api/src/services/mpp-client.ts`, `apps/api/src/routes/marketplace.ts`, `apps/api/src/index.ts`, `apps/web/lib/api.ts`, `apps/web/components/dashboard/Sidebar.tsx`, `apps/web/app/dashboard/marketplace/page.tsx`, package manifests as needed.
+## Active 2026-05-27 — CCTP + Agent Docs Completion
+
+**Goal:** Finish the CCTP verification loop, document the API clearly for agents/developers, expose per-service skill files, and tighten loose error-handling edges.
+**Files affected:** `apps/api/src/routes/*`, `apps/api/src/services/*`, `apps/web/public/SKILL.md`, `apps/web/public/llms.txt`, `apps/web/app/docs/page.tsx`, `tasks/*`, docs/status files.
 **Steps:**
-- [x] Install `@stellar/mpp` and `mppx`; inspect installed types/exports before using any SDK API.
-- [x] Confirm whether a scoped per-request MPP client is available; avoid global `fetch` mutation in the Express server.
-- [x] Create a curated marketplace registry with service IDs, endpoint metadata, display pricing, payload examples, and network/payment-method notes.
-- [x] Implement MPP client wrapper that decrypts the user's Stellar secret only in memory, performs the paid request, captures payment progress/hash data when available, and never logs secrets.
-- [x] Implement `GET /marketplace/services` with JWT or API-key auth and Argens-marked-up display prices.
-- [x] Implement `POST /marketplace/call` with policy check on total cost, marketplace transaction logging, MPP service call, 20% markup USDC transfer to fee wallet, `totalSpent` increment only on full success, and exact response envelope.
-- [x] Define and implement explicit handling for `BLOCKED`, `PENDING_APPROVAL`, upstream failure, MPP payment failure, and markup-payment failure.
-- [x] Wire the marketplace router into `apps/api/src/index.ts`.
-- [x] Add dashboard API client helpers and a `/dashboard/marketplace` page with service cards, payload editor, call result, and recent marketplace transaction link/filter.
-- [x] Add Marketplace to the dashboard sidebar.
-- [x] Build API and web; run the deepest feasible local verification.
-- [ ] Run an end-to-end testnet MPP call before marking Phase 4 complete.
-**Risks:** MPP SDK API may differ from docs; `mppx` may patch global `fetch`; MPP service pricing may only be known after a 402 challenge; MPP service payment and Argens markup are two transactions and therefore not atomic; approval-threshold flow for marketplace may require safely storing/replaying payloads.
-**Done when:** At least one real MPP service can be called on Stellar testnet from an Argens wallet, policy enforcement works for allowed/blocked paths, Argens markup is paid to the fee wallet, the transaction appears in Argens history as `type=marketplace`, and API/web builds pass.
+- [x] Explain the approval-token CCTP status in plain language.
+- [x] Run another small mainnet CCTP burn through the public API-key endpoints and verify both Stellar + Base hashes.
+- [x] Ensure `POST /quote`, `POST /pay`, `GET /transactions/:id`, and approval paths return complete CCTP response shapes.
+- [x] Update `/SKILL.md` with CCTP, docs, `llms.txt`, and per-service skill discovery.
+- [x] Add `GET /marketplace/services/:providerId/skill.md` for agent-readable per-provider service docs.
+- [x] Add `/SKILL/<provider>.md` proxy endpoint on the web app for service skill files.
+- [x] Create `/docs` with a comprehensive responsive guide and code snippets.
+- [x] Add `/llms.txt` so agents can discover Argens docs and skill entry points.
+- [x] Audit expected endpoint errors for clean response envelopes and fix obvious loose ends.
+- [x] Run API/web builds and focused endpoint smoke tests.
+**Verification:** New 0.0100000 USDC CCTP mainnet tx `cmpn8yh5900011uqzobaa94qn` succeeded with Stellar burn `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044` and Base relay `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`. API/web builds passed. Local smoke tests passed for `/v1/marketplace/services/agentmail/skill.md`, `/docs`, `/llms.txt`, and `/SKILL/agentmail.md`.
+**Follow-up:** Approval-token CCTP still needs a live pending-approval payment test. The direct path has now been verified twice.
+**Risks:** Mainnet CCTP tests spend real USDC/Base gas; MPP Router catalog shape may drift; documentation must not overpromise unverified approval-path behavior.
+**Done when:** A new CCTP tx succeeds end-to-end, service skill discovery works, docs build, errors are cleaner, and task/status docs match reality.
 
 ---
 
-## Phase Milestone: Per-Service Skill Files
-**Goal:** Every marketplace service ships a machine-readable skill file agents can fetch to understand exactly how to call that API — no documentation to read, no prompt engineering required.
-**Why:** Matches the "Skill Files Included" promise on the landing page. Agents already self-onboard via the global `SKILL.md`; per-service skill files extend this pattern to individual services, making marketplace calls seamless for any agent.
-**Files affected:** `apps/web/public/skills/<service-id>.md` (static files served by Next.js), `GET /v1/marketplace/services` response (add `skill_url` field per service), `apps/api/src/services/marketplace.ts`, `SKILL.md` (link to skill index)
+## Active 2026-05-26 — CCTP Mainnet Repair
+
+**Goal:** Make Stellar → Base CCTP payments work end-to-end from `POST /pay`, including direct-approved and approval-token paths.
+**Files affected:** `apps/api/src/services/cctp.ts`, `apps/api/src/routes/transactions.ts`, `apps/api/src/routes/approve.ts`, `apps/api/tsconfig.json`, `apps/web/public/SKILL.md`, task docs if status changes.
 **Steps:**
-- [ ] Define skill file format: YAML front-matter (id, name, cost, method, path) + plain-text usage guide + example request/response JSON.
-- [ ] Author skill files for the 5 initial services: `exa-search`, `flux-schnell`, `e2b-sandbox`, `agentmail`, `codex-graphql`.
-- [ ] Serve them as static files from `apps/web/public/skills/` (no auth, CORS `*`, Content-Type: text/markdown).
-- [ ] Add `skill_url` field to `GET /v1/marketplace/services` response pointing to each file.
-- [ ] Add a `/skills` index at `apps/web/public/skills/index.md` listing all services for agent discovery.
-- [ ] Update global `SKILL.md` to reference the skills index.
-- [ ] Test: agent fetches skill file, constructs valid `POST /v1/marketplace/call` without reading docs.
-**Done when:** An AI agent, given only a service's `skill_url`, can call that service correctly on the first attempt.
+- [x] Fix the API build failure introduced by `viem`/`ox` typings.
+- [x] Restart a single clean API dev server on port 3001.
+- [x] Verify CCTP contract/API assumptions against official Circle/Stellar docs and installed SDK types.
+- [x] Fix Stellar SAC approval + `deposit_for_burn` execution.
+- [x] Verify direct `POST /pay` to a Base `0x...` recipient reaches `cross_chain_pending` with a Stellar burn hash.
+- [x] Verify Iris attestation + Base relay populates `destinationTxHash` and marks the transaction `SUCCESS`.
+- [ ] Verify pending-approval CCTP path does the same after approval.
+- [x] Update SKILL/task state to advertise only what is proven.
+**Risks:** Mainnet payment testing spends real USDC and Base gas; CCTP/Soroban SDK behavior may differ from docs; duplicate dev servers can make tests hit stale code.
+**Done when:** API build passes, exactly one dev server is serving current code, a small mainnet Stellar → Base payment completes burn + relay, and transaction history shows both hashes.
 
 ---
 
-## Recently Completed
+## Implemented But Not Yet Verified 2026-05-26
 
-- Phase 1 — Foundation: complete.
-- Phase 2 — Core API: complete, with CCTP/Base deferred and wallet-funded watcher still unverified.
-- Phase 3 — Dashboard: complete.
-- MPP research: complete enough to start SDK verification. The accepted direction is Argens-as-MPP-client using the user's Stellar wallet, not Argens hosting upstream service API keys.
+- [x] CCTP cross-chain payments (Stellar → Base via Circle CCTP V2 direct-approved path)
+  - `services/cctp.ts` — burn on Stellar (Soroban), poll Iris, relay on Base (viem)
+  - `POST /pay` accepts Base `0x...` addresses alongside Stellar `G...` addresses
+  - Fire-and-forget relay: response returns after burn; Base tx hash populated async
+  - SKILL.md v3 — cross-chain section, response shapes, rules updated
+  - `viem` added as API dependency
+
+## Completed 2026-05-25
+
+- [x] SKILL.md v2 — rewrote with accurate response shapes, marketplace section, discovery workflow, error codes
+- [x] GET /marketplace/services — added ?search=, ?category=, ?enabled= server-side filtering
+- [x] GET /marketplace/services/:providerId — new single-provider detail endpoint
+- [x] Favicon — app/icon.png + app/apple-icon.png wired in Next.js App Router
+- [x] Meta title, description, OG, Twitter card tags in layout.tsx
+- [x] Vercel build fix — removed vestigial (dashboard) route group that caused manifest error on Vercel
+- [x] SKILL.md serving fix — confirmed accessible at argens.xyz/SKILL.md
+- [x] Vercel root directory — set to apps/web for GitHub-triggered deployments
+- [x] CLAUDE.md + PROJECT_STATE.md + todo.md updated
+
+---
+
+## Phase 5 — Remaining
+
+### High priority
+
+- [ ] **Railway API deploy** — biggest external-user blocker; dashboard is non-functional without it
+- [ ] **Example payloads** — `example_payload` is always `null`; marketplace call form has no prefills; need a generation pipeline (curated + OpenAPI extraction + LLM-generated fallback)
+- [x] **Documentation page** (`/docs`) — quickstart, API reference, policies, marketplace, CCTP, agent onboarding
+
+### Medium priority
+
+- [x] **Targeted error handling audit** — fixed obvious CCTP/marketplace loose ends; full endpoint-by-endpoint audit can still happen before demo
+- [ ] **Demo script** — define the exact scenario: signup → fund → set policy → agent pays → block → approve → marketplace call
+- [ ] **Loom demo recording** — required for SCF submission
+
+### Lower priority (after above)
+
+- [x] Per-service skill files (`/SKILL/<provider>.md`) — generated from the MPP catalog and upstream docs links
+- [x] `llms.txt` at argens.xyz/llms.txt — links SKILL.md + docs pages
+- [ ] XLM balance alerting on ops wallet
+- [ ] Wallet-funded SSE watcher E2E test
+- [ ] Low balance email E2E verification
+
+---
+
+## Deferred (not V1)
+
+- SDK (@argens/sdk npm)
+- Soroban contract enforcement
+- Multi-chain routing beyond Stellar and Base

@@ -8,6 +8,27 @@ This file is the **single source of truth** for the Codex agent building Argens.
 
 ---
 
+## Status — 2026-06-03
+
+- **Network: Stellar MAINNET.** Live on mainnet. Testnet paths exist only for local-dev parity.
+- **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` is accessible at `argens.xyz/SKILL.md`. Vercel GitHub deployments must use root directory `apps/web`.
+- **API: local only.** Railway deployment is the #1 external-user blocker. The live dashboard cannot serve external users until the API is deployed.
+- **Current branch: `beta_rollout`.** Claude Code has uncommitted work in progress. Do not revert or overwrite it.
+- **Marketplace: Phase 4 complete.** MPP Router mainnet integration is live locally: 86 providers / 493 endpoints, provider-level enablement toggles, search/filter endpoints, mainnet policy paths verified E2E, marketplace revenue routed to `ARGENS_FEE_WALLET`.
+- **Beta access codes: implemented locally.** `AccessCode` schema + migrations exist. Signup requires an access code, supports `?code=...` autofill, and points invalid/missing-code users to the Tally waitlist. Admin can generate/list codes.
+- **Marketplace credits: implemented locally.** `CreditGrant` schema + expirable FIFO credit accounting exist. Marketplace calls can use credits through `ARGENS_CREDIT_POOL_SECRET`; approved marketplace calls re-check credits at execution and fall back to USDC if credits are insufficient. Credit deductions are refunded on pre-payment/on-chain MPP failure paths. Credit-pool env keys exist, but the credit-pool Stellar account is not yet created/funded on mainnet.
+- **Credit-grant emails: implemented locally.** Admin credit grants now send users an immediate marketplace-credit notification after the grant transaction commits. The admin response includes `notification.sent` so operators can see delivery failures without rolling back the grant.
+- **CCTP fee model: implemented locally and preflight hardened.** Stellar → Base CCTP direct/approval paths apply an Argens fee via `computeCctpFee()` using 0.5% with $0.05 min and $2 max, then preflight live USDC balance for `amount + fee`. If insufficient, return `402 INSUFFICIENT_FUNDS_PLUS_FEES`; if live balance cannot be verified, return `503 CCTP_PREFLIGHT_UNAVAILABLE`. No fee is sent before this check passes.
+- **SKILL.md: v5 local.** v4 covered CCTP / `0x...` recipient guidance, per-provider skill files, `/docs`, and `/llms.txt`; v5 adds CCTP fee documentation.
+- **Docs and discoverability: implemented locally.** `/docs`, `/llms.txt`, API provider skill markdown, and web `/SKILL/<provider>.md` proxy all build and smoke-test locally. Deploy still depends on normal Vercel flow.
+- **CCTP V2 / Base settlement: direct path verified twice.** `POST /pay` accepts Base `0x...` addresses and routes Stellar → Base via Circle CCTP V2. Latest 0.0100000 USDC mainnet verification: transaction `cmpn8yh5900011uqzobaa94qn`, Stellar burn `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044`, Base relay `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`. Approval-token CCTP path builds but still needs live approval-path verification.
+- **Approval flow: fixed for public token reads.** `GET /approve/:token` is public, magic-link based, and the token is the bearer credential. Cross-chain approval execution is wired but still needs live approval-path verification.
+- **Admin ops console: implemented locally, backend balance route fixed.** Obscure route `/x/console-a3f9k2p7` uses `ADMIN_SECRET` in `x-admin-secret`; backend endpoints include stats, wallet balances, users, access codes, credit grants, failed transactions, and grant-by-email. `GET /v1/admin/wallets` now reads each Stellar account once, preserves partial success, and verified ops/fee/Base balances on 2026-06-03. The only remaining balance issue is real state: `ARGENS_CREDIT_POOL_PUBLIC` is not created/funded on mainnet.
+- **Current follow-up:** bootstrap/fund the credit-pool wallet before relying on credit-funded marketplace calls; then run a real credit grant to verify email delivery and a credit-funded marketplace call.
+- **What is NOT done yet:** Railway API deploy, approval-token CCTP live verification, credit pool wallet bootstrap/funding, example payloads, demo script/Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E.
+
+---
+
 ## Table of Contents
 
 1. [What Is Argens](#what-is-argens)
@@ -37,7 +58,7 @@ This file is the **single source of truth** for the Codex agent building Argens.
 
 ## What Is Argens?
 
-Argens is a programmable payment infrastructure platform for autonomous AI agents. It gives AI agents the ability to spend USDC autonomously on the Stellar blockchain, within human-defined spending policies enforced by Soroban smart contracts.
+Argens is a programmable payment infrastructure platform for autonomous AI agents. It gives AI agents the ability to spend USDC autonomously on Stellar, within human-defined spending policies enforced by the TypeScript policy engine in V1.
 
 **One-line pitch:** Argens gives your AI agent the ability to pay — an API key that authorizes autonomous USDC spending on Stellar, within rules you define.
 
@@ -45,7 +66,7 @@ Argens is a programmable payment infrastructure platform for autonomous AI agent
 1. **Smart Wallet** — **agent-custodial** USDC wallet on Stellar. Argens holds an encrypted signing key so agents can transact autonomously within policy. Developer funds the wallet with USDC, and can export the private key at any time. Manual dashboard transfers are also supported (with optional 4-digit transfer PIN).
 2. **Policy Engine** — TypeScript-enforced spending rules. Three rules in V1: Allowance, Max Transaction, Approval Threshold. This is the permanent V1 policy engine — Soroban was dropped (see Key Decisions).
 3. **REST API** — any AI agent can call with just an API key. No blockchain knowledge required.
-4. **MPP Marketplace** — a curated catalog of AI services (LLMs, data, tooling) that agents can call and pay for in a single step. Argens applies a ~20% markup — this is the primary revenue model. Direct USDC transfers carry no Argens fee.
+4. **MPP Marketplace** — a curated catalog of AI services (LLMs, data, tooling) that agents can call and pay for in a single step. Marketplace spread is the primary revenue model. Direct USDC transfers carry no Argens fee.
 
 > **Custody terminology.** Do not write "non-custodial" in code, comments, user-facing strings, or docs. Use **agent-custodial** and explain the trade-off when asked. This language must stay consistent with the PRD.
 
@@ -79,7 +100,7 @@ const account = await server.loadAccount(publicKey)
 Never assume:
 - A database migration has run
 - An environment variable is set
-- A Stellar testnet wallet is funded
+- A Stellar mainnet wallet is funded
 - A Soroban contract is deployed
 - A previous build step succeeded
 
@@ -176,7 +197,7 @@ const fee = new Decimal(amount).mul('0.005').toFixed(7)
 Before calling any task done, confirm:
 - Does the endpoint return the exact response shape in this file?
 - Does it handle error cases, not just the happy path?
-- Has it been tested against the testnet, not just mocked?
+- Has it been tested against the active network, not just mocked?
 - Would a staff engineer approve this without changes?
 
 If any answer is no — it is not done.
@@ -231,10 +252,10 @@ Review `tasks/lessons.md` at the start of every new session.
 ### 3. Verification Before Done
 
 Never mark a task complete without proving it works:
-- Run the endpoint against testnet
+- Run the endpoint against the active network
 - Check the database reflects expected state
 - Verify error cases, not just happy path
-- For payment flows: verify the Stellar transaction appears on the testnet explorer
+- For payment flows: verify the Stellar transaction appears on the relevant Stellar explorer
 
 ---
 
@@ -296,7 +317,7 @@ tasks/
 | Backend | Node.js, Express, TypeScript | Separate service from frontend |
 | Database | PostgreSQL via Prisma ORM | See schema below |
 | Smart Contracts | Soroban (Rust) | Policy enforcement on-chain |
-| Blockchain | Stellar — testnet first, mainnet later | USDC only in V1 |
+| Blockchain | Stellar **mainnet** (live) | USDC only in V1; `STELLAR_NETWORK=mainnet` |
 | Auth | Custom JWT + bcrypt | No third-party auth in V1 |
 | Email | Resend | Transactional emails only |
 | Hosting | Vercel (frontend), Railway (backend) | |
