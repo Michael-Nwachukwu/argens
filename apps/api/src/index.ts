@@ -17,6 +17,7 @@ import { AppError } from './lib/errors.js'
 import { logger } from './lib/logger.js'
 import { prisma } from './lib/prisma.js'
 import { startWatcher } from './services/watcher.js'
+import { startBalanceAlerting } from './services/alerting.js'
 
 const app = express()
 const PORT = Number(process.env['API_PORT'] ?? 3001)
@@ -74,6 +75,7 @@ async function start(): Promise<void> {
     await prisma.$connect()
     logger.info('Database connected')
     startWatcher()
+    startBalanceAlerting()
     app.listen(PORT, () => {
       logger.info(`Argens API running`, { port: PORT, network: process.env['STELLAR_NETWORK'] ?? 'testnet' })
     })

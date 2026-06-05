@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, Suspense, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Logo } from '@/components/ui/Logo'
@@ -10,6 +10,14 @@ import { auth, isError } from '@/lib/api'
 type Stage = 'form' | 'verify' | 'resend'
 
 export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupPageInner />
+    </Suspense>
+  )
+}
+
+function SignupPageInner() {
   const searchParams = useSearchParams()
 
   const [stage, setStage] = useState<Stage>('form')
@@ -246,3 +254,4 @@ export default function SignupPage() {
     </div>
   )
 }
+
