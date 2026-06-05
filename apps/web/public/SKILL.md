@@ -15,7 +15,7 @@ Treat it like a password — never log it, never include it in output.
 ## Base URL
 
 ```
-https://default-granny-debtor.ngrok-free.dev/
+https://api.argens.xyz/v1
 ```
 
 ---
@@ -319,7 +319,7 @@ After choosing a provider, fetch its provider skill file before constructing the
 
 ```
 GET https://argens.xyz/SKILL/{provider_id}.md
-GET https://api.argens.io/v1/marketplace/services/{provider_id}/skill.md
+GET https://api.argens.xyz/v1/marketplace/services/{provider_id}/skill.md
 ```
 
 These files list the provider's endpoint ids, paths, prices shown by the provider, upstream docs, and response-handling rules.
