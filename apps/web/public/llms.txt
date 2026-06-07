@@ -6,12 +6,12 @@
 
 - [Argens Skill](https://argens.xyz/SKILL.md): compact instruction file agents should read before using Argens.
 - [Argens Docs](https://argens.xyz/docs): full human-readable API and product guide with examples.
-- [Marketplace Services](https://api.argens.io/v1/marketplace/services): API catalog of providers and endpoints.
+- [Marketplace Services](https://api.argens.xyz/v1/marketplace/services): API catalog of providers and endpoints.
 - [Marketplace Provider Skills](https://argens.xyz/SKILL/{provider_id}.md): provider-specific skill files. Replace `{provider_id}` with a provider id from the marketplace catalog, for example `/SKILL/agentmail.md`.
 
 ## API
 
-- Production API base URL: `https://api.argens.io/v1`
+- Production API base URL: `https://api.argens.xyz/v1`
 - Local API base URL: `http://localhost:3001/v1`
 - Authentication: `Authorization: Bearer <ARGENS_KEY>`
 - Amounts: USDC amount fields are strings with up to 7 decimal places.

@@ -130,6 +130,10 @@ export const wallet = {
       method: 'POST',
       body: JSON.stringify({ password }),
     }),
+  bootstrapRetry: () =>
+    authFetch<{ status: string; wallet_address?: string; message: string }>('/wallet/bootstrap-retry', {
+      method: 'POST',
+    }),
 }
 
 // ─── Policies ─────────────────────────────────────────────────────────────────

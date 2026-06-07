@@ -102,7 +102,8 @@ function escapeHtml(value: string): string {
 // Apple Mail, and Outlook. Uses inline styles only — no CSS classes.
 // Background is warm off-white to match the Argens brand palette.
 
-const FRONTEND_URL = process.env['FRONTEND_URL'] ?? 'http://localhost:3000'
+// FRONTEND_URL may be comma-separated (multiple CORS origins); use only the first for link generation
+const FRONTEND_URL = ((process.env['FRONTEND_URL'] ?? 'http://localhost:3000').split(',')[0] ?? 'http://localhost:3000').trim()
 
 function buildEmailHtml(content: string): string {
   return `<!DOCTYPE html>

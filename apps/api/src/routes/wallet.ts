@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { getUsdcBalance, getXlmBalance, isStellarAddress, validateMemo } from '../services/stellar.js'
+import { getUsdcBalance, getXlmBalance, isStellarAddress, validateMemo, fundNewAccount, createUsdcTrustline } from '../services/stellar.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
 import { getActiveCreditsBalance } from '../services/credits.js'
@@ -118,6 +118,64 @@ walletRouter.get('/wallet/balance', requireJwtOrApiKey, async (req, res, next) =
       credits_balance: credits ? credits.toFixed(7) : '0.0000000',
       wallet_address: wallet.stellarPublicKey,
       cached_at: cachedAt,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /wallet/bootstrap-retry ────────────────────────────────────────────
+// Retries wallet bootstrap for accounts stuck in INITIALISING or TRUSTLINE_PENDING.
+// Called from the dashboard when the user's wallet never became READY.
+
+walletRouter.post('/wallet/bootstrap-retry', requireJwt, async (req, res, next) => {
+  const userId = req.userId!
+
+  try {
+    const wallet = await prisma.wallet.findUnique({ where: { userId } })
+
+    if (!wallet) {
+      sendError(res, 'Wallet not found.', 'WALLET_NOT_FOUND', 404)
+      return
+    }
+
+    if (wallet.status === 'READY') {
+      sendSuccess(res, { status: 'READY', message: 'Wallet is already active.' })
+      return
+    }
+
+    const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
+
+    if (wallet.status === 'INITIALISING') {
+      // Account was never funded on-chain — check ops wallet first
+      const opsPublic = process.env['ARGENS_OPS_WALLET_PUBLIC']
+      if (opsPublic) {
+        const xlm = await getXlmBalance(opsPublic).catch(() => null)
+        if (xlm !== null && parseFloat(xlm) < 2.5) {
+          sendError(
+            res,
+            'Platform wallet is being refilled. Please try again in a few minutes.',
+            'OPS_WALLET_LOW',
+            503,
+          )
+          return
+        }
+      }
+
+      await fundNewAccount(wallet.stellarPublicKey)
+      await prisma.wallet.update({ where: { id: wallet.id }, data: { status: 'TRUSTLINE_PENDING' } })
+    }
+
+    // At this point status is TRUSTLINE_PENDING (either was, or just transitioned)
+    await createUsdcTrustline(secretKey)
+    await prisma.wallet.update({ where: { id: wallet.id }, data: { status: 'READY' } })
+
+    logger.info('Wallet bootstrap retry succeeded', { userId, publicKey: wallet.stellarPublicKey })
+
+    sendSuccess(res, {
+      status: 'READY',
+      wallet_address: wallet.stellarPublicKey,
+      message: 'Wallet activated successfully.',
     })
   } catch (err) {
     next(err)

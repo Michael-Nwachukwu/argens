@@ -80,6 +80,7 @@ Health check. Call this first to confirm the key works and see current limits.
     "api_key_status": "active",
     "wallet_status": "READY",
     "wallet_balance": "492.5000000",
+    "credits_balance": "5.0000000",
     "policies": {
       "allowance_limit": "500.0000000",
       "allowance_remaining": "492.5000000",
@@ -93,6 +94,8 @@ Health check. Call this first to confirm the key works and see current limits.
 ```
 
 `policies` is `null` if no policies have been configured — all transactions will pass.
+
+`credits_balance` is a non-withdrawable Argens-granted budget that covers marketplace service calls. If `wallet_balance` is `"0.0000000"` but `credits_balance` is non-zero, the account can still call marketplace services — credits are consumed first automatically. Credits do not apply to direct USDC transfers (`POST /pay` with a `G...` or `0x...` recipient).
 
 ---
 

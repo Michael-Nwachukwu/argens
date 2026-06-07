@@ -12,6 +12,7 @@ import { requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { getUsdcBalance } from '../services/stellar.js'
+import { getActiveCreditsBalance } from '../services/credits.js'
 import { logger } from '../lib/logger.js'
 
 export const agentRouter: Router = ExpressRouter()
@@ -97,6 +98,7 @@ agentRouter.get('/agent/status', requireJwtOrApiKey, async (req, res, next) => {
       api_key_status: apiKey?.isActive ? 'active' : 'inactive',
       wallet_status: wallet?.status ?? 'not_found',
       wallet_balance: walletBalance,
+      credits_balance: wallet ? (await getActiveCreditsBalance(userId).catch(() => null))?.toFixed(7) ?? '0.0000000' : '0.0000000',
       policies: policyData,
       today_spend: todaySpend,
       today_transactions: todayCount,

@@ -62,6 +62,9 @@ export default function WalletPage() {
   const { user } = useAuth()
   const [walletData, setWalletData] = useState<WalletBalance | null>(null)
   const [loading, setLoading]       = useState(true)
+  const [walletNotReady, setWalletNotReady] = useState(false)
+  const [retryLoading, setRetryLoading]     = useState(false)
+  const [retryError, setRetryError]         = useState('')
   const [showFunds, setShowFunds]   = useState(false)
   const [showSend, setShowSend]         = useState(false)
   const [copied, setCopied]             = useState(false)
@@ -76,10 +79,33 @@ export default function WalletPage() {
 
   useEffect(() => {
     walletApi.balance()
-      .then(r => { if (!isError(r)) setWalletData(r.data) })
+      .then(r => {
+        if (isError(r)) {
+          if (r.code === 'WALLET_NOT_READY') setWalletNotReady(true)
+        } else {
+          setWalletData(r.data)
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  const handleBootstrapRetry = async () => {
+    setRetryLoading(true)
+    setRetryError('')
+    const res = await walletApi.bootstrapRetry()
+    setRetryLoading(false)
+    if (isError(res)) {
+      setRetryError(res.error)
+    } else {
+      setWalletNotReady(false)
+      setLoading(true)
+      walletApi.balance()
+        .then(r => { if (!isError(r)) setWalletData(r.data) })
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    }
+  }
 
   const handleSend = async () => {
     if (!sendForm.recipient || !sendForm.amount) {
@@ -198,6 +224,26 @@ export default function WalletPage() {
           </div>
         }
       />
+      {walletNotReady && (
+        <div style={{ margin: '20px 32px 0', padding: '20px 24px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10 }}>
+          <div style={{ fontFamily: 'var(--font-head)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Wallet setup incomplete</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 16 }}>
+            Your wallet was created but the on-chain setup didn't finish. This can happen when the platform is briefly out of XLM reserves. Click below to retry — it usually takes a few seconds.
+          </div>
+          {retryError && (
+            <div style={{ fontSize: 12, color: 'var(--error)', fontFamily: 'var(--font-mono)', marginBottom: 12, padding: '8px 12px', background: 'var(--error-low)', borderRadius: 6, border: '1px solid rgba(160,72,72,0.25)' }}>
+              {retryError}
+            </div>
+          )}
+          <button
+            onClick={handleBootstrapRetry}
+            disabled={retryLoading}
+            style={{ padding: '9px 20px', background: retryLoading ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: 7, color: retryLoading ? 'var(--muted)' : '#0C0B0A', fontFamily: 'var(--font-head)', fontSize: 13, fontWeight: 600, cursor: retryLoading ? 'not-allowed' : 'pointer' }}
+          >
+            {retryLoading ? 'Activating wallet…' : 'Activate wallet'}
+          </button>
+        </div>
+      )}
       <div style={{ padding: '24px 32px', display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, alignItems: 'start' }}>
 
         {/* Left column */}
