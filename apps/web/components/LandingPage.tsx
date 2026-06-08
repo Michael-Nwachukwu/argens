@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Logo } from './ui/Logo'
+import { SHOWCASE_PROJECTS, type ShowcaseProject } from '@/lib/showcase'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const t = {
@@ -35,6 +36,7 @@ const SYN = {
 
 const SKILL_PROMPT = 'Hi, read https://argens.xyz/SKILL.md and continue with the onboarding steps.'
 const TALLY_FORM_ID = 'xX9AxG'
+const TALLY_SHOWCASE_ID = 'NpPPjW'
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function useTally() {
@@ -128,6 +130,7 @@ function Nav() {
     ['#marketplace', 'Marketplace'],
     ['/services', 'Services'],
     ['#policies', 'Policies'],
+    ['/showcase', 'Showcase'],
     ['/docs', 'Docs'],
   ]
 
@@ -1150,6 +1153,146 @@ function CrossChain() {
   )
 }
 
+// ─── Showcase ─────────────────────────────────────────────────────────────────
+
+function ShowcaseCard({ project, index }: { project: ShowcaseProject; index: number }) {
+  const [hovered, setHovered] = useState(false)
+  const domain = (() => { try { return new URL(project.url).hostname.replace('www.', '') } catch { return project.url } })()
+
+  return (
+    <FadeUp delay={index * 0.08}>
+      <a
+        href={project.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          display: 'block',
+          background: t.bg2,
+          border: `1px solid ${hovered ? t.border2 : t.border}`,
+          borderRadius: 12,
+          overflow: 'hidden',
+          textDecoration: 'none',
+          transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+          boxShadow: hovered ? `0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px ${t.border2}` : '0 2px 8px rgba(0,0,0,0.2)',
+          transition: 'transform 0.22s cubic-bezier(0.16,1,0.3,1), box-shadow 0.22s cubic-bezier(0.16,1,0.3,1), border-color 0.15s',
+        }}
+      >
+        {/* Thumbnail */}
+        <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: t.bg3 }}>
+          {project.thumbnail ? (
+            <img
+              src={project.thumbnail}
+              alt={project.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)', transform: hovered ? 'scale(1.04)' : 'scale(1)' }}
+            />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${t.bg3} 0%, #201E1B 100%)` }}>
+              <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 48, fontWeight: 700, color: t.faint, letterSpacing: '-0.04em', userSelect: 'none' }}>{project.name[0]}</span>
+            </div>
+          )}
+          {/* Bottom gradient overlay */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, background: `linear-gradient(to top, ${t.bg2}, transparent)`, pointerEvents: 'none' }} />
+          {/* Tag */}
+          <div style={{ position: 'absolute', top: 12, right: 12, padding: '3px 10px', background: 'rgba(12,11,10,0.75)', backdropFilter: 'blur(8px)', borderRadius: 20, border: `1px solid ${t.border}`, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: t.text2 }}>
+            {project.tag}
+          </div>
+        </div>
+
+        {/* Body — logo badge lives here so it isn't clipped by the thumbnail's overflow:hidden */}
+        <div style={{ padding: '36px 20px 20px', position: 'relative' }}>
+          {/* Logo badge */}
+          <div style={{
+            position: 'absolute', top: -20, left: 20,
+            width: 40, height: 40, borderRadius: 10,
+            background: t.bg2, border: `1px solid ${t.border2}`,
+            overflow: 'hidden', flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          }}>
+            {project.logo ? (
+              <img src={project.logo} alt={`${project.name} logo`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.accentLow, color: t.accent, fontFamily: 'Space Grotesk, sans-serif', fontSize: 16, fontWeight: 700 }}>
+                {project.name[0]}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: t.text, lineHeight: 1.3 }}>
+              {project.name}
+            </div>
+            <svg style={{ flexShrink: 0, marginTop: 2, color: hovered ? t.accent : t.muted, transition: 'color 0.15s' }} width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2.5 11.5L11.5 2.5M6.5 2.5H11.5V7.5" />
+            </svg>
+          </div>
+          <p style={{ fontSize: 13, color: t.text2, lineHeight: 1.65, margin: '0 0 14px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>
+            {project.description}
+          </p>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted, letterSpacing: '0.02em' }}>
+            {domain}
+          </div>
+        </div>
+      </a>
+    </FadeUp>
+  )
+}
+
+function Showcase() {
+  if (SHOWCASE_PROJECTS.length === 0) return null
+  const preview = SHOWCASE_PROJECTS.slice(0, 6)
+
+  return (
+    <section style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="showcase">
+      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 clamp(20px,4vw,40px)' }}>
+        <FadeUp>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 16, marginBottom: 52 }}>
+            <div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.accent, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block' }} />
+                Built with Argens
+              </div>
+              <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,40px)', fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.1, color: t.text, margin: 0, maxWidth: 480 }}>
+                Products shipping<br />on Argens
+              </h2>
+              <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.7, marginTop: 14, marginBottom: 0, maxWidth: 460 }}>
+                Developers are already wiring agents to pay for real work. Here&apos;s what they&apos;re building.
+              </p>
+            </div>
+            {SHOWCASE_PROJECTS.length > 6 && (
+              <a href="/showcase" style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.muted, textDecoration: 'none', letterSpacing: '0.04em', flexShrink: 0 }}>
+                See all {SHOWCASE_PROJECTS.length} projects →
+              </a>
+            )}
+          </div>
+        </FadeUp>
+        <div className="lp-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+          {preview.map((p, i) => <ShowcaseCard key={p.name} project={p} index={i} />)}
+        </div>
+        <FadeUp delay={0.1}>
+          <div style={{ marginTop: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button
+              data-tally-open={TALLY_SHOWCASE_ID}
+              data-tally-layout="modal"
+              data-tally-width="480"
+              style={{
+                padding: '10px 22px', borderRadius: 8, border: `1px solid ${t.border2}`,
+                background: 'transparent', color: t.muted, cursor: 'pointer',
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 12, letterSpacing: '0.04em',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { (e.target as HTMLButtonElement).style.color = t.accent; (e.target as HTMLButtonElement).style.borderColor = t.accentMid }}
+              onMouseLeave={e => { (e.target as HTMLButtonElement).style.color = t.muted; (e.target as HTMLButtonElement).style.borderColor = t.border2 }}
+            >
+              Submit your project →
+            </button>
+          </div>
+        </FadeUp>
+      </div>
+    </section>
+  )
+}
+
 // ─── CTA + Footer ─────────────────────────────────────────────────────────────
 function CtaFooter() {
   return (
@@ -1260,6 +1403,7 @@ export function LandingPage() {
         <CrossChain />
         <TwoWays />
         <Policies />
+        <Showcase />
         <CtaFooter />
       </main>
     </>

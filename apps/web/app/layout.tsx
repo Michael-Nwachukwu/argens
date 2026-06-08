@@ -6,6 +6,15 @@ import { AuthProvider } from '@/lib/auth-context'
 export const metadata: Metadata = {
   title: 'Argens — Programmable payments for AI agents',
   description: 'Give your AI agent the ability to pay. An API key that authorizes autonomous USDC spending on Stellar, within policies you define.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '256x256 48x48 32x32 16x16', type: 'image/x-icon' },
+      { url: '/argens-icon.png', sizes: '1024x1024', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   openGraph: {
     title: 'Argens — Programmable payments for AI agents',
     description: 'Give your AI agent the ability to pay. An API key that authorizes autonomous USDC spending on Stellar, within policies you define.',
