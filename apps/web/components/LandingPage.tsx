@@ -153,8 +153,13 @@ function Nav() {
                 <li key={href}><a href={href} style={{ fontSize: 13, color: t.muted, textDecoration: 'none', transition: 'color 0.15s' }}>{label}</a></li>
               ))}
             </ul>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <WaitlistButton />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <a href="/login" style={{ fontSize: 13, color: t.muted, textDecoration: 'none', padding: '7px 14px', borderRadius: 7, transition: 'color 0.15s', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 500 }}>
+                Log in
+              </a>
+              <a href="/signup" style={{ fontSize: 13, fontWeight: 600, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 7, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.01em' }}>
+                Sign up
+              </a>
             </div>
           </>
         )}
@@ -186,7 +191,15 @@ function Nav() {
                 {label}
               </a>
             ))}
-            <div style={{ marginTop: 20 }}><WaitlistButton size="lg" full /></div>
+            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <a href="/signup" onClick={() => setMenuOpen(false)} style={{ display: 'block', textAlign: 'center', padding: '13px', borderRadius: 8, background: t.accent, color: t.bg, fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 600, textDecoration: 'none', letterSpacing: '-0.01em' }}>
+                Sign up
+              </a>
+              <a href="/login" onClick={() => setMenuOpen(false)} style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 8, border: `1px solid ${t.border2}`, color: t.text2, fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, textDecoration: 'none' }}>
+                Log in
+              </a>
+              <WaitlistButton size="lg" full label="Join the waitlist" />
+            </div>
           </div>
         </div>
       )}
@@ -450,12 +463,15 @@ function Hero() {
             <p style={{ fontSize: 17, lineHeight: 1.75, color: t.text2, marginBottom: 32, maxWidth: 420, animation: 'fadeInUp 0.6s 0.26s both ease-out' }}>
               A programmable USDC wallet and AI service marketplace for autonomous agents. One API key — your agent pays, calls 20+ services, and operates within the limits you set.
             </p>
-            <div className="lp-hero-cta" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', animation: 'fadeInUp 0.6s 0.34s both ease-out' }}>
-              <WaitlistButton size="lg" label="Get early access" />
-              <a href="#how" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 26px', borderRadius: 7, fontSize: 15, color: t.text2, border: `1px solid ${t.border2}`, textDecoration: 'none' }}>
-                See how it works →
+            <div className="lp-hero-cta" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', animation: 'fadeInUp 0.6s 0.34s both ease-out' }}>
+              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 28px', borderRadius: 7, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.01em' }}>
+                Sign up →
               </a>
+              <WaitlistButton size="lg" label="Join the waitlist" />
             </div>
+            <p style={{ marginTop: 14, fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace', animation: 'fadeInUp 0.6s 0.4s both ease-out' }}>
+              Have an access code? <a href="/signup" style={{ color: t.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>Sign up directly →</a>
+            </p>
             <div className="lp-hero-stats" style={{ marginTop: 40, display: 'flex', alignItems: 'center', gap: 28, animation: 'fadeInUp 0.6s 0.42s both ease-out' }}>
               {[
                 { v: '40+',        l: 'AI services on mainnet' },
@@ -1354,13 +1370,16 @@ function CtaFooter() {
               Your agent is waiting<br/>to pay its first bill.
             </h2>
             <p style={{ fontSize: 17, color: t.muted, lineHeight: 1.75, marginBottom: 40, maxWidth: 460, margin: '0 auto 40px' }}>
-              A wallet, a policy engine, and a marketplace of 40+ AI services — all behind one API key. Get early access and put your agent to work.
+              A wallet, a policy engine, and a marketplace of 40+ AI services — all behind one API key. Request access and put your agent to work.
             </p>
-            <div className="lp-cta-btns" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap' as const }}>
-              <WaitlistButton size="lg" label="Get early access" />
+            <div className="lp-cta-btns" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 32px', borderRadius: 8, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.01em' }}>
+                Sign up →
+              </a>
+              <WaitlistButton size="lg" label="Join the waitlist" />
             </div>
-            <p style={{ marginTop: 24, fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>
-              Or paste <span style={{ color: t.text2 }}>SKILL.md</span> into any agent and it onboards itself in under a minute.
+            <p style={{ marginTop: 20, fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>
+              Have a code? <a href="/signup" style={{ color: t.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>Sign up directly</a> · No code? Join the waitlist above.
             </p>
           </div>
         </FadeUp>
