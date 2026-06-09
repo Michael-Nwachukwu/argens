@@ -244,7 +244,7 @@ export default function ShowcasePage() {
           )}
 
           {/* Grid */}
-          <div className="sc-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+          <div className="sc-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20 }}>
             {filtered.map(p => <ShowcaseCard key={p.name} project={p} />)}
           </div>
 

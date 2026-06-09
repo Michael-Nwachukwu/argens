@@ -22,9 +22,27 @@ export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
     url: 'https://ophunt.xyz',
     tag: 'AI Agent',
     howUsed: [
-      'Each OpHunt agent session calls Argens /pay to settle upstream data provider costs in real-time USDC.',
-      'Spending policy caps prevent runaway costs during high-traffic scraping runs.',
-      'Argens marketplace is used to call Perplexity and Exa for live idea-feed enrichment without managing separate API subscriptions.',
+      'Web scraping via firecrawl_scrape.', 
+      'LLM analysis via DeepSeek endpoint.', 
+      'structured idea extraction from any URL or topic.', 
+      'automated feed pipeline scoring ideas from HN, Reddit, and Product Hunt.', 
+      'runtime service discovery via /marketplace/services.', 
+      'pay-per-call AI spend across all analysis workloads.'
+    ],
+  },
+  {
+    name: 'Camob Residences',
+    description: 'Camob Residence is a Next.js short-let booking site for a two-maisonette property in Lekki. Lagos It features four on-site AI agents, powered through Argens: a guest concierge that answers stay and neighbourhood questions; a pre-arrival itinerary generator that writes a personalised day-by-day plan after payment confirms; an admin operations co-pilot that drafts daily digests (pending bank transfers, refund candidates, guest replies); and a weekly market-positioning brief that pulls real Lagos events and drafts outreach plans and ad-copy starters for the owner\'s inbox',
+    thumbnail: '/showcase/camob/camob-thumb.svg',
+    logo: '/showcase/camob/camob-icon.svg',
+    url: 'https://camobresidences.com',
+    tag: 'Real Estate',
+
+    howUsed: [
+      'Chat completions via deepseek_deepseek_chat.',
+      'web search via brave_brave_web-search for the weekly events brief.',
+      'agent mail via stableemail_send for outbound delivery.',
+      'all routed through one shared client with spending caps and per-call AgentRun audit rows'
     ],
   },
 ]
