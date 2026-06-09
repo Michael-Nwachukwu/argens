@@ -5,11 +5,13 @@ export interface ShowcaseProject {
   logo: string       // URL to square logo (empty = first-letter fallback)
   url: string
   tag: string        // e.g. "AI Agent", "Dev Tool", "Finance"
+  howUsed?: string[] // bullet points describing how the project uses Argens
 }
 
 // ─── Add projects here ────────────────────────────────────────────────────────
 // thumbnail: ideally 1200×675 (16:9). Use any CDN or /public/showcase/...
 // logo:      ideally 128×128 or SVG. Leave empty to show first letter of name.
+// howUsed:   optional bullet points — shown in a collapsible "How we used Argens" panel.
 
 export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
   {
@@ -19,5 +21,10 @@ export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
     logo: '/showcase/ophunt/ophunt-icon.svg',
     url: 'https://ophunt.xyz',
     tag: 'AI Agent',
+    howUsed: [
+      'Each OpHunt agent session calls Argens /pay to settle upstream data provider costs in real-time USDC.',
+      'Spending policy caps prevent runaway costs during high-traffic scraping runs.',
+      'Argens marketplace is used to call Perplexity and Exa for live idea-feed enrichment without managing separate API subscriptions.',
+    ],
   },
 ]

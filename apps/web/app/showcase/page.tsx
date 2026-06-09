@@ -36,6 +36,7 @@ const ALL_TAGS = ['All', ...Array.from(new Set(SHOWCASE_PROJECTS.map(p => p.tag)
 
 function ShowcaseCard({ project }: { project: ShowcaseProject }) {
   const [hovered, setHovered] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const domain = (() => { try { return new URL(project.url).hostname.replace('www.', '') } catch { return project.url } })()
 
   return (
@@ -50,14 +51,13 @@ function ShowcaseCard({ project }: { project: ShowcaseProject }) {
         background: t.bg2,
         border: `1px solid ${hovered ? t.border2 : t.border}`,
         borderRadius: 12,
-        overflow: 'hidden',
         textDecoration: 'none',
         boxShadow: hovered ? `0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px ${t.border2}` : '0 2px 8px rgba(0,0,0,0.2)',
-        transition: 'transform 0.22s cubic-bezier(0.16,1,0.3,1), box-shadow 0.22s cubic-bezier(0.16,1,0.3,1), border-color 0.15s',
+        transition: 'box-shadow 0.22s cubic-bezier(0.16,1,0.3,1), border-color 0.15s',
       }}
     >
-      {/* Thumbnail */}
-      <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: t.bg3 }}>
+      {/* Thumbnail — overflow:hidden here, not on card, so expandable section isn't clipped */}
+      <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: t.bg3, borderRadius: '11px 11px 0 0' }}>
         {project.thumbnail ? (
           <img
             src={project.thumbnail}
@@ -99,9 +99,48 @@ function ShowcaseCard({ project }: { project: ShowcaseProject }) {
         <p style={{ fontSize: 13, color: t.text2, lineHeight: 1.65, margin: '0 0 14px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {project.description}
         </p>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted, letterSpacing: '0.02em' }}>
-          {domain}
+
+        {/* Domain + toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted, letterSpacing: '0.02em' }}>
+            {domain}
+          </div>
+          {project.howUsed && project.howUsed.length > 0 && (
+            <button
+              onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v) }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.05em',
+                color: expanded ? t.accent : t.faint,
+                transition: 'color 0.15s',
+                flexShrink: 0,
+              }}
+            >
+              how we used argens
+              <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none', fontSize: 9 }}>▾</span>
+            </button>
+          )}
         </div>
+
+        {/* Expandable how-we-used section */}
+        {project.howUsed && project.howUsed.length > 0 && (
+          <div style={{
+            overflow: 'hidden',
+            maxHeight: expanded ? 400 : 0,
+            opacity: expanded ? 1 : 0,
+            transition: 'max-height 0.32s cubic-bezier(0.16,1,0.3,1), opacity 0.22s ease',
+          }}>
+            <ul style={{ margin: '12px 0 0', padding: '12px 0 0 0', borderTop: `1px solid ${t.border}`, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {project.howUsed.map((item, i) => (
+                <li key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: t.text2, lineHeight: 1.6 }}>
+                  <span style={{ color: t.accent, fontSize: 10, marginTop: 3, flexShrink: 0 }}>◆</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </a>
   )
