@@ -184,6 +184,58 @@ function Lead({ children }: { children: React.ReactNode }) {
   return <p style={{ fontSize: 16, color: t.text2, lineHeight: 1.8, maxWidth: 680 }}>{children}</p>
 }
 
+function syntaxHighlight(code: string): React.ReactNode {
+  return code.split('\n').map((line, lineIdx, arr) => {
+    const isLast = lineIdx === arr.length - 1
+    // Comment lines
+    if (/^\s*(#|\/\/)/.test(line)) {
+      return (
+        <React.Fragment key={lineIdx}>
+          <span style={{ color: t.muted, fontStyle: 'italic' }}>{line}</span>
+          {!isLast && '\n'}
+        </React.Fragment>
+      )
+    }
+    // Tokenize non-comment lines
+    const tokens: React.ReactNode[] = []
+    let rest = line
+    let idx = 0
+    while (rest.length > 0) {
+      let m: RegExpMatchArray | null
+      // JSON key: "key":
+      m = rest.match(/^("[\w\s._/-]+")(\s*:)/)
+      if (m) { tokens.push(<span key={idx++} style={{ color: t.accent }}>{m[1]}</span>, <span key={idx++} style={{ color: t.text2 }}>{m[2]}</span>); rest = rest.slice(m[0].length); continue }
+      // URL
+      m = rest.match(/^https?:\/\/[^\s\\,'"{}()]+/)
+      if (m) { tokens.push(<span key={idx++} style={{ color: '#7DB88A' }}>{m[0]}</span>); rest = rest.slice(m[0].length); continue }
+      // String value
+      m = rest.match(/^"[^"]*"/)
+      if (m) { tokens.push(<span key={idx++} style={{ color: '#7DB88A' }}>{m[0]}</span>); rest = rest.slice(m[0].length); continue }
+      // Boolean / null
+      m = rest.match(/^(true|false|null)(?=[\s,}\])]|$)/)
+      if (m) { tokens.push(<span key={idx++} style={{ color: '#E09050' }}>{m[0]}</span>); rest = rest.slice(m[0].length); continue }
+      // Number
+      m = rest.match(/^-?\d+(\.\d+)?(?=[\s,}\])]|$)/)
+      if (m) { tokens.push(<span key={idx++} style={{ color: '#A08BC8' }}>{m[0]}</span>); rest = rest.slice(m[0].length); continue }
+      // Arrow →
+      if (rest[0] === '→') { tokens.push(<span key={idx++} style={{ color: t.accent }}>→</span>); rest = rest.slice(1); continue }
+      // HTTP method / shell command at token boundary
+      m = rest.match(/^(curl|GET|POST|PUT|DELETE|PATCH|export)(?=\s|$)/)
+      if (m) { tokens.push(<span key={idx++} style={{ color: t.accent, fontWeight: 600 }}>{m[0]}</span>); rest = rest.slice(m[0].length); continue }
+      // env var $FOO
+      m = rest.match(/^\$[A-Z_][A-Z_0-9]*/)
+      if (m) { tokens.push(<span key={idx++} style={{ color: '#A08BC8' }}>{m[0]}</span>); rest = rest.slice(m[0].length); continue }
+      tokens.push(rest[0]); rest = rest.slice(1)
+    }
+    return (
+      <React.Fragment key={lineIdx}>
+        {tokens}
+        {!isLast && '\n'}
+      </React.Fragment>
+    )
+  })
+}
+
 function TerminalBlock({ file, tag, children }: { file?: string; tag?: React.ReactNode; children: React.ReactNode }) {
   const [copied, setCopied] = useState(false)
   const codeRef = useRef<HTMLPreElement>(null)
@@ -194,6 +246,8 @@ function TerminalBlock({ file, tag, children }: { file?: string; tag?: React.Rea
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
   }
+
+  const highlighted = typeof children === 'string' ? syntaxHighlight(children) : children
 
   return (
     <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 16 }}>
@@ -210,7 +264,7 @@ function TerminalBlock({ file, tag, children }: { file?: string; tag?: React.Rea
         </div>
       </div>
       <pre ref={codeRef} style={{ margin: 0, padding: '16px 18px', fontSize: 12.5, lineHeight: 1.75, fontFamily: 'JetBrains Mono, monospace', overflowX: 'auto', color: t.text2 }}>
-        <code>{children}</code>
+        <code>{highlighted}</code>
       </pre>
     </div>
   )
@@ -321,10 +375,10 @@ function OverviewSection() {
       <FadeUp delay={0.1}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: t.border, borderRadius: 10, overflow: 'hidden', marginTop: 48 }} className="docs-stats-grid">
           {[
-            { v: 'USDC',    l: 'only asset in V1'          },
-            { v: '$0',      l: 'fee on direct transfers'   },
-            { v: '80+',     l: 'marketplace providers'     },
-            { v: 'Stellar', l: '+ Base via CCTP V2'        },
+            { v: 'USDC',    l: 'only asset in V1'           },
+            { v: '80+',     l: 'marketplace providers'      },
+            { v: 'Stellar', l: '+ Base via CCTP V2'         },
+            { v: '24h',     l: 'approval window for pauses' },
           ].map((s, i) => (
             <div key={i} style={{ background: t.bg2, padding: '20px 24px' }}>
               <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: t.accent, marginBottom: 4 }}>{s.v}</div>
@@ -374,14 +428,14 @@ GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 export ARGENS_KEY="argns_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # Verify it's active
-curl https://api.argens.io/v1/agent/status \\
+curl https://api.argens.xyz/v1/agent/status \\
   -H "Authorization: Bearer $ARGENS_KEY"`,
     },
     {
       num: '05',
       title: 'Make your first payment',
       desc: 'Call POST /pay with a Stellar G... address for a direct Stellar payment, or a 0x... EVM address for a cross-chain USDC transfer to Base via CCTP V2. No additional configuration needed.',
-      code: `curl -X POST https://api.argens.io/v1/pay \\
+      code: `curl -X POST https://api.argens.xyz/v1/pay \\
   -H "Authorization: Bearer $ARGENS_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -450,7 +504,7 @@ function AuthSection() {
       <FadeUp delay={0.1}>
         <TerminalBlock file="curl" tag={<StatusBadge status="confirmed" />}>
 {`# Agent auth — works for /pay, /quote, /agent/status, /marketplace/*
-curl https://api.argens.io/v1/agent/status \\
+curl https://api.argens.xyz/v1/agent/status \\
   -H "Authorization: Bearer argns_live_xxxxxxxx"
 
 # → 200
@@ -458,6 +512,7 @@ curl https://api.argens.io/v1/agent/status \\
   "data": {
     "api_key_status": "active",
     "wallet_balance": "492.5000000",
+    "credits_balance": "5.0000000",
     "policies": {
       "allowance_limit": "500.0000000",
       "allowance_remaining": "492.5000000",
@@ -519,7 +574,7 @@ function PaymentsSection() {
         </div>
 
         {tab === 'stellar' && (
-          <TerminalBlock file="POST /pay" tag={<span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.success }}>Stellar · no Argens fee</span>}>
+          <TerminalBlock file="POST /pay" tag={<StatusBadge status="confirmed" />}>
 {`# Request
 {
   "recipient": "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
@@ -711,7 +766,7 @@ function PoliciesSection() {
 
       <FadeUp delay={0.12}>
         <Callout type="tip">
-          <strong>total_spent tracks the requested amount only.</strong> Direct USDC transfers carry no Argens fee — the wallet is debited exactly what you request. Marketplace calls are debited at the marked-up cost_paid amount.
+          <strong>total_spent tracks the requested amount only.</strong> The wallet is debited exactly what you request on direct transfers. Marketplace calls are debited at the <Mono>cost_paid</Mono> amount logged on the transaction.
         </Callout>
       </FadeUp>
     </section>
@@ -775,7 +830,7 @@ function MarketplaceSection() {
         <SectionLabel>Marketplace</SectionLabel>
         <SectionHeading>80+ AI services. One API key. Zero subscriptions.</SectionHeading>
         <Lead>
-          Call any enabled provider by service ID. Argens handles the upstream API call, charges the marked-up cost from your wallet, runs the full policy check, and logs the transaction. Your agent needs no separate accounts or API keys.
+          Call any enabled provider by service ID. Argens handles the upstream API call, debits the cost from your wallet, runs the full policy check, and logs the transaction. Your agent needs no separate accounts or API keys.
         </Lead>
       </FadeUp>
 
@@ -869,7 +924,7 @@ function MarketplaceSection() {
             <StatusBadge status="confirmed" />
           </div>
           <p style={{ fontSize: 13, color: t.text2, lineHeight: 1.7 }}>
-            The same three policies — max transaction, allowance, approval threshold — apply to marketplace calls exactly as they do to direct payments. Agents cannot bypass policy limits by routing through the marketplace. The <Mono>cost_paid</Mono> (marked-up amount) is what policy checks against, not the base upstream cost.
+            The same three policies — max transaction, allowance, approval threshold — apply to marketplace calls exactly as they do to direct payments. Agents cannot bypass policy limits by routing through the marketplace. The <Mono>cost_paid</Mono> field on the transaction record is what policy checks against.
           </p>
         </div>
       </FadeUp>
@@ -1010,7 +1065,7 @@ function ResponsesSection() {
             { key: 'destination_tx_hash', type: 'string?', desc: 'Base mint transaction hash. Present after successful CCTP relay.' },
             { key: 'cross_chain',       type: 'boolean',  desc: 'true when the payment used the CCTP route to Base.' },
             { key: 'blocked_reason',    type: 'string?',  desc: 'max_transaction_exceeded | allowance_exceeded — present when BLOCKED.' },
-            { key: 'cost_paid',         type: 'string?',  desc: 'Marketplace only. The marked-up total charged from the wallet.' },
+            { key: 'cost_paid',         type: 'string?',  desc: 'Marketplace only. The total debited from the wallet for this service call.' },
             { key: 'policy_result',     type: 'object?',  desc: 'Policy check result stored for audit purposes.' },
           ]} />
         </div>

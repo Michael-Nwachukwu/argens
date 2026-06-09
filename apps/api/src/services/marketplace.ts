@@ -565,6 +565,29 @@ async function executeMarketplaceCallInternal(
       )
     }
     await markMarketplaceFailed(finalTxId, `MPP Router returned HTTP ${mppResult.status}`, mppResult)
+
+    // Detect "channel not installed" — this is an Argens-side infrastructure gap, not a
+    // caller error. Give a clear message so the agent isn't confused about its own request.
+    const upstreamErr = typeof mppResult.body === 'object' && mppResult.body !== null ? mppResult.body as Record<string, unknown> : null
+    const isChannelError = mppResult.status === 503 && (
+      String(upstreamErr?.['error'] ?? '').toLowerCase().includes('channel') ||
+      String(upstreamErr?.['detail'] ?? '').toLowerCase().includes('channel')
+    )
+    if (isChannelError) {
+      logger.error('MPP Router channel not configured for service — operator action required', {
+        userId,
+        serviceId: service.id,
+        transactionId: finalTxId,
+        upstream_body: mppResult.body,
+      })
+      throw new AppError(
+        'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid — contact support@argens.io with the transaction_id for a full refund.',
+        'MARKETPLACE_SERVICE_UNAVAILABLE',
+        503,
+        { transaction_id: finalTxId, service_id: service.id },
+      )
+    }
+
     throw new AppError('Marketplace service call failed after payment attempt.', 'MARKETPLACE_UPSTREAM_FAILED', 502, {
       transaction_id: finalTxId,
       upstream_status: mppResult.status,
