@@ -97,7 +97,7 @@
 
 ### High priority
 
-- [ ] **Railway API deploy** — biggest external-user blocker; dashboard is non-functional without it
+- [x] **API deploy** — live on a VPS via Dokploy (Railway plan dropped)
 - [ ] **Example payloads** — `example_payload` is always `null`; marketplace call form has no prefills; need a generation pipeline (curated + OpenAPI extraction + LLM-generated fallback)
 - [x] **Documentation page** (`/docs`) — quickstart, API reference, policies, marketplace, CCTP, agent onboarding
 

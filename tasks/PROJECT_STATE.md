@@ -11,7 +11,7 @@
 |---|---|---|
 | Network | ✅ Mainnet live | STELLAR_NETWORK=mainnet |
 | Web app | ✅ Live on Vercel | argens.xyz — landing + full dashboard |
-| API | ⚠️ Local only | Railway deploy is the next infrastructure task |
+| API | ✅ Deployed | Live on a VPS via Dokploy |
 | SKILL.md | ✅ v5 local | v5 adds CCTP fee guidance on top of per-service skill discovery, docs, and llms.txt |
 | Phase 1 — Foundation | ✅ Complete | Auth, wallet bootstrap, API keys |
 | Phase 2 — Core API | ✅ Complete | All payment/policy/transaction endpoints |
@@ -19,7 +19,7 @@
 | Phase 4 — Marketplace | ✅ Complete | 86 providers, E2E verified on mainnet |
 | Phase 5 — Polish & Demo | 🔄 In progress | Partially done; see below |
 | CCTP Stellar → Base | ✅ Direct path verified twice; preflight hardened | Latest 0.0100000 USDC mainnet burn + Base relay succeeded locally on 2026-05-27. On 2026-06-03, direct and approval-token paths were patched to fail closed before fee payment when live `amount + fee` balance cannot be verified. |
-| Phase 6 — Mainnet infra | ⚠️ Partial | Mainnet code is live; Railway + alerting pending |
+| Phase 6 — Mainnet infra | ⚠️ Partial | API deployed (VPS/Dokploy); alerting pending |
 
 ---
 
@@ -128,9 +128,9 @@
 - [x] STELLAR_NETWORK=mainnet
 - [x] Mainnet ops wallet funded + in use
 - [x] Fee wallet — USDC trustline verified, receives marketplace markup
-- [ ] Credit pool wallet — env keys exist, but the public account is not created/funded on mainnet yet
+- [x] Credit pool wallet — bootstrapped and funded on mainnet; working well
 - [x] argens.xyz live (Vercel)
-- [ ] **Railway API deployment** — #1 blocker for external users
+- [x] **API deployment** — live on a VPS via Dokploy (Railway plan dropped)
 - [ ] XLM balance alerting on ops wallet
 - [ ] Wallet-funded SSE watcher E2E test
 - [ ] Low balance email E2E verification
@@ -142,12 +142,10 @@
 
 | Priority | Task | Blocks |
 |---|---|---|
-| 1 | **Railway API deploy** | Everything for external users |
-| 2 | **Bootstrap/fund credit pool wallet** | Credit-funded marketplace calls |
-| 3 | **Approval-token CCTP live verification** | Accurate CCTP claims for approval flow |
-| 4 | **Example payloads** | Marketplace UX usable by agents |
-| 5 | **Loom demo** | SCF submission |
-| 6 | **Demo script** | SCF submission |
+| 1 | **Approval-token CCTP live verification** | Accurate CCTP claims for approval flow |
+| 2 | **Example payloads** | Marketplace UX usable by agents |
+| 3 | **Loom demo** | SCF submission |
+| 4 | **Demo script** | SCF submission |
 
 ---
 
