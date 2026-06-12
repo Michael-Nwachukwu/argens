@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#0C0B0A; }
+  body { font-family:"Space Grotesk",sans-serif; position:relative; }
+
+  /* outer frame — dark with gold ticker bars top */
+  .bar { position:absolute; height:54px; background:#C5A253; z-index:1; }
+  #bar-l { left:120px; top:0; width:300px; }
+  #bar-r { right:120px; top:0; width:300px; background:#8F7437; }
+
+  /* champagne card */
+  #card {
+    position:absolute; left:44px; top:44px; right:44px; bottom:44px;
+    background-color:#F2EBD5; border-radius:26px; overflow:hidden; z-index:2;
+    box-shadow: 0 40px 120px rgba(0,0,0,0.6);
+  }
+  /* ornamental lattice texture */
+  #card .tex {
+    position:absolute; inset:0;
+    background-image:
+      radial-gradient(rgba(168,138,72,0.20) 1.7px, transparent 1.7px),
+      radial-gradient(rgba(168,138,72,0.11) 1.7px, transparent 1.7px),
+      repeating-linear-gradient(45deg, rgba(180,150,84,0.05) 0 2px, transparent 2px 14px),
+      repeating-linear-gradient(-45deg, rgba(180,150,84,0.05) 0 2px, transparent 2px 14px);
+    background-size: 26px 26px, 26px 26px, auto, auto;
+    background-position: 0 0, 13px 13px, 0 0, 0 0;
+  }
+  /* sun */
+  #sun {
+    position:absolute; right:30px; top:-40px; width:380px; height:380px; border-radius:50%;
+    background: radial-gradient(circle at 50% 50%, rgba(224,160,80,0.85) 0%, rgba(224,160,80,0.45) 45%, rgba(224,160,80,0) 70%);
+  }
+  /* scallop edges (stamp look) */
+  .scallop { position:absolute; top:0; bottom:0; width:44px; z-index:3;
+    background-repeat:repeat-y; }
+  #sc-l { left:24px;
+    background-image: radial-gradient(circle 17px at 0% 50%, #0C0B0A 16px, transparent 17.5px);
+    background-size: 44px 88px; }
+  #sc-r { right:24px;
+    background-image: radial-gradient(circle 17px at 100% 50%, #0C0B0A 16px, transparent 17.5px);
+    background-size: 44px 88px; }
+
+  /* coin-balloon */
+  .coinballoon { position:absolute; }
+  .coinballoon svg { display:block; }
+
+  /* birds = tiny chevrons */
+  .bird { position:absolute; font-family:"Space Grotesk"; font-weight:700; color:#7A6230; opacity:0.7; }
+
+  /* headline */
+  #stack { position:absolute; left:0; right:0; top:560px; text-align:center; z-index:4; }
+  #h1 {
+    font-size:108px; font-weight:700; letter-spacing:-0.025em; line-height:1.08;
+    color:#9A7A33;
+    text-shadow: 0 1px 0 rgba(255,250,235,0.6);
+  }
+  #h2 { margin-top:44px; font-size:54px; font-weight:600; letter-spacing:-0.01em; color:#AE8C44; }
+
+  /* dunes */
+  #dunes { position:absolute; left:0; right:0; bottom:0; height:430px; z-index:3; }
+  .dune { position:absolute; border-radius:50% 50% 0 0 / 100% 100% 0 0; }
+  #d1 { left:-300px; right:30%; bottom:-160px; height:480px; background:#8F7437; }
+  #d2 { left:25%; right:-340px; bottom:-200px; height:520px; background:#5C4A22; }
+  #d3 { left:-200px; right:-200px; bottom:-360px; height:540px; background:#3A2E15; }
+  .dune::after { content:""; position:absolute; inset:0; border-radius:inherit;
+    background-image: radial-gradient(rgba(255,235,190,0.13) 2px, transparent 2px);
+    background-size: 22px 22px; }
+  #dune-chev { position:absolute; left:50%; bottom:66px; transform:translateX(-50%); z-index:4; }
+
+  /* grain */
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="bar-l" class="bar"></div>
+  <div id="bar-r" class="bar"></div>
+
+  <div id="card">
+    <div class="tex"></div>
+    <div id="sun"></div>
+
+    <!-- coin balloons -->
+    <div class="coinballoon" style="left:96px; top:40px;">
+      <svg width="240" height="330" viewBox="0 0 240 330">
+        <circle cx="120" cy="108" r="104" fill="#C5A253"/>
+        <circle cx="120" cy="108" r="104" fill="none" stroke="#8F7437" stroke-width="7"/>
+        <circle cx="120" cy="108" r="76" fill="none" stroke="rgba(143,116,55,0.55)" stroke-width="5"/>
+        <ellipse cx="84" cy="64" rx="30" ry="44" fill="rgba(255,242,210,0.45)" transform="rotate(-28 84 64)"/>
+        <g fill="#3A2E15">
+          <rect x="100" y="62" width="13.5" height="86" rx="6.75" transform="rotate(30.5 107 105)"/>
+          <circle cx="142" cy="138" r="13" />
+        </g>
+        <line x1="58" y1="196" x2="98" y2="262" stroke="#5C4A22" stroke-width="4"/>
+        <line x1="182" y1="196" x2="142" y2="262" stroke="#5C4A22" stroke-width="4"/>
+        <rect x="92" y="258" width="56" height="48" rx="8" fill="#3A2E15"/>
+        <text x="120" y="291" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="26" fill="#E8CC85">»</text>
+      </svg>
+    </div>
+
+    <div class="coinballoon" style="right:50px; top:-26px;">
+      <svg width="330" height="470" viewBox="0 0 330 470">
+        <circle cx="165" cy="150" r="146" fill="#C5A253"/>
+        <circle cx="165" cy="150" r="146" fill="none" stroke="#8F7437" stroke-width="9"/>
+        <circle cx="165" cy="150" r="108" fill="none" stroke="rgba(143,116,55,0.55)" stroke-width="6"/>
+        <ellipse cx="112" cy="86" rx="42" ry="62" fill="rgba(255,242,210,0.45)" transform="rotate(-28 112 86)"/>
+        <g fill="#3A2E15">
+          <rect x="138" y="84" width="19" height="122" rx="9.5" transform="rotate(30.5 147.5 145)"/>
+          <circle cx="196" cy="192" r="18.5" />
+        </g>
+        <line x1="76" y1="272" x2="128" y2="372" stroke="#5C4A22" stroke-width="5"/>
+        <line x1="254" y1="272" x2="202" y2="372" stroke="#5C4A22" stroke-width="5"/>
+        <rect x="122" y="366" width="86" height="66" rx="10" fill="#3A2E15"/>
+        <text x="165" y="411" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="36" fill="#E8CC85">»</text>
+      </svg>
+    </div>
+
+    <div class="coinballoon" style="left:472px; top:218px;">
+      <svg width="110" height="158" viewBox="0 0 110 158">
+        <circle cx="55" cy="48" r="46" fill="#C5A253"/>
+        <circle cx="55" cy="48" r="46" fill="none" stroke="#8F7437" stroke-width="4"/>
+        <ellipse cx="40" cy="29" rx="13" ry="19" fill="rgba(255,242,210,0.45)" transform="rotate(-28 40 29)"/>
+        <g fill="#3A2E15">
+          <rect x="47" y="28" width="6.5" height="40" rx="3.25" transform="rotate(30.5 50 48)"/>
+          <circle cx="65" cy="62" r="6" />
+        </g>
+        <line x1="38" y1="90" x2="50" y2="124" stroke="#5C4A22" stroke-width="2.5"/>
+        <line x1="72" y1="90" x2="60" y2="124" stroke="#5C4A22" stroke-width="2.5"/>
+        <rect x="44" y="121" width="22" height="19" rx="4" fill="#3A2E15"/>
+      </svg>
+    </div>
+
+    <div class="coinballoon" style="left:74px; top:880px;">
+      <svg width="96" height="138" viewBox="0 0 96 138">
+        <circle cx="48" cy="42" r="40" fill="#C5A253"/>
+        <circle cx="48" cy="42" r="40" fill="none" stroke="#8F7437" stroke-width="3.5"/>
+        <ellipse cx="35" cy="26" rx="11" ry="16" fill="rgba(255,242,210,0.45)" transform="rotate(-28 35 26)"/>
+        <g fill="#3A2E15">
+          <rect x="41" y="25" width="5.5" height="34" rx="2.75" transform="rotate(30.5 44 42)"/>
+          <circle cx="57" cy="54" r="5.2" />
+        </g>
+        <line x1="33" y1="79" x2="43" y2="108" stroke="#5C4A22" stroke-width="2"/>
+        <line x1="63" y1="79" x2="53" y2="108" stroke="#5C4A22" stroke-width="2"/>
+        <rect x="38" y="105" width="20" height="17" rx="3.5" fill="#3A2E15"/>
+      </svg>
+    </div>
+
+    <div class="bird" style="left:560px; top:118px; font-size:30px; transform:rotate(-12deg)">»</div>
+    <div class="bird" style="left:212px; top:430px; font-size:24px; transform:rotate(8deg)">»</div>
+    <div class="bird" style="right:170px; top:560px; font-size:26px; transform:rotate(-6deg)">»</div>
+
+    <div id="stack">
+      <div id="h1">Payments already<br/>look easier;</div>
+      <div id="h2">with Argens.</div>
+    </div>
+
+    <div id="dunes">
+      <div id="d1" class="dune"></div>
+      <div id="d2" class="dune"></div>
+      <div id="d3" class="dune"></div>
+      <div id="dune-chev">
+        <svg width="84" height="62" viewBox="0 0 84 62" fill="none">
+          <path d="M6 8 L30 31 L6 54" stroke="#F2EBD5" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M44 8 L68 31 L44 54" stroke="#F2EBD5" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div id="sc-l" class="scallop"></div>
+    <div id="sc-r" class="scallop"></div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="7"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.045"/>
+  </svg>
+</body>
+</html>

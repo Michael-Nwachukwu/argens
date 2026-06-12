@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#070605; }
+  body { font-family:"Space Grotesk",sans-serif; position:relative; color:#EDE9E3; }
+  .lbox { position:absolute; left:0; right:0; height:64px; background:#000; z-index:5; }
+  #lb-t { top:0; } #lb-b { bottom:0; }
+  #vig { position:absolute; inset:0;
+    background: radial-gradient(ellipse at 50% 46%, rgba(197,162,83,0.07) 0%, rgba(7,6,5,0) 52%),
+                radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.75) 100%); }
+
+  #studio { position:absolute; left:50%; top:142px; transform:translateX(-50%); text-align:center; }
+  #studio .ring { width:170px; height:170px; margin:0 auto; border-radius:50%;
+    border:3px solid #34302B; display:flex; align-items:flex-end; justify-content:center;
+    overflow:hidden; background:radial-gradient(circle at 50% 36%, #1C1916, #0C0B0A); }
+  #studio .lbl { margin-top:22px; font-family:"JetBrains Mono",monospace; font-size:21px;
+    letter-spacing:0.42em; color:#706B65; text-transform:uppercase; }
+
+  #title { position:absolute; left:0; right:0; top:430px; text-align:center; }
+  #title .h { font-size:96px; font-weight:700; letter-spacing:-0.02em; line-height:1.1; }
+  #title .h .g { color:#C5A253; }
+  #title .s { margin-top:20px; font-size:36px; color:#706B65; font-weight:500; font-style:italic; }
+
+  #roll { position:absolute; left:170px; right:170px; top:752px; font-family:"JetBrains Mono",monospace; }
+  .cr { display:flex; align-items:baseline; font-size:29px; margin-bottom:34px; }
+  .cr .role { color:#8E8880; letter-spacing:0.04em; }
+  .cr .dots { flex:1; margin:0 18px; border-bottom:3px dotted #34302B; transform:translateY(-7px); }
+  .cr .who { color:#EDE9E3; font-weight:500; }
+  .cr .who.g { color:#C5A253; }
+  .cr .who.dim { color:#706B65; font-style:italic; }
+
+  #rating { position:absolute; left:50%; bottom:128px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:22px; }
+  #rating .box { border:3px solid #34302B; border-radius:8px; padding:12px 18px;
+    font-family:"JetBrains Mono",monospace; font-weight:600; font-size:30px; color:#C5A253; }
+  #rating { white-space:nowrap; }
+  #rating .txt { font-family:"JetBrains Mono",monospace; font-size:19px; color:#706B65;
+    letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; }
+
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="lb-t" class="lbox"></div>
+  <div id="lb-b" class="lbox"></div>
+  <div id="vig"></div>
+
+  <div id="studio">
+    <div class="ring">
+      <svg width="100" height="116" viewBox="0 0 91 105" style="margin-bottom:-6px">
+        <g transform="translate(21,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+        <g transform="translate(49,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+        <rect x="35" y="0" width="14" height="7" fill="#3E4346"/><rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+        <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/><rect x="7" y="21" width="7" height="14" fill="#B0623A"/>
+        <rect x="77" y="21" width="7" height="14" fill="#B0623A"/><rect x="21" y="21" width="14" height="14" fill="#3E4346"/>
+        <rect x="49" y="21" width="14" height="14" fill="#3E4346"/><rect x="28" y="21" width="7" height="7" fill="#FFFFFF"/>
+        <rect x="49" y="21" width="7" height="7" fill="#FFFFFF"/><rect x="14" y="28" width="7" height="7" fill="#E0A096"/>
+        <rect x="70" y="28" width="7" height="7" fill="#E0A096"/><rect x="35" y="35" width="14" height="7" fill="#3E4346"/>
+        <rect x="28" y="42" width="35" height="7" fill="#3E4346"/><rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+        <rect x="63" y="56" width="7" height="7" fill="#3E4346"/>
+        <g transform="translate(0,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+        <g transform="translate(84,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+      </svg>
+    </div>
+    <div class="lbl">argens presents</div>
+  </div>
+
+  <div id="title">
+    <div class="h">No humans<br/>were <span class="g">needed.</span></div>
+    <div class="s">a workflow by research-agent-01</div>
+  </div>
+
+  <div id="roll">
+    <div class="cr"><span class="role">research</span><span class="dots"></span><span class="who">agent</span></div>
+    <div class="cr"><span class="role">api calls</span><span class="dots"></span><span class="who">agent</span></div>
+    <div class="cr"><span class="role">payments</span><span class="dots"></span><span class="who g">agent · usdc</span></div>
+    <div class="cr"><span class="role">spending limits</span><span class="dots"></span><span class="who">policy engine</span></div>
+    <div class="cr"><span class="role">you</span><span class="dots"></span><span class="who dim">asleep</span></div>
+  </div>
+
+  <div id="rating">
+    <div class="box">A</div>
+    <div class="txt">rated A · fully autonomous · argens.xyz</div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="41"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.07"/>
+  </svg>
+</body>
+</html>

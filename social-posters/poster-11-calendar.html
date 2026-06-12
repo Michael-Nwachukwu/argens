@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#D7E2F2; }
+  body { font-family:"Space Grotesk",sans-serif; position:relative; color:#1E2C4A; }
+  #tex { position:absolute; inset:0;
+    background-image: radial-gradient(rgba(30,44,74,0.10) 1.6px, transparent 1.6px);
+    background-size: 26px 26px; }
+  .cloud { position:absolute; background:#EDF3FB; border-radius:999px; }
+
+  #h1 { position:absolute; left:84px; top:104px; width:760px;
+    font-size:78px; font-weight:700; letter-spacing:-0.028em; line-height:1.12; }
+  #h1 .g { color:#9A7A33; }
+  #sub { position:absolute; left:84px; top:430px; width:860px;
+    font-size:38px; font-weight:500; line-height:1.5; color:#54668C; }
+
+  /* monthly badge struck out -->  */
+  #badge { position:absolute; right:96px; top:96px; transform:rotate(8deg);
+    background:#FBEFEC; border:4px solid #B4452F; border-radius:16px;
+    padding:18px 26px; font-family:"JetBrains Mono",monospace; font-weight:600;
+    font-size:34px; color:#B4452F; }
+  #badge .strike { position:absolute; left:8px; right:8px; top:50%; height:6px;
+    background:#B4452F; border-radius:3px; transform:rotate(-7deg); }
+
+  /* calendar card */
+  #cal { position:absolute; left:50%; top:620px; transform:translateX(-50%);
+    width:840px; background:#FFFFFF; border-radius:24px;
+    box-shadow: 0 40px 90px rgba(30,44,74,0.28), inset 0 2px 0 #fff;
+    border:3px solid #B9C9E2; overflow:visible; }
+  #cal .head { display:flex; justify-content:space-between; align-items:center;
+    padding:30px 40px 22px; border-bottom:3px solid #E3EAF5; }
+  #cal .head .m { font-size:36px; font-weight:700; letter-spacing:-0.01em; }
+  #cal .head .y { font-family:"JetBrains Mono",monospace; font-size:24px; color:#8295B5; }
+  #cal .dows { display:grid; grid-template-columns:repeat(7,1fr); padding:18px 28px 0;
+    font-family:"JetBrains Mono",monospace; font-size:19px; color:#8295B5; text-align:center;
+    letter-spacing:0.06em; }
+  #cal .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; padding:14px 28px 30px; }
+  .day { height:88px; border-radius:14px; background:#F3F7FC; border:2px solid #E3EAF5;
+    position:relative; font-family:"JetBrains Mono",monospace; font-size:20px; color:#A8B7CF; }
+  .day span { position:absolute; left:10px; top:8px; }
+  .day.pay { background:#FdF6E4; border-color:#C5A253; }
+  .day.pay .coin { position:absolute; left:50%; top:54%; transform:translate(-50%,-50%); }
+  .day.pay .amt { position:absolute; left:0; right:0; bottom:6px; text-align:center;
+    font-size:16px; font-weight:600; color:#9A7A33; }
+
+  /* mascot sitting on calendar -->  */
+  #masc { position:absolute; right:64px; top:-92px; }
+
+  #foot { position:absolute; left:0; right:0; bottom:88px; text-align:center; }
+  #foot .l { font-size:48px; font-weight:700; letter-spacing:-0.02em; }
+  #foot .l .g { color:#9A7A33; }
+  #foot .wm { margin-top:30px; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+  <div class="cloud" style="left:60px; top:430px; width:150px; height:44px;"></div>
+  <div class="cloud" style="right:120px; top:380px; width:110px; height:36px;"></div>
+  <div class="cloud" style="right:60px; bottom:240px; width:140px; height:40px;"></div>
+
+  <div id="h1">Your agent worked twice this week. <span class="g">You paid twice.</span></div>
+  <div id="sub">No retainers. No monthly minimums. Usage is the only bill.</div>
+
+  <div id="badge">$29/mo<div class="strike"></div></div>
+
+  <div id="cal">
+    <div id="masc">
+      <svg width="100" height="116" viewBox="0 0 91 105">
+        <g transform="translate(21,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+        <g transform="translate(49,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+        <rect x="35" y="0" width="14" height="7" fill="#3E4346"/><rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+        <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/><rect x="7" y="21" width="7" height="14" fill="#B0623A"/>
+        <rect x="77" y="21" width="7" height="14" fill="#B0623A"/><rect x="21" y="21" width="14" height="14" fill="#3E4346"/>
+        <rect x="49" y="21" width="14" height="14" fill="#3E4346"/><rect x="28" y="21" width="7" height="7" fill="#FFFFFF"/>
+        <rect x="49" y="21" width="7" height="7" fill="#FFFFFF"/><rect x="14" y="28" width="7" height="7" fill="#E0A096"/>
+        <rect x="70" y="28" width="7" height="7" fill="#E0A096"/><rect x="35" y="35" width="14" height="7" fill="#3E4346"/>
+        <rect x="28" y="42" width="35" height="7" fill="#3E4346"/><rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+        <rect x="63" y="56" width="7" height="7" fill="#3E4346"/>
+        <g transform="translate(0,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+        <g transform="translate(84,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+      </svg>
+    </div>
+    <div class="head"><div class="m">This week</div><div class="y">on-chain · usdc</div></div>
+    <div class="dows"><div>mon</div><div>tue</div><div>wed</div><div>thu</div><div>fri</div><div>sat</div><div>sun</div></div>
+    <div class="grid">
+      <div class="day"><span>1</span></div>
+      <div class="day pay"><span style="color:#9A7A33">2</span>
+        <div class="coin"><svg width="38" height="38" viewBox="0 0 38 38">
+          <circle cx="19" cy="19" r="17" fill="#C5A253" stroke="#8F7437" stroke-width="3"/>
+          <ellipse cx="13" cy="12" rx="5" ry="7" fill="rgba(255,246,220,0.6)" transform="rotate(-28 13 12)"/>
+        </svg></div>
+        <div class="amt">$0.07</div>
+      </div>
+      <div class="day"><span>3</span></div>
+      <div class="day"><span>4</span></div>
+      <div class="day pay"><span style="color:#9A7A33">5</span>
+        <div class="coin"><svg width="38" height="38" viewBox="0 0 38 38">
+          <circle cx="19" cy="19" r="17" fill="#C5A253" stroke="#8F7437" stroke-width="3"/>
+          <ellipse cx="13" cy="12" rx="5" ry="7" fill="rgba(255,246,220,0.6)" transform="rotate(-28 13 12)"/>
+        </svg></div>
+        <div class="amt">$0.12</div>
+      </div>
+      <div class="day"><span>6</span></div>
+      <div class="day"><span>7</span></div>
+    </div>
+  </div>
+
+  <div id="foot">
+    <div class="l">Pay per use. <span class="g">Not per month.</span></div>
+    <div class="wm">
+      <svg width="180" height="40" viewBox="0 0 180 40">
+        <g transform="translate(0,3) scale(0.62)" fill="#9A7A33">
+          <rect x="14.5" y="0" width="14" height="50" rx="7" transform="rotate(30.5 21.5 25)"/>
+          <circle cx="40" cy="40.5" r="8.6"/>
+        </g>
+        <text x="44" y="29" font-family="Space Grotesk" font-weight="600" font-size="26" fill="#1E2C4A">argens.</text>
+      </svg>
+    </div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="47"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.04"/>
+  </svg>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#0C1322; }
+  body { font-family:"Space Grotesk",sans-serif; position:relative; }
+  #sky { position:absolute; inset:0;
+    background: linear-gradient(180deg, #0A0F1C 0%, #0E1730 58%, #131F3E 100%); }
+  .star { position:absolute; border-radius:50%; background:#E8EDF8; }
+  #moon { position:absolute; right:120px; top:120px; width:150px; height:150px; border-radius:50%;
+    background:#F0E6C8; box-shadow: 0 0 80px rgba(240,230,200,0.45), inset -14px -10px 0 rgba(190,175,130,0.55); }
+  #moon::after { content:""; position:absolute; left:34px; top:40px; width:26px; height:26px;
+    border-radius:50%; background:rgba(190,175,130,0.4); box-shadow: 44px 30px 0 -6px rgba(190,175,130,0.35); }
+  .cloud { position:absolute; background:rgba(26,38,68,0.9); border-radius:999px; }
+
+  #kick { position:absolute; left:84px; top:120px; font-family:"JetBrains Mono",monospace;
+    font-size:22px; letter-spacing:0.2em; text-transform:uppercase; color:#6E7FA8; }
+  #h1 { position:absolute; left:84px; top:172px; width:880px;
+    font-size:86px; font-weight:700; letter-spacing:-0.028em; line-height:1.1; color:#EFE7F2; }
+  #h1 .p { color:#E3A5C0; }
+  #sub { position:absolute; left:84px; top:412px; width:800px;
+    font-size:38px; font-weight:500; line-height:1.5; color:#9AA7C4; }
+
+  /* log card */
+  #log { position:absolute; left:50%; top:592px; transform:translateX(-50%) rotate(-1.2deg);
+    width:850px; background:#10182C; border:3px solid #25304E; border-radius:22px;
+    box-shadow: 0 44px 100px rgba(0,0,0,0.6); overflow:hidden; }
+  #log .bar { display:flex; align-items:center; justify-content:space-between;
+    padding:24px 34px; border-bottom:3px solid #1B2540; }
+  #log .bar .t { font-family:"JetBrains Mono",monospace; font-size:23px; color:#9AA7C4; letter-spacing:0.06em; }
+  #log .bar .live { display:flex; align-items:center; gap:12px;
+    font-family:"JetBrains Mono",monospace; font-size:20px; color:#7FD49B; letter-spacing:0.1em; }
+  #log .bar .live .d { width:12px; height:12px; border-radius:50%; background:#7FD49B; }
+  #log .rows { padding:14px 34px 12px; }
+  .row { display:flex; align-items:baseline; gap:22px; padding:19px 0;
+    border-bottom:2px dashed #1B2540; font-family:"JetBrains Mono",monospace; font-size:25px; }
+  .row:last-child { border-bottom:none; }
+  .row .tm { color:#6E7FA8; }
+  .row .sv { color:#E8EDF8; }
+  .row .what { color:#6E7FA8; font-size:22px; }
+  .row .fill { flex:1; }
+  .row .amt { color:#E8CC85; font-weight:600; }
+  .row .ok { color:#7FD49B; }
+  #log .ft { padding:22px 34px; background:#0C1322; border-top:3px solid #1B2540;
+    display:flex; justify-content:space-between; font-family:"JetBrains Mono",monospace; font-size:23px; }
+  #log .ft .a { color:#E3A5C0; letter-spacing:0.06em; }
+  #log .ft .b { color:#E8CC85; font-weight:600; }
+
+  /* mascot on night shift with desk lamp */
+  #shift { position:absolute; left:92px; bottom:74px; }
+  #lampglow { position:absolute; left:64px; bottom:90px; width:300px; height:200px;
+    background: radial-gradient(ellipse at 30% 100%, rgba(232,204,133,0.22), rgba(232,204,133,0) 65%); }
+
+  #wm { position:absolute; right:96px; bottom:104px; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="sky"></div>
+  <div class="star" style="left:130px; top:140px; width:5px; height:5px;"></div>
+  <div class="star" style="left:320px; top:90px; width:4px; height:4px; opacity:0.7"></div>
+  <div class="star" style="left:540px; top:150px; width:6px; height:6px;"></div>
+  <div class="star" style="left:760px; top:80px; width:4px; height:4px; opacity:0.6"></div>
+  <div class="star" style="left:240px; top:330px; width:4px; height:4px; opacity:0.5"></div>
+  <div class="star" style="left:900px; top:330px; width:5px; height:5px; opacity:0.8"></div>
+  <div class="star" style="left:680px; top:300px; width:3px; height:3px; opacity:0.5"></div>
+  <div id="moon"></div>
+  <div class="cloud" style="left:-40px; top:300px; width:220px; height:52px;"></div>
+  <div class="cloud" style="right:200px; top:260px; width:170px; height:44px; opacity:0.8"></div>
+
+  <div id="kick">// the night shift</div>
+  <div id="h1">What your agent did <span class="p">while you slept.</span></div>
+  <div id="sub">Real services. Real USDC. Zero human input.</div>
+
+  <div id="log">
+    <div class="bar">
+      <div class="t">transactions · last night</div>
+      <div class="live"><div class="d"></div>autonomous</div>
+    </div>
+    <div class="rows">
+      <div class="row"><span class="tm">02:14</span><span class="sv">exa.ai</span><span class="what">· search</span><span class="fill"></span><span class="amt">$0.04</span><span class="ok">✓</span></div>
+      <div class="row"><span class="tm">02:31</span><span class="sv">anthropic</span><span class="what">· tokens</span><span class="fill"></span><span class="amt">$0.12</span><span class="ok">✓</span></div>
+      <div class="row"><span class="tm">03:05</span><span class="sv">deepgram</span><span class="what">· transcribe</span><span class="fill"></span><span class="amt">$0.06</span><span class="ok">✓</span></div>
+      <div class="row"><span class="tm">03:48</span><span class="sv">replicate</span><span class="what">· render</span><span class="fill"></span><span class="amt">$0.21</span><span class="ok">✓</span></div>
+      <div class="row"><span class="tm">04:52</span><span class="sv">serpapi</span><span class="what">· results</span><span class="fill"></span><span class="amt">$0.03</span><span class="ok">✓</span></div>
+    </div>
+    <div class="ft"><span class="a">human inputs: 0</span><span class="b">total: $0.46</span></div>
+  </div>
+
+  <div id="lampglow"></div>
+  <div id="shift">
+    <svg width="108" height="125" viewBox="0 0 91 105">
+      <g transform="translate(21,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+      <g transform="translate(49,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+      <rect x="35" y="0" width="14" height="7" fill="#3E4346"/><rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+      <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/><rect x="7" y="21" width="7" height="14" fill="#B0623A"/>
+      <rect x="77" y="21" width="7" height="14" fill="#B0623A"/><rect x="21" y="21" width="14" height="14" fill="#3E4346"/>
+      <rect x="49" y="21" width="14" height="14" fill="#3E4346"/><rect x="28" y="21" width="7" height="7" fill="#FFFFFF"/>
+      <rect x="49" y="21" width="7" height="7" fill="#FFFFFF"/><rect x="14" y="28" width="7" height="7" fill="#E0A096"/>
+      <rect x="70" y="28" width="7" height="7" fill="#E0A096"/><rect x="35" y="35" width="14" height="7" fill="#3E4346"/>
+      <rect x="28" y="42" width="35" height="7" fill="#3E4346"/><rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+      <rect x="63" y="56" width="7" height="7" fill="#3E4346"/>
+      <g transform="translate(0,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+      <g transform="translate(84,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+    </svg>
+  </div>
+
+  <div id="wm">
+    <svg width="180" height="40" viewBox="0 0 180 40">
+      <g transform="translate(0,3) scale(0.62)" fill="#E8CC85">
+        <rect x="14.5" y="0" width="14" height="50" rx="7" transform="rotate(30.5 21.5 25)"/>
+        <circle cx="40" cy="40.5" r="8.6"/>
+      </g>
+      <text x="44" y="29" font-family="Space Grotesk" font-weight="600" font-size="26" fill="#E8EDF8">argens.</text>
+    </svg>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="53"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>
