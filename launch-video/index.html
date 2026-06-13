@@ -6,10 +6,10 @@
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
       @font-face {
-        font-family: "Space Grotesk";
+        font-family: "DM Sans";
         font-style: normal;
-        font-weight: 300 700;
-        src: url("fonts/SpaceGrotesk-latin.woff2") format("woff2");
+        font-weight: 100 1000;
+        src: url("fonts/DMSans-latin.woff2") format("woff2");
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
@@ -18,7 +18,7 @@
       }
       body { font-family: "Inter", sans-serif; }
       code, pre, .mono { font-family: "JetBrains Mono", monospace; }
-      .head { font-family: "Space Grotesk", sans-serif; }
+      .head { font-family: "DM Sans", sans-serif; }
 
       /* ── scene shells ─────────────────────────────────────────── */
       .scene {
@@ -89,7 +89,7 @@
         padding: 30px 0; text-align: center;
         border: 5px solid #A04848; border-radius: 12px;
         background-color: rgba(160,72,72,0.12);
-        font-family: "Space Grotesk", sans-serif; font-size: 64px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 64px; font-weight: 700;
         letter-spacing: 0.02em; color: #C76060; transform: rotate(-5deg);
         box-shadow: 0 18px 60px rgba(0,0,0,0.5);
       }
@@ -102,16 +102,16 @@
       /* ── scene 2 · claim ─────────────────────────────────────── */
       #s2-ghost {
         position: absolute; right: -130px; top: -160px;
-        font-family: "Space Grotesk", sans-serif; font-size: 760px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 760px; font-weight: 700;
         letter-spacing: -0.04em; color: #1C1916; line-height: 1;
       }
       #s2-stack { position: absolute; left: 160px; top: 300px; }
       #s2-think {
-        font-family: "Space Grotesk", sans-serif; font-size: 64px; font-weight: 500;
+        font-family: "DM Sans", sans-serif; font-size: 64px; font-weight: 500;
         color: #706B65; letter-spacing: -0.015em; line-height: 1.3;
       }
       #s2-claim {
-        margin-top: 22px; font-family: "Space Grotesk", sans-serif;
+        margin-top: 22px; font-family: "DM Sans", sans-serif;
         font-size: 158px; font-weight: 700; letter-spacing: -0.03em;
         color: #EDE9E3; line-height: 1.02;
       }
@@ -143,9 +143,9 @@
         position: absolute; border-radius: 50%;
         background-color: #403C38; filter: blur(6px); opacity: 0;
       }
-      #s3-wordclip { position: absolute; left: 960px; top: 442px; overflow: hidden; height: 238px; padding-top: 18px; }
+      #s3-wordclip { position: absolute; left: 960px; top: 436px; overflow: hidden; height: 250px; padding-top: 24px; }
       #s3-word {
-        font-family: "Space Grotesk", sans-serif; font-size: 172px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 172px; font-weight: 700;
         letter-spacing: -0.035em; color: #EDE9E3; line-height: 1.05;
       }
       #s3-cap {
@@ -157,7 +157,7 @@
       /* ── scene 4 · api call ──────────────────────────────────── */
       #s4-left { position: absolute; left: 140px; top: 250px; width: 660px; }
       #s4-head {
-        margin-top: 26px; font-family: "Space Grotesk", sans-serif;
+        margin-top: 26px; font-family: "DM Sans", sans-serif;
         font-size: 84px; font-weight: 700; letter-spacing: -0.025em;
         color: #EDE9E3; line-height: 1.08;
       }
@@ -213,24 +213,36 @@
       .bub img { width: 34%; height: 34%; object-fit: contain; }
       .bub .bn { font-family: "Inter", sans-serif; font-size: 14px; color: #706B65; letter-spacing: 0.02em; }
       .bub .mg {
-        font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 44px;
+        font-family: "DM Sans", sans-serif; font-weight: 700; font-size: 44px;
         color: #B0A99F; line-height: 1;
       }
-      #b1  { left: 288px;  top: 178px; width: 165px; height: 165px; }
-      #b2  { left: 603px;  top: 103px; width: 125px; height: 125px; }
-      #b3  { left: 1183px; top: 103px; width: 145px; height: 145px; }
-      #b4  { left: 1525px; top: 215px; width: 170px; height: 170px; }
-      #b5  { left: 135px;  top: 440px; width: 140px; height: 140px; }
-      #b6  { left: 288px;  top: 683px; width: 125px; height: 125px; }
-      #b7  { left: 590px;  top: 820px; width: 140px; height: 140px; }
-      #b8  { left: 923px;  top: 843px; width: 125px; height: 125px; }
-      #b9  { left: 1233px; top: 813px; width: 135px; height: 135px; }
-      #b10 { left: 1545px; top: 665px; width: 150px; height: 150px; }
-      #b11 { left: 1673px; top: 438px; width: 125px; height: 125px; }
-      #b12 { left: 58px;   top: 233px; width: 115px; height: 115px; }
-      #b13 { left: 35px;   top: 650px; width: 110px; height: 110px; }
+      .bub.sm { gap: 5px; }
+      .bub.sm .mg { font-size: 30px; }
+      .bub.sm .bn { font-size: 11.5px; }
+      #b1 { left: 584px; top: 484px; width: 152px; height: 152px; }
+      #b2 { left: 585px; top: 388px; width: 130px; height: 130px; }
+      #b3 { left: 640px; top: 587px; width: 120px; height: 120px; }
+      #b4 { left: 1172px; top: 508px; width: 148px; height: 148px; }
+      #b5 { left: 685px; top: 292px; width: 126px; height: 126px; }
+      #b6 { left: 869px; top: 248px; width: 112px; height: 112px; }
+      #b7 { left: 1005px; top: 235px; width: 134px; height: 134px; }
+      #b8 { left: 1131px; top: 326px; width: 118px; height: 118px; }
+      #b9 { left: 1218px; top: 415px; width: 126px; height: 126px; }
+      #b10 { left: 1107px; top: 624px; width: 140px; height: 140px; }
+      #b11 { left: 974px; top: 674px; width: 112px; height: 112px; }
+      #b12 { left: 850px; top: 692px; width: 122px; height: 122px; }
+      #b13 { left: 757px; top: 643px; width: 110px; height: 110px; }
+      #b14 { left: 488px; top: 598px; width: 100px; height: 100px; }
+      #b15 { left: 508px; top: 304px; width: 96px; height: 96px; }
+      #b16 { left: 629px; top: 190px; width: 92px; height: 92px; }
+      #b17 { left: 1214px; top: 204px; width: 94px; height: 94px; }
+      #b18 { left: 1358px; top: 341px; width: 90px; height: 90px; }
+      #b19 { left: 1357px; top: 605px; width: 100px; height: 100px; }
+      #b20 { left: 1182px; top: 761px; width: 96px; height: 96px; }
+      #b21 { left: 930px; top: 819px; width: 92px; height: 92px; }
+      #b22 { left: 671px; top: 782px; width: 88px; height: 88px; }
       #s5m-center {
-        position: absolute; left: 770px; top: 360px; width: 380px; height: 380px;
+        position: absolute; left: 790px; top: 350px; width: 340px; height: 340px;
         border-radius: 50%; background-color: #131210; border: 2px solid #34302B;
         display: flex; align-items: center; justify-content: center; z-index: 5;
         box-shadow: 0 18px 60px rgba(0,0,0,0.5);
@@ -241,11 +253,11 @@
       }
       .morph-item img { width: 105px; height: 105px; object-fit: contain; }
       .morph-item .mn-t {
-        font-family: "Space Grotesk", sans-serif; font-size: 38px; font-weight: 600;
+        font-family: "DM Sans", sans-serif; font-size: 38px; font-weight: 600;
         color: #EDE9E3; letter-spacing: -0.01em;
       }
       .morph-item .mn-big {
-        font-family: "Space Grotesk", sans-serif; font-size: 58px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 58px; font-weight: 700;
         color: #EDE9E3; letter-spacing: -0.02em;
       }
       #s5m-argens {
@@ -254,20 +266,21 @@
       }
       #s5m-argens img { width: 118px; height: 125px; }
       #s5m-argens span {
-        font-family: "Space Grotesk", sans-serif; font-size: 62px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 62px; font-weight: 700;
         letter-spacing: -0.03em; color: #EDE9E3;
       }
       #s5m-cap {
-        position: absolute; left: 0; top: 1022px; width: 1920px; text-align: center;
-        font-family: "JetBrains Mono", monospace; font-size: 18px; letter-spacing: 0.1em;
-        text-transform: uppercase; color: #706B65;
+        position: absolute; left: 0; top: 968px; width: 1920px; text-align: center;
+        font-family: "DM Sans", sans-serif; font-size: 44px; font-weight: 700;
+        letter-spacing: -0.02em; color: #EDE9E3;
       }
+      #s5m-cap .g { color: #C5A253; }
 
       /* ── scene 6x · cross-chain ──────────────────────────────── */
       #s6x-kick { position: absolute; left: 0; top: 108px; width: 1920px; text-align: center; }
       #s6x-head {
         position: absolute; left: 160px; top: 158px; width: 1600px; text-align: center;
-        font-family: "Space Grotesk", sans-serif; font-size: 104px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 104px; font-weight: 700;
         letter-spacing: -0.03em; color: #EDE9E3; line-height: 1.05;
       }
       #s6x-sub {
@@ -281,7 +294,7 @@
         box-shadow: 0 14px 48px rgba(0,0,0,0.5);
       }
       .xnode .nm {
-        font-family: "Space Grotesk", sans-serif; font-size: 27px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 27px; font-weight: 700;
         letter-spacing: 0.02em; color: #EDE9E3;
       }
       .xnode .sb {
@@ -345,7 +358,7 @@
       #s7-logo { display: flex; align-items: center; gap: 10px; }
       #s7-logo img { width: 30px; height: 32px; }
       #s7-logo span {
-        font-family: "Space Grotesk", sans-serif; font-size: 27px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 27px; font-weight: 700;
         letter-spacing: -0.025em; color: #EDE9E3;
       }
       #s7-balchip {
@@ -357,7 +370,7 @@
         text-transform: uppercase; color: #706B65;
       }
       #s7-balchip .amt {
-        margin-top: 6px; font-family: "Space Grotesk", sans-serif;
+        margin-top: 6px; font-family: "DM Sans", sans-serif;
         font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #EDE9E3;
       }
       #s7-balchip .sub { margin-top: 4px; font-size: 14px; color: #706B65; }
@@ -378,7 +391,7 @@
         display: flex; align-items: center; padding: 0 44px;
       }
       #s7-top .t {
-        font-family: "Space Grotesk", sans-serif; font-size: 28px; font-weight: 600;
+        font-family: "DM Sans", sans-serif; font-size: 28px; font-weight: 600;
         letter-spacing: -0.015em; color: #EDE9E3;
       }
       #s7-top .s { margin-left: 18px; font-size: 18px; color: #706B65; }
@@ -392,7 +405,7 @@
         text-transform: uppercase; color: #706B65;
       }
       .pcard .val {
-        margin-top: 12px; font-family: "Space Grotesk", sans-serif;
+        margin-top: 12px; font-family: "DM Sans", sans-serif;
         font-size: 46px; font-weight: 700; letter-spacing: -0.02em; color: #EDE9E3;
       }
       .pcard .note { margin-top: 8px; font-size: 16px; color: #706B65; }
@@ -400,7 +413,7 @@
       #s7-save {
         position: absolute; right: 0px; top: -62px;
         background-color: #C5A253; color: #0C0B0A; border-radius: 8px;
-        padding: 12px 26px; font-family: "Space Grotesk", sans-serif;
+        padding: 12px 26px; font-family: "DM Sans", sans-serif;
         font-size: 19px; font-weight: 600;
       }
       #s7-toast {
@@ -446,13 +459,13 @@
       #s8-mark { position: absolute; left: 895px; top: 185px; width: 130px; height: 138px; }
       #s8-head {
         position: absolute; left: 160px; top: 370px; width: 1600px; text-align: center;
-        font-family: "Space Grotesk", sans-serif; font-size: 112px; font-weight: 700;
+        font-family: "DM Sans", sans-serif; font-size: 112px; font-weight: 700;
         letter-spacing: -0.03em; color: #EDE9E3; line-height: 1.06;
       }
       #s8-pill {
         position: absolute; left: 50%; top: 660px; margin-left: -290px; width: 580px;
         padding: 30px 0; text-align: center; background-color: #C5A253;
-        border-radius: 60px; font-family: "Space Grotesk", sans-serif;
+        border-radius: 60px; font-family: "DM Sans", sans-serif;
         font-size: 38px; font-weight: 600; letter-spacing: -0.01em; color: #0C0B0A;
         box-shadow: 0 22px 70px rgba(0,0,0,0.45);
       }
@@ -725,6 +738,15 @@
           <div class="bub" id="b11"><span class="mg">T</span><span class="bn">Together</span></div>
           <div class="bub" id="b12"><img src="logos/ollama.svg" alt="" /><span class="bn">Ollama</span></div>
           <div class="bub" id="b13"><img src="logos/googlegemini.svg" alt="" /><span class="bn">Gemini</span></div>
+          <div class="bub sm" id="b14"><span class="mg">S</span><span class="bn">Stability</span></div>
+          <div class="bub sm" id="b15"><span class="mg">C</span><span class="bn">Cohere</span></div>
+          <div class="bub sm" id="b16"><span class="mg">f</span><span class="bn">fal</span></div>
+          <div class="bub sm" id="b17"><span class="mg">R</span><span class="bn">Runway</span></div>
+          <div class="bub sm" id="b18"><span class="mg">T</span><span class="bn">Tavily</span></div>
+          <div class="bub sm" id="b19"><span class="mg">A</span><span class="bn">AssemblyAI</span></div>
+          <div class="bub sm" id="b20"><span class="mg">F</span><span class="bn">Firecrawl</span></div>
+          <div class="bub sm" id="b21"><span class="mg">S</span><span class="bn">Serper</span></div>
+          <div class="bub sm" id="b22"><span class="mg">B</span><span class="bn">Browserbase</span></div>
           <div id="s5m-center">
             <div class="morph-item" id="mc1"><span class="mn-big">OpenAI</span></div>
             <div class="morph-item" id="mc2"><img src="logos/anthropic.svg" alt="" /><span class="mn-t">Anthropic</span></div>
@@ -735,7 +757,7 @@
             <div id="s5m-argens"><img src="argens-icon.svg" alt="" /><span>argens</span></div>
           </div>
         </div>
-        <div id="s5m-cap">86 providers · 493 endpoints · one wallet · one balance</div>
+        <div id="s5m-cap">80+ services on argens. <span class="g">Pay as you use.</span></div>
       </div>
 
       <!-- ════ SCENE 6x · cross-chain (30.4–38.6s) ════ -->
@@ -987,30 +1009,41 @@
       tl.fromTo("#mc5", { opacity: 0, scale: 1.14 }, { opacity: 1, scale: 1, duration: 0.2, ease: "power2.out" }, 25.5);
       tl.set("#mc5", { opacity: 0 }, 26.05);
       tl.fromTo("#mc6", { opacity: 0, scale: 1.14 }, { opacity: 1, scale: 1, duration: 0.2, ease: "power2.out" }, 26.05);
-      // zoom out, scatter the cluster into view
+      // zoom out — the services gather around argens
       tl.to("#s5m-wrap", { scale: 1.0, duration: 0.95, ease: "power2.inOut" }, 27.0);
-      tl.fromTo("#b2",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 27.55);
-      tl.fromTo("#b1",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 27.7);
-      tl.fromTo("#b3",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 27.85);
-      tl.fromTo("#b12", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.0);
-      tl.fromTo("#b4",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.15);
-      tl.fromTo("#b5",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.3);
-      tl.fromTo("#b10", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.45);
-      tl.fromTo("#b6",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.6);
-      tl.fromTo("#b11", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.72);
-      tl.fromTo("#b7",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.84);
-      tl.fromTo("#b9",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 28.96);
-      tl.fromTo("#b8",  { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 29.08);
-      tl.fromTo("#b13", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.34, ease: "back.out(2.2)" }, 29.2);
+      tl.fromTo("#b1", { opacity: 0, scale: 0.6, x: -165, y: 22 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.45);
+      tl.fromTo("#b2", { opacity: 0, scale: 0.6, x: -170, y: -37 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.52);
+      tl.fromTo("#b3", { opacity: 0, scale: 0.6, x: -143, y: 70 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.6);
+      tl.fromTo("#b4", { opacity: 0, scale: 0.6, x: 158, y: 34 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.67);
+      tl.fromTo("#b5", { opacity: 0, scale: 0.6, x: -117, y: -91 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.75);
+      tl.fromTo("#b6", { opacity: 0, scale: 0.6, x: -19, y: -119 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.82);
+      tl.fromTo("#b7", { opacity: 0, scale: 0.6, x: 61, y: -120 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.9);
+      tl.fromTo("#b8", { opacity: 0, scale: 0.6, x: 127, y: -74 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 27.97);
+      tl.fromTo("#b9", { opacity: 0, scale: 0.6, x: 177, y: -23 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.05);
+      tl.fromTo("#b10", { opacity: 0, scale: 0.6, x: 119, y: 96 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.12);
+      tl.fromTo("#b11", { opacity: 0, scale: 0.6, x: 38, y: 115 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.2);
+      tl.fromTo("#b12", { opacity: 0, scale: 0.6, x: -27, y: 128 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.27);
+      tl.fromTo("#b13", { opacity: 0, scale: 0.6, x: -82, y: 98 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.35);
+      tl.fromTo("#b14", { opacity: 0, scale: 0.6, x: -232, y: 70 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.42);
+      tl.fromTo("#b15", { opacity: 0, scale: 0.6, x: -222, y: -92 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.5);
+      tl.fromTo("#b16", { opacity: 0, scale: 0.6, x: -157, y: -156 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.57);
+      tl.fromTo("#b17", { opacity: 0, scale: 0.6, x: 165, y: -148 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.65);
+      tl.fromTo("#b18", { opacity: 0, scale: 0.6, x: 244, y: -74 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.72);
+      tl.fromTo("#b19", { opacity: 0, scale: 0.6, x: 246, y: 74 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.8);
+      tl.fromTo("#b20", { opacity: 0, scale: 0.6, x: 148, y: 159 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.87);
+      tl.fromTo("#b21", { opacity: 0, scale: 0.6, x: 9, y: 190 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 28.95);
+      tl.fromTo("#b22", { opacity: 0, scale: 0.6, x: -135, y: 168 }, { opacity: 1, scale: 1, x: 0, y: 0, duration: 0.5, ease: "back.out(1.7)" }, 29.02);
       // the morphing bubble lands as argens — bigger than everything around it
       tl.set("#mc6", { opacity: 0 }, 27.9);
       tl.fromTo("#s5m-argens", { opacity: 0, scale: 0.75 }, { opacity: 1, scale: 1, duration: 0.45, ease: "back.out(1.9)" }, 27.9);
-      tl.to("#s5m-center", { scale: 1.12, duration: 0.5, ease: "back.out(1.6)" }, 28.0);
+      tl.to("#s5m-center", { scale: 1.06, duration: 0.5, ease: "back.out(1.6)" }, 28.0);
       // gentle float on a few bubbles while we hold
       tl.to("#b4", { y: -9, duration: 1.0, ease: "sine.inOut", yoyo: true, repeat: 1 }, 29.4);
       tl.to("#b7", { y: -7, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: 1 }, 29.55);
       tl.to("#b1", { y: -6, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: 1 }, 29.5);
-      tl.fromTo("#s5m-cap", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: "sine.out" }, 29.3);
+      tl.to("#b19", { y: -7, duration: 0.85, ease: "sine.inOut", yoyo: true, repeat: 1 }, 29.6);
+      tl.to("#b16", { y: -5, duration: 0.75, ease: "sine.inOut", yoyo: true, repeat: 1 }, 29.45);
+      tl.fromTo("#s5m-cap", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: "sine.out" }, 29.45);
       // transition out — vertical push up
       tl.to("#s5m", { y: -1080, duration: 0.6, ease: "power3.inOut" }, 30.4);
 

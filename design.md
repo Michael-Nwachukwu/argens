@@ -62,7 +62,7 @@ Neither element is ever recoloured. Do not apply filters, opacity, or colour ove
 | `md`      | 20      | 18        |
 | `lg`      | 22      | 22        |
 
-Font: **Space Grotesk 700**, `letter-spacing: -0.025em`, colour `var(--text)`.  
+Font: **DM Sans 700**, `letter-spacing: -0.025em`, colour `var(--text)`.  
 Gap between mark and wordmark: `7px`.
 
 ### Voice in UI
@@ -138,7 +138,7 @@ Three font families. Loaded from Google Fonts in `globals.css`.
 
 | Role       | Family                        | CSS variable      | Weights used   |
 |------------|-------------------------------|-------------------|----------------|
-| Heading    | Space Grotesk                 | `var(--font-head)`| 400, 500, 600, 700 |
+| Heading    | DM Sans                 | `var(--font-head)`| 400, 500, 600, 700 |
 | Body       | Inter                         | `var(--font-body)`| 400, 500, 600  |
 | Monospace  | JetBrains Mono                | `var(--font-mono)`| 400, 500       |
 
@@ -146,23 +146,23 @@ Three font families. Loaded from Google Fonts in `globals.css`.
 
 | Role                    | Font            | Size   | Weight | Tracking        |
 |-------------------------|-----------------|--------|--------|-----------------|
-| Display / hero          | Space Grotesk   | 48–64px| 700    | `-0.03em`       |
-| Page heading (H1)       | Space Grotesk   | 32–40px| 700    | `-0.03em`       |
-| Card heading / TopBar   | Space Grotesk   | 18px   | 600    | `-0.015em`      |
-| Section label           | Space Grotesk   | 16–17px| 600–700| `-0.01em`       |
+| Display / hero          | DM Sans   | 48–64px| 700    | `-0.03em`       |
+| Page heading (H1)       | DM Sans   | 32–40px| 700    | `-0.03em`       |
+| Card heading / TopBar   | DM Sans   | 18px   | 600    | `-0.015em`      |
+| Section label           | DM Sans   | 16–17px| 600–700| `-0.01em`       |
 | Body text               | Inter           | 13–14px| 400    | `normal`        |
 | Secondary body          | Inter           | 13px   | 400    | `normal`        |
 | Mono label / code       | JetBrains Mono  | 11–13px| 400    | `0.02–0.06em`   |
 | Uppercase tag / badge   | JetBrains Mono  | 10–11px| 400–500| `0.04–0.10em`   |
-| Balance display         | Space Grotesk   | 20px   | 700    | `-0.02em`       |
-| Large balance / stat    | Space Grotesk   | 28–32px| 700    | `-0.03em`       |
+| Balance display         | DM Sans   | 20px   | 700    | `-0.02em`       |
+| Large balance / stat    | DM Sans   | 28–32px| 700    | `-0.03em`       |
 
 ### Rules
 
 - Page `font-size` base: `16px`. `line-height: 1.6`.
 - `-webkit-font-smoothing: antialiased` on `html`.
 - Uppercase text always uses JetBrains Mono + `letter-spacing: 0.06em+`.
-- `letter-spacing` is always negative on Space Grotesk headings — this is intentional and should not be removed.
+- `letter-spacing` is always negative on DM Sans headings — this is intentional and should not be removed.
 
 ---
 

@@ -29,7 +29,7 @@ colors:
 
 typography:
   fonts:
-    head: "Space Grotesk"           # 400 / 500 / 600 / 700
+    head: "DM Sans"           # 400 / 500 / 600 / 700
     body: "Inter"                   # 400 / 500 / 600
     mono: "JetBrains Mono"          # 400 / 500
 
@@ -269,7 +269,7 @@ A video-first companion to `design.md`. Argens is an **agent-custodial** crypto-
 
 ## Overview
 
-Argens at frame scale is **dark, precise, and laconic**. The page ground (`{colors.bg}` #0C0B0A) carries 80–90% of pixels; gold (`{colors.accent}` #C5A253) is the brand's only voltage and fires **once per frame** — a slash, a pill, an active rule, a numeral. Headings sit in Space Grotesk with negative tracking; labels sit in JetBrains Mono with +0.06em uppercase tracking. There is no second hue. There is no decorative gradient (the radial gold glow from the landing page is a chrome flourish, not a frame motif).
+Argens at frame scale is **dark, precise, and laconic**. The page ground (`{colors.bg}` #0C0B0A) carries 80–90% of pixels; gold (`{colors.accent}` #C5A253) is the brand's only voltage and fires **once per frame** — a slash, a pill, an active rule, a numeral. Headings sit in DM Sans with negative tracking; labels sit in JetBrains Mono with +0.06em uppercase tracking. There is no second hue. There is no decorative gradient (the radial gold glow from the landing page is a chrome flourish, not a frame motif).
 
 ### Frame Craft Bar
 
@@ -290,7 +290,7 @@ Tokens carry verbatim. At frame scale they obey three rules:
 
 Two ramps. The reading ramp from `design.md` survives for chrome and colophon; the **hero ramp** (`{typography.hero}`) is the frame's working register.
 
-- **Headings — Space Grotesk.** Negative tracking is non-negotiable; it is how the wordmark coheres at 30vw.
+- **Headings — DM Sans.** Negative tracking is non-negotiable; it is how the wordmark coheres at 30vw.
 - **Body — Inter, 1.6vw / 1.5 line-height.**
 - **Mono — JetBrains Mono.** Always uppercase, always tracked ≥0.06em. This is the brand's label voice — sidebar headers, badge text, kicker eyebrows.
 - **Legibility floor — 1.4vw (≈27px @1920).** Any load-bearing line meets the floor. Sizes below 1.4vw are colophon / footnote only and may never carry a beat's meaning.
@@ -320,7 +320,7 @@ Radius scale survives verbatim. CTA geometry rule: at frame scale, the giant pil
 Frontmatter `components:` is the source of truth. Prose context follows.
 
 - **`{components.logo-mark}` / `{components.logo-mark-giant}`** — two distinct gold forms: a thick diagonal slash running **NE → SW** (upper-right to lower-left, long axis at ~120° from horizontal) occupying the upper-center-left of the mark; and a separate gold circle (diameter ≈ 35.6% of mark width) anchored at the **lower-right corner** (centre at 81% across / 77% down). There is a large visual gap (~29% of mark width) between the slash's right edge and the circle — these are **not a connected pill**. The SVG bounding box is 51.75 × 54.75 (aspect ratio 0.9452:1, slightly taller than wide). Never render in a square container; always preserve `width: {width}` and `height: {height}` separately. The giant variant carries the cover treatment.
-- **`{components.wordmark-mega}`** — Space Grotesk 700 at `{typography.hero.wordmark-mega}` (30vw). The brand's signature monumental gesture. One per sequence, maximum.
+- **`{components.wordmark-mega}`** — DM Sans 700 at `{typography.hero.wordmark-mega}` (30vw). The brand's signature monumental gesture. One per sequence, maximum.
 - **`{components.button-primary-giant}`** — the closer's accent pill. Gold fill, dark text, fully round at scale. Construction not in tokens: cursor pointer behaviour is irrelevant; what matters is that the pill is **the only saturated gold** when it appears.
 - **`{components.balance-chip-giant}`** — the focal-artifact plate's hero. Bg3 inset, hairline border, mono uppercase label above an `{components.amount-string}` numeral. Construction: a 1px `{colors.border}` divider sits between label and amount on the giant variant only (web variant skips this).
 - **`{components.amount-string}`** — always two decimals, currency suffix in mono ("USDC", "USD"), never the bare number. When the value is loading: em-dash `—` in `{colors.muted}`. Never expose API 7-decimal raw values.
@@ -474,7 +474,7 @@ Run before finalizing any frame:
 - [ ] **Squint** — exactly one element dominates at 3–6× its nearest neighbour.
 - [ ] **Silence** — sparse plate reads 55–75% empty (ledger exempt and declared).
 - [ ] **Restraint** — exactly one full-strength `{colors.accent}` placement; echoes use `accent-low` / `accent-mid`.
-- [ ] **Weight** — Space Grotesk heads carry negative tracking; mono labels carry +0.06em uppercase.
+- [ ] **Weight** — DM Sans heads carry negative tracking; mono labels carry +0.06em uppercase.
 - [ ] **Depth** — at most one `{shadows.card-rest}` lift; no glows; no radial gradient.
 - [ ] **Geometry** — radii match `{rounded}` tokens; giant pill uses `{rounded.pill}`.
 - [ ] **Anchor** — centred unless the plate is ledger or chrome; consecutive frames vary the anchor.

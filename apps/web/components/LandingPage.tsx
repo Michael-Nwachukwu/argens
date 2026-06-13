@@ -99,7 +99,7 @@ function WaitlistButton({ size = 'sm', label = 'Join the waitlist', full }: { si
       style={{
         padding: pad, borderRadius: 7, fontSize: font, fontWeight: 600,
         background: t.accent, color: t.bg, border: 'none', cursor: 'pointer',
-        fontFamily: 'Space Grotesk, sans-serif',
+        fontFamily: 'DM Sans, sans-serif',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: full ? '100%' : undefined,
         letterSpacing: '-0.01em',
@@ -154,10 +154,10 @@ function Nav() {
               ))}
             </ul>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <a href="/login" style={{ fontSize: 13, color: t.muted, textDecoration: 'none', padding: '7px 14px', borderRadius: 7, transition: 'color 0.15s', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 500 }}>
+              <a href="/login" style={{ fontSize: 13, color: t.muted, textDecoration: 'none', padding: '7px 14px', borderRadius: 7, transition: 'color 0.15s', fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}>
                 Log in
               </a>
-              <a href="/signup" style={{ fontSize: 13, fontWeight: 600, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 7, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.01em' }}>
+              <a href="/signup" style={{ fontSize: 13, fontWeight: 600, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 7, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', letterSpacing: '-0.01em' }}>
                 Sign up
               </a>
             </div>
@@ -192,10 +192,10 @@ function Nav() {
               </a>
             ))}
             <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <a href="/signup" onClick={() => setMenuOpen(false)} style={{ display: 'block', textAlign: 'center', padding: '13px', borderRadius: 8, background: t.accent, color: t.bg, fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 600, textDecoration: 'none', letterSpacing: '-0.01em' }}>
+              <a href="/signup" onClick={() => setMenuOpen(false)} style={{ display: 'block', textAlign: 'center', padding: '13px', borderRadius: 8, background: t.accent, color: t.bg, fontFamily: 'DM Sans, sans-serif', fontSize: 15, fontWeight: 600, textDecoration: 'none', letterSpacing: '-0.01em' }}>
                 Sign up
               </a>
-              <a href="/login" onClick={() => setMenuOpen(false)} style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 8, border: `1px solid ${t.border2}`, color: t.text2, fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, textDecoration: 'none' }}>
+              <a href="/login" onClick={() => setMenuOpen(false)} style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 8, border: `1px solid ${t.border2}`, color: t.text2, fontFamily: 'DM Sans, sans-serif', fontSize: 15, textDecoration: 'none' }}>
                 Log in
               </a>
               <WaitlistButton size="lg" full label="Join the waitlist" />
@@ -457,14 +457,14 @@ function Hero() {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block', animation: 'glow 2s infinite alternate' }}/>
               Live on Stellar mainnet
             </div>
-            <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(36px, 5.5vw, 72px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 22, animation: 'fadeInUp 0.6s 0.18s both ease-out' }}>
+            <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(36px, 5.5vw, 72px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 22, animation: 'fadeInUp 0.6s 0.18s both ease-out' }}>
               Give your AI agent the ability to pay.
             </h1>
             <p style={{ fontSize: 17, lineHeight: 1.75, color: t.text2, marginBottom: 32, maxWidth: 420, animation: 'fadeInUp 0.6s 0.26s both ease-out' }}>
               A programmable USDC wallet and AI service marketplace for autonomous agents. One API key — your agent pays, calls 20+ services, and operates within the limits you set.
             </p>
             <div className="lp-hero-cta" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', animation: 'fadeInUp 0.6s 0.34s both ease-out' }}>
-              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 28px', borderRadius: 7, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.01em' }}>
+              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 28px', borderRadius: 7, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', letterSpacing: '-0.01em' }}>
                 Sign up →
               </a>
               <WaitlistButton size="lg" label="Join the waitlist" />
@@ -481,7 +481,7 @@ function Hero() {
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
                   {i > 0 && <div className="lp-stat-div" style={{ width: 1, height: 30, background: t.border }}/>}
                   <div>
-                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: t.accent }}>{s.v}</div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 16, color: t.accent }}>{s.v}</div>
                     <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{s.l}</div>
                   </div>
                 </div>
@@ -596,7 +596,7 @@ function Problem() {
       <div className="lp-pad" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 40px' }}>
         <FadeUp>
           <div style={{ maxWidth: 680, margin: '0 auto 56px', textAlign: 'center' }}>
-            <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(20px,3vw,30px)', fontWeight: 500, lineHeight: 1.5, letterSpacing: '-0.02em', color: t.text }}>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(20px,3vw,30px)', fontWeight: 500, lineHeight: 1.5, letterSpacing: '-0.02em', color: t.text }}>
               Agents can plan, reason, and act.{' '}
               <span style={{ color: t.muted }}>But every time they need to spend money, the loop breaks. A human has to step in.</span>
             </p>
@@ -610,7 +610,7 @@ function Problem() {
             <FadeUp key={c.who} delay={i * 0.08}>
               <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, padding: 22, height: '100%', boxSizing: 'border-box' }}>
                 <div style={{ fontSize: 18, color: t.accent, marginBottom: 14, fontFamily: 'JetBrains Mono, monospace' }}>{c.icon}</div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, marginBottom: 12 }}>{c.who}</div>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, marginBottom: 12 }}>{c.who}</div>
                 <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${t.border}` }}>
                   <span style={{ color: t.error, marginRight: 6 }}>✕</span>{c.before}
                 </div>
@@ -657,7 +657,7 @@ function HowItWorks() {
         <FadeUp>
           <div style={{ marginBottom: 64 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>How it works</span>
-            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 500 }}>
+            <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 500 }}>
               From zero to autonomous<br/>agent payments in three steps.
             </h2>
           </div>
@@ -667,7 +667,7 @@ function HowItWorks() {
             <div className="lp-how-row" style={{ display: 'grid', gridTemplateColumns: '64px 1fr minmax(0,360px)', gap: 40, alignItems: 'start', padding: '36px 0', borderTop: `1px solid ${t.border}` }}>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.accent, paddingTop: 3, letterSpacing: '0.04em' }}>{s.num}</div>
               <div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 20, fontWeight: 600, letterSpacing: '-0.015em', marginBottom: 10 }}>{s.title}</div>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 20, fontWeight: 600, letterSpacing: '-0.015em', marginBottom: 10 }}>{s.title}</div>
                 <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.7, maxWidth: 400 }}>{s.desc}</p>
               </div>
               <div className="lp-how-code" style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, overflow: 'hidden', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
@@ -731,7 +731,7 @@ function Marketplace() {
                 <div style={{ width: 10, height: 10, background: t.accent, borderRadius: 2, flexShrink: 0 }}/>
                 <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>Pay-per-use marketplace</span>
               </div>
-              <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(32px,4.2vw,58px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, margin: 0, color: t.text }}>
+              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(32px,4.2vw,58px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, margin: 0, color: t.text }}>
                 40+ AI services.<br/>Zero subscriptions.
               </h2>
             </div>
@@ -741,7 +741,7 @@ function Marketplace() {
               <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, marginBottom: 22 }}>
                 Your agent calls any provider — AI models, search engines, code sandboxes, data APIs — paying per use from its Argens wallet. No separate accounts. No API keys to manage per service. No rate-limit negotiations.
               </p>
-              <a href="/services" style={{ fontSize: 14, color: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 500 }}>Browse all services →</a>
+              <a href="/services" style={{ fontSize: 14, color: t.accent, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}>Browse all services →</a>
             </div>
           </FadeUp>
         </div>
@@ -760,14 +760,14 @@ function Marketplace() {
                         {svc.cost} <span style={{ color: t.faint, fontSize: 10 }}>USDC</span>
                       </span>
                     </div>
-                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text }}>{svc.name}</div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, color: t.text }}>{svc.name}</div>
                     <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint }}>{svc.id}</div>
                     <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.55, marginTop: 2 }}>{svc.desc}</div>
                   </div>
                 )
               })}
               <div style={{ background: t.bg2, padding: '22px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 120 }}>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: t.accent }}>+35</div>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 30, color: t.accent }}>+35</div>
                 <div style={{ fontSize: 12, color: t.muted, textAlign: 'center' as const, lineHeight: 1.5 }}>more services<br/>on mainnet</div>
               </div>
             </div>
@@ -781,7 +781,7 @@ function Marketplace() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                   <div style={{ width: 10, height: 10, background: t.accent, borderRadius: 2, flexShrink: 0 }}/>
-                  <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: t.text }}>{f.title}</div>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 16, color: t.text }}>{f.title}</div>
                 </div>
                 <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.7, margin: 0, paddingLeft: 20 }}>{f.desc}</p>
               </div>
@@ -807,7 +807,7 @@ function TwoWays() {
         <FadeUp>
           <div style={{ marginBottom: 56 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Integration</span>
-            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1 }}>Two ways to integrate.</h2>
+            <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1 }}>Two ways to integrate.</h2>
             <p style={{ marginTop: 14, fontSize: 16, color: t.muted, maxWidth: 480, lineHeight: 1.7 }}>Write code for full control. Paste one line into your agent for an integration that takes under a minute.</p>
           </div>
         </FadeUp>
@@ -819,7 +819,7 @@ function TwoWays() {
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
                 </div>
                 <div>
-                  <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16 }}>Write code</div>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16 }}>Write code</div>
                   <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>REST API · any language</div>
                 </div>
               </div>
@@ -843,7 +843,7 @@ function TwoWays() {
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM5 8h6M8 5l3 3-3 3"/></svg>
                 </div>
                 <div>
-                  <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16 }}>Prompt your agent</div>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16 }}>Prompt your agent</div>
                   <div style={{ fontSize: 12, color: t.accent, marginTop: 2, fontFamily: 'monospace' }}>SKILL.md · zero install · zero SDK</div>
                 </div>
               </div>
@@ -944,7 +944,7 @@ function Policies() {
         <FadeUp>
           <div style={{ marginBottom: 56 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.muted, marginBottom: 16, display: 'block' }}>Policies</span>
-            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 520 }}>
+            <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(26px,3.5vw,48px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, maxWidth: 520 }}>
               Guardrails that run automatically,<br/>not on good intentions.
             </h2>
             <p style={{ marginTop: 16, fontSize: 16, color: t.muted, maxWidth: 500, lineHeight: 1.7 }}>
@@ -963,7 +963,7 @@ function Policies() {
             }}>
               <div style={{ width: 38, height: 38, borderRadius: 9, background: t.accentLow, border: `1px solid ${t.accentMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.accent }}>{card.icon}</div>
               <div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16, marginBottom: 6 }}>{card.title}</div>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, marginBottom: 6 }}>{card.title}</div>
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.accent, marginBottom: 10, opacity: 0.85 }}>{card.rule}</div>
                 <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.65 }}>{card.desc}</p>
               </div>
@@ -1057,7 +1057,7 @@ function CrossChain() {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0052FF', display: 'inline-block', animation: 'glow 2s infinite alternate' }}/>
               <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: '#5B8EFF', background: 'rgba(0,82,255,0.08)', border: '1px solid rgba(0,82,255,0.2)', padding: '4px 12px', borderRadius: 20, letterSpacing: '0.04em' }}>CCTP V2 · LIVE ON MAINNET</span>
             </div>
-            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(28px,4vw,52px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 16, color: t.text }}>
+            <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(28px,4vw,52px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 16, color: t.text }}>
               Pay any Base address.<br/>From Stellar, in one call.
             </h2>
             <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, maxWidth: 480, margin: '0 auto' }}>
@@ -1073,7 +1073,7 @@ function CrossChain() {
             <div style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
               <StellarSVG size={64} />
             </div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Stellar</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Stellar</div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted }}>Burn USDC</div>
           </div>
 
@@ -1088,7 +1088,7 @@ function CrossChain() {
             <div style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
               <UsdcSVG size={64} />
             </div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Circle CCTP V2</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Circle CCTP V2</div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted }}>Iris Attestation</div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.accent }}>~8–20 seconds</div>
           </div>
@@ -1104,7 +1104,7 @@ function CrossChain() {
             <div style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,82,255,0.3)' }}>
               <BaseSVG size={64} />
             </div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Base</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Base</div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted }}>Mint USDC</div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#5B8EFF' }}>native USDC</div>
           </div>
@@ -1116,7 +1116,7 @@ function CrossChain() {
 
           <FadeUp delay={0.06}>
             <div>
-              <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, marginBottom: 14, color: t.text }}>One request. Argens handles the rest.</div>
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, marginBottom: 14, color: t.text }}>One request. Argens handles the rest.</div>
               <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>
                 <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.border}`, background: t.bg, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {[0,1,2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#3A3733' }}/>)}
@@ -1154,7 +1154,7 @@ function CrossChain() {
                     color: '#5B8EFF', fontSize: 15,
                   }}>{f.icon}</div>
                   <div>
-                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, marginBottom: 4, color: t.text }}>{f.title}</div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, marginBottom: 4, color: t.text }}>{f.title}</div>
                     <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.65 }}>{f.desc}</div>
                   </div>
                 </div>
@@ -1205,7 +1205,7 @@ function ShowcaseCard({ project, index }: { project: ShowcaseProject; index: num
             />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${t.bg3} 0%, #201E1B 100%)` }}>
-              <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 48, fontWeight: 700, color: t.faint, letterSpacing: '-0.04em', userSelect: 'none' }}>{project.name[0]}</span>
+              <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 48, fontWeight: 700, color: t.faint, letterSpacing: '-0.04em', userSelect: 'none' }}>{project.name[0]}</span>
             </div>
           )}
           {/* Bottom gradient overlay */}
@@ -1229,13 +1229,13 @@ function ShowcaseCard({ project, index }: { project: ShowcaseProject; index: num
             {project.logo ? (
               <img src={project.logo} alt={`${project.name} logo`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.accentLow, color: t.accent, fontFamily: 'Space Grotesk, sans-serif', fontSize: 16, fontWeight: 700 }}>
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.accentLow, color: t.accent, fontFamily: 'DM Sans, sans-serif', fontSize: 16, fontWeight: 700 }}>
                 {project.name[0]}
               </div>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: t.text, lineHeight: 1.3 }}>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: t.text, lineHeight: 1.3 }}>
               {project.name}
             </div>
             <svg style={{ flexShrink: 0, marginTop: 2, color: hovered ? t.accent : t.muted, transition: 'color 0.15s' }} width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -1307,7 +1307,7 @@ function Showcase() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block' }} />
                 Built with Argens
               </div>
-              <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(26px,3.5vw,40px)', fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.1, color: t.text, margin: 0, maxWidth: 480 }}>
+              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(26px,3.5vw,40px)', fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.1, color: t.text, margin: 0, maxWidth: 480 }}>
                 Products shipping<br />on Argens
               </h2>
               <p style={{ fontSize: 15, color: t.muted, lineHeight: 1.7, marginTop: 14, marginBottom: 0, maxWidth: 460 }}>
@@ -1366,14 +1366,14 @@ function CtaFooter() {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block', animation: 'glow 2s infinite alternate' }}/>
               Early access — mainnet live
             </div>
-            <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(32px,5vw,60px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 20, color: t.text }}>
+            <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(32px,5vw,60px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 20, color: t.text }}>
               Your agent is waiting<br/>to pay its first bill.
             </h2>
             <p style={{ fontSize: 17, color: t.muted, lineHeight: 1.75, marginBottom: 40, maxWidth: 460, margin: '0 auto 40px' }}>
               A wallet, a policy engine, and a marketplace of 40+ AI services — all behind one API key. Request access and put your agent to work.
             </p>
             <div className="lp-cta-btns" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
-              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 32px', borderRadius: 8, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.01em' }}>
+              <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 32px', borderRadius: 8, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', letterSpacing: '-0.01em' }}>
                 Sign up →
               </a>
               <WaitlistButton size="lg" label="Join the waitlist" />

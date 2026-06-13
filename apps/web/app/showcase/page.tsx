@@ -66,7 +66,7 @@ function ShowcaseCard({ project }: { project: ShowcaseProject }) {
           />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${t.bg3} 0%, #201E1B 100%)` }}>
-            <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 56, fontWeight: 700, color: t.faint, letterSpacing: '-0.04em', userSelect: 'none' }}>{project.name[0]}</span>
+            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 56, fontWeight: 700, color: t.faint, letterSpacing: '-0.04em', userSelect: 'none' }}>{project.name[0]}</span>
           </div>
         )}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, background: `linear-gradient(to top, ${t.bg2}, transparent)`, pointerEvents: 'none' }} />
@@ -83,13 +83,13 @@ function ShowcaseCard({ project }: { project: ShowcaseProject }) {
           {project.logo ? (
             <img src={project.logo} alt={`${project.name} logo`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.accentLow, color: t.accent, fontFamily: 'Space Grotesk, sans-serif', fontSize: 16, fontWeight: 700 }}>
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.accentLow, color: t.accent, fontFamily: 'DM Sans, sans-serif', fontSize: 16, fontWeight: 700 }}>
               {project.name[0]}
             </div>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8, marginTop: 8 }}>
-          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em', color: t.text, lineHeight: 1.3 }}>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em', color: t.text, lineHeight: 1.3 }}>
             {project.name}
           </div>
           <svg style={{ flexShrink: 0, marginTop: 2, color: hovered ? t.accent : t.muted, transition: 'color 0.15s' }} width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -169,7 +169,7 @@ export default function ShowcasePage() {
         <Logo />
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <Link href="/" style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>← Back</Link>
-          <Link href="/signup" style={{ padding: '7px 16px', background: t.accent, borderRadius: 7, fontSize: 13, fontWeight: 600, color: t.bg, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif' }}>
+          <Link href="/signup" style={{ padding: '7px 16px', background: t.accent, borderRadius: 7, fontSize: 13, fontWeight: 600, color: t.bg, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>
             Get started
           </Link>
         </div>
@@ -185,7 +185,7 @@ export default function ShowcasePage() {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, flexShrink: 0 }} />
             Built with Argens
           </div>
-          <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(32px,5vw,56px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, margin: '0 0 18px', color: t.text }}>
+          <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(32px,5vw,56px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, margin: '0 0 18px', color: t.text }}>
             Products shipping<br />on Argens
           </h1>
           <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, margin: '0 0 28px', maxWidth: 480, marginInline: 'auto' }}>
@@ -195,7 +195,7 @@ export default function ShowcasePage() {
             data-tally-open={TALLY_SHOWCASE_ID}
             data-tally-layout="modal"
             data-tally-width="480"
-            style={{ padding: '10px 22px', borderRadius: 8, border: `1px solid ${t.border2}`, background: 'transparent', color: t.text2, cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}
+            style={{ padding: '10px 22px', borderRadius: 8, border: `1px solid ${t.border2}`, background: 'transparent', color: t.text2, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}
           >
             Submit your project →
           </button>
@@ -251,10 +251,10 @@ export default function ShowcasePage() {
           {/* Submit CTA */}
           <div style={{ marginTop: 64, padding: '32px 36px', background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 16, fontWeight: 600, marginBottom: 6, color: t.text }}>Built something with Argens?</div>
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 16, fontWeight: 600, marginBottom: 6, color: t.text }}>Built something with Argens?</div>
               <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>Ship it here. Send us a note with your project name, a short description, and a thumbnail.</div>
             </div>
-            <a href="mailto:hello@argens.io?subject=Showcase submission" style={{ padding: '10px 22px', background: t.accent, borderRadius: 8, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, fontWeight: 600, color: t.bg, textDecoration: 'none', flexShrink: 0 }}>
+            <a href="mailto:hello@argens.io?subject=Showcase submission" style={{ padding: '10px 22px', background: t.accent, borderRadius: 8, fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 600, color: t.bg, textDecoration: 'none', flexShrink: 0 }}>
               Submit your project →
             </a>
           </div>
