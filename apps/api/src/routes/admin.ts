@@ -18,6 +18,7 @@
 import { type Router, type Request, type Response, type NextFunction } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { z } from 'zod'
+import { timingSafeEqual, createHash } from 'crypto'
 import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
@@ -32,6 +33,12 @@ export const adminRouter: Router = ExpressRouter()
 
 // ─── Admin auth middleware ─────────────────────────────────────────────────────
 
+export function secretsMatch(provided: string, expected: string): boolean {
+  const a = createHash('sha256').update(provided).digest()
+  const b = createHash('sha256').update(expected).digest()
+  return timingSafeEqual(a, b)
+}
+
 function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const expected = process.env['ADMIN_SECRET']
   if (!expected) {
@@ -40,7 +47,7 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
     return
   }
   const provided = req.header('x-admin-secret')
-  if (!provided || provided !== expected) {
+  if (!provided || !secretsMatch(provided, expected)) {
     sendError(res, 'Unauthorized.', 'UNAUTHORIZED', 401)
     return
   }
@@ -351,7 +358,17 @@ adminRouter.get('/users/:userId', async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        wallet: true,
+        wallet: {
+          select: {
+            id: true,
+            stellarPublicKey: true,
+            status: true,
+            balanceCache: true,
+            balanceCachedAt: true,
+            creditsGranted: true,
+            createdAt: true,
+          },
+        },
         policies: true,
         creditGrants: { orderBy: [{ createdAt: 'desc' }], take: 20 },
         _count: { select: { transactions: true } },

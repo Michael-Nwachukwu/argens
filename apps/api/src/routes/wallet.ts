@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { getUsdcBalance, getXlmBalance, isStellarAddress, validateMemo, fundNewAccount, createUsdcTrustline } from '../services/stellar.js'
+import { getUsdcBalance, getXlmBalance, getAccountBalances, isStellarAddress, validateMemo, fundNewAccount, createUsdcTrustline } from '../services/stellar.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
 import { getActiveCreditsBalance } from '../services/credits.js'
@@ -72,24 +72,27 @@ walletRouter.get('/wallet/balance', requireJwtOrApiKey, async (req, res, next) =
     let balance: string
     let cachedAt: string
 
+    let xlmBalance: string | null = null
+
     if (cacheAge < CACHE_TTL_MS) {
-      // Serve from cache
+      // Serve USDC from cache; XLM isn't cached so still fetch it separately
       balance = wallet.balanceCache.toFixed(7)
       cachedAt = wallet.balanceCachedAt!.toISOString()
+      xlmBalance = await getXlmBalance(wallet.stellarPublicKey).catch(() => null)
     } else {
-      // Fetch live from Horizon and refresh cache
+      // Fetch both balances with a single Horizon loadAccount call
       try {
-        const live = await getUsdcBalance(wallet.stellarPublicKey)
-        if (live !== null) {
+        const balances = await getAccountBalances(wallet.stellarPublicKey)
+        if (balances !== null) {
           await prisma.wallet.update({
             where: { id: wallet.id },
-            data: { balanceCache: live, balanceCachedAt: now },
+            data: { balanceCache: balances.usdc, balanceCachedAt: now },
           })
-          balance = live
+          balance = balances.usdc
+          xlmBalance = balances.xlm
           cachedAt = now.toISOString()
         } else {
-          // Account doesn't exist on this network (e.g. testnet wallet on mainnet config)
-          // Reset cache to 0 so stale data isn't served on the next cached read
+          // Account doesn't exist on this network — reset cache to 0
           await prisma.wallet.update({
             where: { id: wallet.id },
             data: { balanceCache: 0, balanceCachedAt: now },
@@ -105,10 +108,9 @@ walletRouter.get('/wallet/balance', requireJwtOrApiKey, async (req, res, next) =
         })
         balance = wallet.balanceCache.toFixed(7)
         cachedAt = wallet.balanceCachedAt?.toISOString() ?? now.toISOString()
+        xlmBalance = await getXlmBalance(wallet.stellarPublicKey).catch(() => null)
       }
     }
-
-    const xlmBalance = await getXlmBalance(wallet.stellarPublicKey).catch(() => null)
     const credits = await getActiveCreditsBalance(userId).catch(() => null)
 
     sendSuccess(res, {

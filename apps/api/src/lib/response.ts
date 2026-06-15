@@ -3,7 +3,7 @@ import { Decimal } from '@prisma/client/runtime/library'
 
 // Recursively convert Prisma Decimal objects to 7dp strings for JSON output.
 // This ensures no floating-point values ever leave the API.
-function serializeDecimals(value: unknown): unknown {
+export function serializeDecimals(value: unknown): unknown {
   if (value instanceof Decimal) return value.toFixed(7)
   if (value instanceof Date) return value.toISOString()
   if (Array.isArray(value)) return value.map(serializeDecimals)

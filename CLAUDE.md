@@ -909,6 +909,8 @@ First failure stops processing immediately. Checks run in this order:
 
 `policy.totalSpent` tracks the **requested amount only**. There is no Argens fee on direct payments — nothing else to exclude.
 
+**Reservation semantics (implemented in `services/policy.ts`).** `checkPolicyAndReserve` atomically checks policy AND increments `totalSpent` in a single `Serializable` transaction so concurrent payments cannot both pass the allowance check independently. The increment happens at check time, not at Stellar submission time. If Stellar submission fails, `releaseSpend` decrements `totalSpent` as a compensating write. For CCTP cross-chain payments via `POST /pay`, the reservation is made at check time (`incrementOnSuccess: false` in the relay executor). For CCTP payments routed through the approval flow (`POST /approve/:token`), `totalSpent` is incremented inside the relay executor on SUCCESS (`incrementOnSuccess: true`). Do not add a second `incrementTotalSpent` call in either path — the relay executor (`services/cctp-relay.ts`) owns that call.
+
 ---
 
 ## Notifications

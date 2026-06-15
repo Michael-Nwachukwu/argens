@@ -7,7 +7,10 @@
     "dev:web": "pnpm --filter @argens/web dev",
     "build:api": "pnpm --filter @argens/api build",
     "db:migrate": "pnpm --filter @argens/api db:migrate",
-    "db:studio": "pnpm --filter @argens/api db:studio"
+    "db:studio": "pnpm --filter @argens/api db:studio",
+    "typecheck": "pnpm --filter @argens/api exec tsc --noEmit",
+    "test": "pnpm --filter @argens/api test",
+    "verify": "pnpm typecheck && pnpm test"
   },
   "engines": {
     "node": ">=20.0.0",

@@ -154,6 +154,34 @@ export async function getXlmBalance(publicKey: string): Promise<string | null> {
   }
 }
 
+/**
+ * Fetch USDC and XLM balances with a single Horizon loadAccount call.
+ * Returns null when the account doesn't exist on this network (404).
+ * Throws StellarError for genuine connectivity failures.
+ */
+export async function getAccountBalances(
+  publicKey: string,
+): Promise<{ usdc: string; xlm: string } | null> {
+  try {
+    const account = await server.loadAccount(publicKey)
+    const usdcBalance = account.balances.find(
+      (b) =>
+        b.asset_type === 'credit_alphanum4' &&
+        (b as Horizon.HorizonApi.BalanceLineAsset).asset_code === 'USDC' &&
+        (b as Horizon.HorizonApi.BalanceLineAsset).asset_issuer === USDC_ISSUER,
+    )
+    const native = account.balances.find((b) => b.asset_type === 'native')
+    return {
+      usdc: usdcBalance?.balance ?? '0.0000000',
+      xlm: native?.balance ?? '0.0000000',
+    }
+  } catch (e) {
+    const status = (e as { response?: { status?: number } }).response?.status
+    if (status === 404) return null
+    throw new StellarError('Failed to fetch balances', { publicKey, error: (e as Error).message })
+  }
+}
+
 // ─── Address validation helpers ────────────────────────────────────────────────
 export function isStellarAddress(address: string): boolean {
   return address.startsWith('G') && address.length === 56

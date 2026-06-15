@@ -20,19 +20,18 @@ import { AppError, NotFoundError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
-import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
+import { checkPolicy, checkPolicyAndReserve, releaseSpend, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
 import { isStellarAddress, isEvmAddress, validateMemo, getUsdcBalance } from '../services/stellar.js'
 import {
   burnUsdcOnStellar,
   encodeEvmRecipient,
-  pollAttestation,
-  relayOnBase,
   computeCctpFee,
   verifyCctpPreflightBalance,
   CCTP_FEE_RATE,
   BASE_DOMAIN,
 } from '../services/cctp.js'
+import { enqueueRelay } from '../services/cctp-relay.js'
 import {
   sendBlockedEmail,
   sendPendingApprovalEmail,
@@ -112,7 +111,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
       return
     }
 
-    const policyResult = await checkPolicy(userId, amount)
+    const policyResult = await checkPolicyAndReserve(userId, amount)
 
     // ── BLOCKED ─────────────────────────────────────────────────────────────
     if (policyResult.status === 'BLOCKED') {
@@ -228,6 +227,11 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         })
       } catch (stellarErr) {
         logger.error('Stellar payment failed', { userId, transactionId: tx.id, error: (stellarErr as Error).message })
+        await releaseSpend(userId, amount).catch((releaseErr: unknown) =>
+          logger.error('Failed to release reserved spend after Stellar failure', {
+            userId, transactionId: tx.id, error: (releaseErr as Error).message,
+          }),
+        )
         await prisma.transaction.update({
           where: { id: tx.id },
           data: { status: 'FAILED', blockedReason: (stellarErr as Error).message },
@@ -246,6 +250,9 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
 
       if (!feeWallet) {
         logger.error('ARGENS_FEE_WALLET not configured for CCTP fee', { userId, transactionId: tx.id })
+        await releaseSpend(userId, amount).catch((releaseErr: unknown) =>
+          logger.error('Failed to release spend on fee-wallet-missing', { userId, error: (releaseErr as Error).message }),
+        )
         await prisma.transaction.update({
           where: { id: tx.id },
           data: { status: 'FAILED', blockedReason: 'Fee wallet not configured' },
@@ -264,6 +271,9 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           code: err.code,
           error: err.message,
         })
+        await releaseSpend(userId, amount).catch((releaseErr: unknown) =>
+          logger.error('Failed to release spend on preflight failure', { userId, error: (releaseErr as Error).message }),
+        )
         await prisma.transaction.update({
           where: { id: tx.id },
           data: {
@@ -294,6 +304,9 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
       } catch (feeErr) {
         const errMsg = feeErr instanceof Error ? feeErr.message : String(feeErr)
         logger.error('CCTP fee payment failed', { userId, transactionId: tx.id, error: errMsg })
+        await releaseSpend(userId, amount).catch((releaseErr: unknown) =>
+          logger.error('Failed to release spend on fee-payment failure', { userId, error: (releaseErr as Error).message }),
+        )
         await prisma.transaction.update({
           where: { id: tx.id },
           data: { status: 'FAILED', blockedReason: `Fee payment failed: ${errMsg}` },
@@ -337,29 +350,14 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           poll_url: `/v1/transactions/${tx.id}`,
         })
 
-        // Fire-and-forget: attest + relay. Updates transaction record when done.
-        void (async () => {
-          try {
-            const { message, attestation } = await pollAttestation(stellarTxHash)
-            const { baseTxHash } = await relayOnBase(message, attestation)
-            await prisma.transaction.update({
-              where: { id: tx.id },
-              data: { status: 'SUCCESS', destinationTxHash: baseTxHash },
-            })
-            await incrementTotalSpent(userId, amount)
-            logger.info('CCTP relay complete', { txId: tx.id, baseTxHash })
-          } catch (relayErr) {
-            await prisma.transaction.update({
-              where: { id: tx.id },
-              data: { status: 'FAILED', blockedReason: (relayErr as Error).message },
-            })
-            logger.error('CCTP relay failed', { txId: tx.id, error: (relayErr as Error).message })
-          }
-        })()
+        // Spend already reserved by checkPolicyAndReserve — incrementOnSuccess: false.
+        void enqueueRelay(tx.id, { incrementOnSuccess: false })
       } catch (burnErr) {
         const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
         const errStr = String(burnErr)
         const errJson = (() => { try { return JSON.stringify(burnErr) } catch { return null } })()
+        // Burn failed after fee was sent — funds burned on Stellar, fee is gone.
+        // Do NOT release the reservation: the user was debited (fee sent) even though the burn failed.
         logger.error('CCTP burn failed after fee was taken — manual reconciliation needed', {
           userId, transactionId: tx.id, error: errMsg, raw: errStr, json: errJson, feeTxHash, feeAmount,
         })

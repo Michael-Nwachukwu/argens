@@ -50,9 +50,6 @@
   .coinballoon { position:absolute; }
   .coinballoon svg { display:block; }
 
-  /* birds = tiny chevrons */
-  .bird { position:absolute; font-family:"DM Sans"; font-weight:700; color:#7A6230; opacity:0.7; }
-
   /* headline */
   #stack { position:absolute; left:0; right:0; top:560px; text-align:center; z-index:4; }
   #h1 {
@@ -71,7 +68,6 @@
   .dune::after { content:""; position:absolute; inset:0; border-radius:inherit;
     background-image: radial-gradient(rgba(255,235,190,0.13) 2px, transparent 2px);
     background-size: 22px 22px; }
-  #dune-chev { position:absolute; left:50%; bottom:66px; transform:translateX(-50%); z-index:4; }
 
   /* grain */
   #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
@@ -99,7 +95,7 @@
         <line x1="58" y1="196" x2="98" y2="262" stroke="#5C4A22" stroke-width="4"/>
         <line x1="182" y1="196" x2="142" y2="262" stroke="#5C4A22" stroke-width="4"/>
         <rect x="92" y="258" width="56" height="48" rx="8" fill="#3A2E15"/>
-        <text x="120" y="291" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="26" fill="#E8CC85">»</text>
+        <text x="120" y="291" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="26" fill="#E8CC85">$</text>
       </svg>
     </div>
 
@@ -116,7 +112,7 @@
         <line x1="76" y1="272" x2="128" y2="372" stroke="#5C4A22" stroke-width="5"/>
         <line x1="254" y1="272" x2="202" y2="372" stroke="#5C4A22" stroke-width="5"/>
         <rect x="122" y="366" width="86" height="66" rx="10" fill="#3A2E15"/>
-        <text x="165" y="411" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="36" fill="#E8CC85">»</text>
+        <text x="165" y="411" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="36" fill="#E8CC85">$</text>
       </svg>
     </div>
 
@@ -150,10 +146,6 @@
       </svg>
     </div>
 
-    <div class="bird" style="left:560px; top:118px; font-size:30px; transform:rotate(-12deg)">»</div>
-    <div class="bird" style="left:212px; top:430px; font-size:24px; transform:rotate(8deg)">»</div>
-    <div class="bird" style="right:170px; top:560px; font-size:26px; transform:rotate(-6deg)">»</div>
-
     <div id="stack">
       <div id="h1">Payments already<br/>look easier;</div>
       <div id="h2">with Argens.</div>
@@ -163,12 +155,6 @@
       <div id="d1" class="dune"></div>
       <div id="d2" class="dune"></div>
       <div id="d3" class="dune"></div>
-      <div id="dune-chev">
-        <svg width="84" height="62" viewBox="0 0 84 62" fill="none">
-          <path d="M6 8 L30 31 L6 54" stroke="#F2EBD5" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M44 8 L68 31 L44 54" stroke="#F2EBD5" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
     </div>
 
     <div id="sc-l" class="scallop"></div>
