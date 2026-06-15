@@ -78,7 +78,7 @@ function ProviderAvatar({ name, size = 36 }: { name: string; size?: number }) {
       background: `${color}18`, border: `1px solid ${color}40`,
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     }}>
-      <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: size * 0.42, color }}>{name.charAt(0).toUpperCase()}</span>
+      <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: size * 0.42, color }}>{name.charAt(0).toUpperCase()}</span>
     </div>
   )
 }
@@ -121,7 +121,7 @@ function ProviderRow({ provider }: { provider: Provider }) {
 
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-              <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+              <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
                 {provider.name}
               </span>
               {provider.status === 'limited' && (
@@ -214,10 +214,10 @@ function ProviderRow({ provider }: { provider: Provider }) {
                 </div>
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.faint }}>← select an endpoint to preview its call payload</div>
                 <div style={{ marginTop: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' as const }}>
-                  <a href="/signup" onClick={e => e.stopPropagation()} style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 12, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 5, textDecoration: 'none' }}>Create account</a>
-                  <a href="/dashboard/marketplace" onClick={e => e.stopPropagation()} style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, color: t.text2, border: `1px solid ${t.border2}`, padding: '7px 14px', borderRadius: 5, textDecoration: 'none' }}>Dashboard →</a>
+                  <a href="/signup" onClick={e => e.stopPropagation()} style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 12, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 5, textDecoration: 'none' }}>Create account</a>
+                  <a href="/dashboard/marketplace" onClick={e => e.stopPropagation()} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: t.text2, border: `1px solid ${t.border2}`, padding: '7px 14px', borderRadius: 5, textDecoration: 'none' }}>Dashboard →</a>
                   {provider.docs_url && (
-                    <a href={provider.docs_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, color: t.muted, textDecoration: 'none' }}>Docs ↗</a>
+                    <a href={provider.docs_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: t.muted, textDecoration: 'none' }}>Docs ↗</a>
                   )}
                 </div>
               </div>
@@ -273,7 +273,7 @@ function ServicesNav() {
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <a href="/login" style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>Sign in</a>
-        <a href="/signup" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 13, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 6, textDecoration: 'none' }}>
+        <a href="/signup" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 13, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 6, textDecoration: 'none' }}>
           Get started
         </a>
       </div>
@@ -357,7 +357,7 @@ export default function ServicesPage() {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, animation: 'pulse 2s infinite' }}/>
               Mainnet live · {loading ? '…' : `${providers.length} providers`}
             </div>
-            <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 'clamp(28px,5vw,54px)', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 14, color: t.text }}>
+            <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 'clamp(28px,5vw,54px)', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 14, color: t.text }}>
               80+ AI services. One API key.
             </h1>
             <p style={{ fontSize: 16, color: t.text2, lineHeight: 1.75, maxWidth: 500, margin: '0 auto 32px' }}>
@@ -387,7 +387,7 @@ export default function ServicesPage() {
                 borderColor: category === cat ? t.accentMid : t.border,
                 background: category === cat ? t.accentLow : 'transparent',
                 color: category === cat ? t.accent : t.muted,
-                fontFamily: category === cat ? 'Space Grotesk, sans-serif' : 'Inter, sans-serif',
+                fontFamily: category === cat ? 'DM Sans, sans-serif' : 'Inter, sans-serif',
                 fontWeight: category === cat ? 600 : 400,
                 fontSize: 13, cursor: 'pointer', transition: 'all 0.15s',
               }}>{cat}</button>
@@ -405,7 +405,7 @@ export default function ServicesPage() {
                 {filtered.length} provider{filtered.length !== 1 ? 's' : ''}
                 {(search || category !== 'All') && <span style={{ color: t.faint }}> · filtered</span>}
               </span>
-              <a href="/signup" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 12, color: t.accent, textDecoration: 'none' }}>
+              <a href="/signup" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 12, color: t.accent, textDecoration: 'none' }}>
                 Create account to enable →
               </a>
             </div>
@@ -437,7 +437,7 @@ export default function ServicesPage() {
                 <div style={{ color: t.muted, fontSize: 14, fontFamily: 'Inter, sans-serif', marginBottom: 12 }}>
                   {search ? `No services match "${search}"` : `No services in "${category}"`}
                 </div>
-                <button onClick={() => { setSearch(''); setCategory('All') }} style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, color: t.accent, background: 'transparent', border: `1px solid ${t.accentMid}`, padding: '7px 16px', borderRadius: 6, cursor: 'pointer' }}>Clear filters</button>
+                <button onClick={() => { setSearch(''); setCategory('All') }} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: t.accent, background: 'transparent', border: `1px solid ${t.accentMid}`, padding: '7px 16px', borderRadius: 6, cursor: 'pointer' }}>Clear filters</button>
               </div>
             ) : (
               filtered.map(p => <ProviderRow key={p.id} provider={p} />)
@@ -453,17 +453,17 @@ export default function ServicesPage() {
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.accent, letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 20 }}>
                 One key, every service
               </div>
-              <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 'clamp(24px,4vw,42px)', letterSpacing: '-0.025em', lineHeight: 1.15, marginBottom: 16, color: t.text }}>
+              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 'clamp(24px,4vw,42px)', letterSpacing: '-0.025em', lineHeight: 1.15, marginBottom: 16, color: t.text }}>
                 Your agent can call all of these.
               </h2>
               <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, maxWidth: 500, margin: '0 auto 32px' }}>
                 Create an account, fund your Stellar wallet with USDC, set spending limits, and your agent is ready to use every provider on this page — without a single separate API key.
               </p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-                <a href="/signup" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.bg, background: t.accent, padding: '11px 28px', borderRadius: 7, textDecoration: 'none' }}>
+                <a href="/signup" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.bg, background: t.accent, padding: '11px 28px', borderRadius: 7, textDecoration: 'none' }}>
                   Create free account
                 </a>
-                <a href="/docs" style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, color: t.text2, border: `1px solid ${t.border2}`, padding: '11px 24px', borderRadius: 7, textDecoration: 'none' }}>
+                <a href="/docs" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 14, color: t.text2, border: `1px solid ${t.border2}`, padding: '11px 24px', borderRadius: 7, textDecoration: 'none' }}>
                   Read the docs
                 </a>
               </div>

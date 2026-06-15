@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#11331F; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+  #tex { position:absolute; inset:0;
+    background-image:
+      radial-gradient(rgba(96,170,120,0.16) 1.6px, transparent 1.6px),
+      repeating-linear-gradient(45deg, rgba(22,72,42,0.6) 0 2px, transparent 2px 18px);
+    background-size: 30px 30px, auto; }
+  #vig { position:absolute; inset:0;
+    background: radial-gradient(ellipse at 50% 38%, rgba(240,224,172,0.08) 0%, rgba(17,51,31,0) 55%); }
+
+  #h1 { position:absolute; left:84px; top:104px; width:430px;
+    font-size:64px; font-weight:700; letter-spacing:-0.028em; line-height:1.14; color:#EFF5E9; }
+  #h1 .g { color:#E8CC85; }
+  #sub { position:absolute; left:84px; top:430px; width:430px;
+    font-size:36px; font-weight:500; line-height:1.55; color:#9CC4A8; }
+
+  /* receipt */
+  #rc { position:absolute; right:84px; top:120px; width:470px; transform:rotate(2.5deg);
+    filter: drop-shadow(0 40px 70px rgba(0,0,0,0.5)); }
+  #rc .paper { background:#F8F2E0; padding:44px 40px 36px;
+    font-family:"JetBrains Mono",monospace; color:#2A2417; }
+  #rc .zig { height:22px;
+    background:
+      linear-gradient(-45deg, transparent 15px, #F8F2E0 0),
+      linear-gradient(45deg, transparent 15px, #F8F2E0 0);
+    background-size: 30px 30px; background-position: left bottom; background-repeat: repeat-x; }
+  #rc .top { text-align:center; }
+  #rc .top .nm { font-weight:600; font-size:30px; letter-spacing:0.22em; }
+  #rc .top .ad { margin-top:8px; font-size:17px; color:#8A7D5C; letter-spacing:0.06em; }
+  .hr { border:none; border-top:2.5px dashed #C9BD98; margin:26px 0; }
+  .li { display:flex; align-items:baseline; font-size:21px; margin-bottom:18px; }
+  .li .k { white-space:nowrap; }
+  .li .dots { flex:1; margin:0 10px; border-bottom:2.5px dotted #C9BD98; transform:translateY(-5px); }
+  .li .v { white-space:nowrap; font-weight:600; }
+  .li .v.zero { color:#3F8757; }
+  .li.used .k, .li.used .v { font-weight:600; }
+  .tot { display:flex; font-size:27px; font-weight:600; }
+  .tot .dots { flex:1; margin:0 10px; border-bottom:none; }
+  #rc .note { margin-top:26px; text-align:center; font-size:18px; color:#8A7D5C; letter-spacing:0.08em; }
+  /* barcode */
+  #bc { margin:26px auto 0; width:280px; height:54px;
+    background: repeating-linear-gradient(90deg,#2A2417 0 4px, transparent 4px 7px, #2A2417 7px 9px, transparent 9px 16px, #2A2417 16px 22px, transparent 22px 26px); }
+
+  /* stamp on receipt */
+  #stamp { position:absolute; right:116px; top:400px; transform:rotate(-11deg); z-index:5;
+    border:5px solid #3F8757; border-radius:14px; padding:16px 28px;
+    font-family:"JetBrains Mono",monospace; font-weight:600; font-size:30px;
+    letter-spacing:0.18em; color:#3F8757; background:rgba(248,242,224,0.6); }
+
+  #quote { position:absolute; left:84px; bottom:210px; width:520px;
+    font-size:40px; font-weight:600; line-height:1.4; color:#EFF5E9; letter-spacing:-0.01em; }
+  #quote .g { color:#E8CC85; }
+  #wm { position:absolute; left:84px; bottom:96px; }
+
+  .sp { position:absolute; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+  <div id="vig"></div>
+
+  <div id="h1">Zero subscriptions<span class="g"> is a product decision.</span></div>
+  <div id="sub">We could charge monthly. We chose not to.</div>
+
+  <div id="rc">
+    <div class="paper">
+      <div class="top">
+        <div class="nm">ARGENS</div>
+        <div class="ad">payment layer for ai agents<br/>stellar mainnet · usdc</div>
+      </div>
+      <hr class="hr"/>
+      <div class="li"><span class="k">monthly fee</span><span class="dots"></span><span class="v zero">$0.00</span></div>
+      <div class="li"><span class="k">seat license</span><span class="dots"></span><span class="v zero">$0.00</span></div>
+      <div class="li"><span class="k">platform fee</span><span class="dots"></span><span class="v zero">$0.00</span></div>
+      <div class="li"><span class="k">setup</span><span class="dots"></span><span class="v zero">$0.00</span></div>
+      <hr class="hr"/>
+      <div class="li used"><span class="k">what your agent used</span><span class="dots"></span><span class="v">$1.27</span></div>
+      <hr class="hr"/>
+      <div class="tot"><span>TOTAL</span><span class="dots"></span><span>$1.27</span></div>
+      <div class="note">thank you · pay for what runs<br/>nothing more</div>
+      <div id="bc"></div>
+    </div>
+    <div class="zig"></div>
+  </div>
+
+  <div id="stamp">NO SUBSCRIPTION</div>
+
+  <div id="quote">Pay for what your agent uses. <span class="g">Nothing more.</span></div>
+
+  <div class="sp" style="left:600px; top:120px;">
+    <svg width="36" height="36" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#E8CC85"/></svg>
+  </div>
+  <div class="sp" style="left:560px; bottom:300px;">
+    <svg width="26" height="26" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#9CC4A8" opacity="0.85"/></svg>
+  </div>
+
+  <div id="wm">
+    <svg width="180" height="40" viewBox="0 0 180 40">
+      <g transform="translate(0,3) scale(0.62)" fill="#E8CC85">
+        <rect x="14.5" y="0" width="14" height="50" rx="7" transform="rotate(30.5 21.5 25)"/>
+        <circle cx="40" cy="40.5" r="8.6"/>
+      </g>
+      <text x="44" y="29" font-family="DM Sans" font-weight="600" font-size="26" fill="#EFF5E9">argens.</text>
+    </svg>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="67"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

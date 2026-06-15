@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#36101D; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+  #tex { position:absolute; inset:0;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(90,28,48,0.55) 0 3px, transparent 3px 22px),
+      repeating-linear-gradient(-45deg, rgba(90,28,48,0.55) 0 3px, transparent 3px 22px),
+      radial-gradient(rgba(160,70,100,0.14) 1.6px, transparent 1.6px);
+    background-size: auto, auto, 30px 30px; }
+  #vig { position:absolute; inset:0;
+    background: radial-gradient(ellipse at 50% 44%, rgba(229,180,90,0.10) 0%, rgba(54,16,29,0) 55%); }
+
+  #kick { position:absolute; left:0; right:0; top:108px; text-align:center;
+    font-family:"JetBrains Mono",monospace; font-size:23px; letter-spacing:0.34em;
+    text-transform:uppercase; color:#C98FA4; }
+  #h1 { position:absolute; left:0; right:0; top:166px; text-align:center;
+    font-size:112px; font-weight:700; letter-spacing:-0.025em; color:#F6EBDD; }
+  #h1 .g { color:#E5B45A; }
+  #sub { position:absolute; left:0; right:0; top:330px; text-align:center;
+    font-size:38px; font-weight:500; color:#C98FA4; }
+
+  /* ticket */
+  #tkt { position:absolute; left:50%; top:760px; transform:translate(-50%,-50%) rotate(-4deg);
+    width:840px; height:392px; border-radius:24px;
+    background: linear-gradient(168deg, #EFCD86 0%, #DDB35E 42%, #C5963E 100%);
+    box-shadow: 0 50px 110px rgba(0,0,0,0.55), inset 0 3px 0 rgba(255,246,222,0.7);
+  }
+  #tkt .inner { position:absolute; inset:18px; border:3px solid rgba(84,58,16,0.55);
+    border-radius:14px; }
+  #tkt .inner2 { position:absolute; inset:26px; border:1.5px solid rgba(84,58,16,0.3);
+    border-radius:10px; }
+  /* perforation + stub */
+  #tkt .perf { position:absolute; right:198px; top:10px; bottom:10px;
+    border-right:4px dashed rgba(84,58,16,0.5); }
+  #tkt .stub { position:absolute; right:0; top:0; bottom:0; width:198px;
+    display:flex; align-items:center; justify-content:center; }
+  #tkt .stub .v { transform:rotate(90deg); white-space:nowrap;
+    font-family:"JetBrains Mono",monospace; font-weight:600; font-size:27px;
+    letter-spacing:0.3em; color:#54380F; }
+  /* notches */
+  .notch { position:absolute; width:44px; height:44px; border-radius:50%; background:#36101D; }
+  #n1 { left:-22px; top:174px; } #n2 { right:176px; top:-22px; } #n3 { right:176px; bottom:-22px; }
+
+  #tkt .body { position:absolute; left:56px; top:48px; right:240px; }
+  #tkt .t1 { font-family:"JetBrains Mono",monospace; font-size:21px; letter-spacing:0.3em;
+    text-transform:uppercase; color:#6E4B16; }
+  #tkt .t2 { margin-top:14px; font-size:88px; font-weight:700; letter-spacing:-0.025em; color:#2E1F06; }
+  #tkt .t3 { margin-top:16px; display:flex; gap:14px; align-items:center;
+    font-family:"JetBrains Mono",monospace; font-size:22px; color:#54380F; }
+  #tkt .t4 { margin-top:30px; font-family:"JetBrains Mono",monospace; font-size:23px;
+    letter-spacing:0.08em; color:#6E4B16; }
+
+  #feet { position:absolute; left:0; right:0; bottom:200px; text-align:center;
+    font-family:"JetBrains Mono",monospace; font-size:26px; letter-spacing:0.12em; color:#E5B45A; }
+  #feet .d { color:#8E5A6E; margin:0 16px; }
+  #wm { position:absolute; left:50%; bottom:88px; transform:translateX(-50%); }
+
+  .sp { position:absolute; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+  <div id="vig"></div>
+
+  <div id="kick">the beta is open · if you have a code</div>
+  <div id="h1">Access is <span class="g">earned.</span></div>
+  <div id="sub">Argens beta — invitation only.</div>
+
+  <div id="tkt">
+    <div class="inner"></div>
+    <div class="inner2"></div>
+    <div class="perf"></div>
+    <div class="stub"><div class="v">ADMIT ONE AGENT</div></div>
+    <div class="notch" id="n1"></div>
+    <div class="notch" id="n2"></div>
+    <div class="notch" id="n3"></div>
+    <div class="body">
+      <div class="t1">Argens · private beta</div>
+      <div class="t2">Admit one<br/>agent.</div>
+      <div class="t3">
+        <svg width="30" height="32" viewBox="0 0 52 55"><g fill="#54380F">
+          <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+          <circle cx="41" cy="41.5" r="8.8"/>
+        </g></svg>
+        <span>Nº&nbsp;argns_beta_0001</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sp" style="left:148px; top:486px;">
+    <svg width="44" height="44" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#E5B45A"/></svg>
+  </div>
+  <div class="sp" style="right:130px; top:560px;">
+    <svg width="30" height="30" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#C98FA4"/></svg>
+  </div>
+  <div class="sp" style="right:210px; top:1020px;">
+    <svg width="36" height="36" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#E5B45A" opacity="0.9"/></svg>
+  </div>
+  <div class="sp" style="left:190px; top:1010px;">
+    <svg width="24" height="24" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#F6EBDD" opacity="0.7"/></svg>
+  </div>
+
+  <div id="feet">real agents <span class="d">·</span> real USDC <span class="d">·</span> real mainnet</div>
+
+  <div id="wm">
+    <svg width="180" height="40" viewBox="0 0 180 40">
+      <g transform="translate(0,3) scale(0.62)" fill="#E5B45A">
+        <rect x="14.5" y="0" width="14" height="50" rx="7" transform="rotate(30.5 21.5 25)"/>
+        <circle cx="40" cy="40.5" r="8.6"/>
+      </g>
+      <text x="44" y="29" font-family="DM Sans" font-weight="600" font-size="26" fill="#F6EBDD">argens.</text>
+    </svg>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="43"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

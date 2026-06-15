@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#0C0B0A; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+
+  #tex {
+    position:absolute; inset:0;
+    background-image: radial-gradient(rgba(64,60,56,0.45) 1.2px, transparent 1.2px);
+    background-size: 48px 48px;
+  }
+  #vig {
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse at 50% 38%, rgba(197,162,83,0.12) 0%, rgba(12,11,10,0) 55%);
+  }
+
+  /* ghost key behind */
+  #ghostkey {
+    position:absolute; left:50%; top:118px; transform:translateX(-50%) rotate(7deg);
+    width:300px; height:300px; border-radius:56px;
+    background:rgba(28,25,22,0.5); border:2px solid rgba(52,48,43,0.6);
+  }
+
+  /* keycap */
+  #key {
+    position:absolute; left:50%; top:218px; transform:translateX(-50%) rotate(-4deg);
+    width:430px; height:430px; border-radius:72px;
+    background: linear-gradient(178deg, #2A2517 0%, #1A1711 55%, #11100C 100%);
+    box-shadow:
+      0 30px 0 #0A0908,
+      0 32px 2px rgba(197,162,83,0.18),
+      0 70px 110px rgba(0,0,0,0.8),
+      inset 0 3px 0 rgba(232,204,133,0.45),
+      inset 0 -16px 36px rgba(0,0,0,0.6);
+  }
+  #key .face {
+    position:absolute; left:30px; top:24px; right:30px; bottom:44px;
+    border-radius:50px;
+    background: linear-gradient(178deg, #353020 0%, #232013 60%, #1A1711 100%);
+    box-shadow: inset 0 2px 0 rgba(232,204,133,0.35), inset 0 -10px 24px rgba(0,0,0,0.5);
+    display:flex; align-items:center; justify-content:center;
+  }
+  #key .gloss {
+    position:absolute; left:52px; top:38px; right:52px; height:94px; border-radius:42px;
+    background: linear-gradient(180deg, rgba(244,225,174,0.16), rgba(244,225,174,0));
+  }
+  #key .lab {
+    font-family:"JetBrains Mono",monospace; font-weight:600; font-size:104px;
+    letter-spacing:-0.02em;
+    background: linear-gradient(170deg, #F4E1AE 8%, #E8CC85 36%, #C5A253 70%, #9F833F 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter: drop-shadow(0 3px 0 rgba(0,0,0,0.65));
+  }
+
+  .sp { position:absolute; }
+  .cf { position:absolute; border-radius:3px; }
+
+  /* copy */
+  #copy { position:absolute; left:0; right:0; top:818px; text-align:center; }
+  #l1 { font-size:84px; font-weight:700; letter-spacing:-0.025em; color:#EDE9E3; }
+  #l2 { margin-top:24px; font-size:42px; font-weight:600; letter-spacing:-0.01em; color:#C5A253; }
+  #l3 {
+    margin-top:62px; display:inline-block;
+    font-family:"JetBrains Mono",monospace; font-size:22px; letter-spacing:0.14em;
+    text-transform:uppercase; color:#706B65;
+  }
+  #l3 .dot { color:#4D9B6A; }
+
+  #mark { position:absolute; left:50%; bottom:80px; transform:translateX(-50%); }
+
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+  <div id="vig"></div>
+
+  <div id="ghostkey"></div>
+  <div id="key">
+    <div class="face"><span class="lab">/pay</span></div>
+    <div class="gloss"></div>
+  </div>
+
+  <div class="sp" style="left:208px; top:208px;">
+    <svg width="48" height="48" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#F4E1AE"/></svg>
+  </div>
+  <div class="sp" style="right:218px; top:566px;">
+    <svg width="34" height="34" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#C5A253"/></svg>
+  </div>
+  <div class="sp" style="right:280px; top:160px;">
+    <svg width="22" height="22" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#EDE9E3" opacity="0.75"/></svg>
+  </div>
+  <div class="sp" style="left:252px; top:680px;">
+    <svg width="20" height="20" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#C5A253" opacity="0.85"/></svg>
+  </div>
+
+  <div class="cf" style="left:330px; top:130px; width:26px; height:8px; background:#C5A253; transform:rotate(31deg)"></div>
+  <div class="cf" style="right:330px; top:740px; width:22px; height:7px; background:#4D9B6A; transform:rotate(-24deg)"></div>
+  <div class="cf" style="left:180px; top:520px; width:18px; height:6px; background:#EDE9E3; opacity:0.5; transform:rotate(12deg)"></div>
+
+  <div id="copy">
+    <div id="l1">One key. Real money.</div>
+    <div id="l2">Your agent pays with a single API call.</div>
+    <div id="l3"><span class="dot">●</span>&nbsp; live on stellar mainnet</div>
+  </div>
+
+  <div id="mark">
+    <svg width="190" height="42" viewBox="0 0 190 42">
+      <g transform="translate(0,4) scale(0.62)" fill="#C5A253">
+        <rect x="14.5" y="0" width="14" height="50" rx="7" transform="rotate(30.5 21.5 25)"/>
+        <circle cx="40" cy="40.5" r="8.6"/>
+      </g>
+      <text x="44" y="31" font-family="DM Sans" font-weight="600" font-size="28" fill="#EDE9E3">argens.</text>
+    </svg>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="9"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

@@ -110,13 +110,14 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
       logger.error('Failed to send verification email', { userId: user.id, error: (e as Error).message }),
     )
 
-    const isDev = process.env['NODE_ENV'] !== 'production'
     const frontendUrl = process.env['FRONTEND_URL'] ?? 'http://localhost:3000'
 
     logger.info('User signed up', { userId: user.id, accessCodeId: code.id })
+    if (process.env['NODE_ENV'] !== 'production') {
+      logger.info('Dev verification URL', { userId: user.id, url: `${frontendUrl}/auth/verify?token=${emailVerificationToken}` })
+    }
     sendSuccess(res, {
       message: 'Account created. Check your email to verify and activate your wallet.',
-      ...(isDev && { dev_verify_url: `${frontendUrl}/auth/verify?token=${emailVerificationToken}` }),
     }, 201)
   } catch (e) {
     // Unique constraint race on AccessCode.redeemedBy → code was taken between check and update

@@ -142,7 +142,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
       <div style={{ width: '100%', maxWidth: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}><Logo size="lg" /></div>
         <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 12, padding: '28px 26px' }}>
-          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 17, color: t.text, marginBottom: 6 }}>Ops Console</div>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 17, color: t.text, marginBottom: 6 }}>Ops Console</div>
           <div style={{ fontSize: 13, color: t.muted, marginBottom: 22, lineHeight: 1.6 }}>Paste the admin secret to continue.</div>
           {error && (
             <div style={{ padding: '10px 14px', background: t.errorLow, border: '1px solid rgba(160,72,72,0.3)', borderRadius: 7, color: t.error, fontSize: 13, marginBottom: 16, fontFamily: 'JetBrains Mono, monospace' }}>{error}</div>
@@ -154,7 +154,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
               placeholder="admin secret"
               style={{ width: '100%', boxSizing: 'border-box', background: t.bg, border: `1px solid ${t.border2}`, borderRadius: 7, padding: '10px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: t.text, outline: 'none', marginBottom: 12 }}
             />
-            <button type="submit" disabled={loading || !secret} style={{ width: '100%', padding: 11, background: loading ? t.bg3 : t.accent, border: 'none', borderRadius: 7, color: loading ? t.muted : t.bg, fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+            <button type="submit" disabled={loading || !secret} style={{ width: '100%', padding: 11, background: loading ? t.bg3 : t.accent, border: 'none', borderRadius: 7, color: loading ? t.muted : t.bg, fontFamily: 'DM Sans, sans-serif', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
               {loading ? 'Verifying…' : 'Unlock console'}
             </button>
           </form>
@@ -170,7 +170,7 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
   return (
     <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '18px 20px' }}>
       <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.faint, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>{label}</div>
-      <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: accent ?? t.text, letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 24, color: accent ?? t.text, letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: t.muted, marginTop: 6, fontFamily: 'JetBrains Mono, monospace' }}>{sub}</div>}
     </div>
   )
@@ -180,7 +180,7 @@ function Section({ title, children, action }: { title: string; children: React.R
   return (
     <section style={{ marginTop: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, margin: 0 }}>{title}</h2>
+        <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, margin: 0 }}>{title}</h2>
         {action}
       </div>
       <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>{children}</div>
@@ -228,7 +228,7 @@ function Console({ onLogout }: { onLogout: () => void }) {
 
         {/* Wallet balances */}
         <section>
-          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginTop: 0, marginBottom: 12 }}>Wallet balances</h2>
+          <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginTop: 0, marginBottom: 12 }}>Wallet balances</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
             {balances?.stellar.map((w) => (
               <WalletCard key={w.envKey} w={w} />
@@ -242,7 +242,7 @@ function Console({ onLogout }: { onLogout: () => void }) {
 
         {/* Stats */}
         <section style={{ marginTop: 24 }}>
-          <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 12 }}>System stats</h2>
+          <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 12 }}>System stats</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <StatCard label="Users" value={stats?.users.total ?? '—'} sub={`${stats?.users.verified ?? 0} verified`} />
             <StatCard label="Access codes" value={stats?.access_codes.total ?? '—'} sub={`${stats?.access_codes.redeemed ?? 0} used / ${stats?.access_codes.unredeemed ?? 0} free`} />
@@ -270,7 +270,7 @@ function Console({ onLogout }: { onLogout: () => void }) {
                 color: tab === key ? t.text : t.muted,
                 fontSize: 13,
                 cursor: 'pointer',
-                fontFamily: 'Space Grotesk, sans-serif',
+                fontFamily: 'DM Sans, sans-serif',
                 fontWeight: tab === key ? 600 : 400,
                 marginBottom: -1,
               }}
@@ -298,7 +298,7 @@ function WalletCard({ w }: { w: BalancesReport['stellar'][number] }) {
       {w.configured ? (
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-            <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: t.text }}>
+            <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 20, color: t.text }}>
               {w.usdc ? `$${usdcNum.toFixed(2)}` : '—'}
             </span>
             <span style={{ fontSize: 11, color: t.muted, fontFamily: 'JetBrains Mono, monospace' }}>USDC</span>
@@ -338,7 +338,7 @@ function RelayerCard({ r }: { r: BalancesReport['base_relayer'] }) {
       {r.configured ? (
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-            <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: lowGas ? t.error : t.text }}>
+            <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 20, color: lowGas ? t.error : t.text }}>
               {r.eth ? ethNum.toFixed(5) : '—'}
             </span>
             <span style={{ fontSize: 11, color: t.muted, fontFamily: 'JetBrains Mono, monospace' }}>ETH</span>
@@ -491,7 +491,7 @@ function CodesPanel({ onChanged }: { onChanged: () => void }) {
               placeholder="note (optional)"
               style={{ background: t.bg, border: `1px solid ${t.border2}`, borderRadius: 6, padding: '6px 10px', fontSize: 12, color: t.text, fontFamily: 'Inter, sans-serif', width: 200, outline: 'none' }}
             />
-            <button type="submit" disabled={busy} style={{ padding: '6px 14px', background: t.accent, border: 'none', borderRadius: 6, color: t.bg, fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer' }}>
+            <button type="submit" disabled={busy} style={{ padding: '6px 14px', background: t.accent, border: 'none', borderRadius: 6, color: t.bg, fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer' }}>
               {busy ? '…' : 'Generate'}
             </button>
           </form>
@@ -577,7 +577,7 @@ function CreditsPanel({ onChanged }: { onChanged: () => void }) {
   return (
     <>
       <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
-        <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, marginBottom: 12 }}>Grant credits by email</div>
+        <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, marginBottom: 12 }}>Grant credits by email</div>
         {msg && (
           <div style={{ padding: '8px 12px', borderRadius: 6, fontSize: 12, fontFamily: 'JetBrains Mono, monospace', marginBottom: 10, background: msg.kind === 'ok' ? t.successLow : t.errorLow, color: msg.kind === 'ok' ? t.success : t.error, border: `1px solid ${msg.kind === 'ok' ? 'rgba(77,155,106,0.3)' : 'rgba(160,72,72,0.3)'}` }}>{msg.text}</div>
         )}
@@ -586,7 +586,7 @@ function CreditsPanel({ onChanged }: { onChanged: () => void }) {
           <Field label="Amount (USDC)"><input required type="number" min={0.01} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} style={inputStyle()}/></Field>
           <Field label="Expires (days)"><input required type="number" min={1} max={365} value={days} onChange={(e) => setDays(parseInt(e.target.value, 10) || 60)} style={inputStyle()}/></Field>
           <Field label="Reason (optional)"><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="beta tester thank-you" style={inputStyle()}/></Field>
-          <button type="submit" disabled={busy} style={{ padding: '8px 16px', background: t.accent, border: 'none', borderRadius: 6, color: t.bg, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', height: 34 }}>
+          <button type="submit" disabled={busy} style={{ padding: '8px 16px', background: t.accent, border: 'none', borderRadius: 6, color: t.bg, fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', height: 34 }}>
             {busy ? '…' : 'Grant'}
           </button>
         </form>

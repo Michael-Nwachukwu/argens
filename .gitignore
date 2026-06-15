@@ -8,3 +8,8 @@ dist
 .next
 prisma/migrations/*.sql
 .claude
+launch-video
+launch-video-vertical
+social-posters/out/
+launch-video-vertical
+landing-demo

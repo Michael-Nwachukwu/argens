@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#2A2008; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+
+  /* plaid frame */
+  #plaid {
+    position:absolute; inset:0;
+    background-color:#3A2E15;
+    background-image:
+      repeating-linear-gradient(0deg,  rgba(143,116,55,0.55) 0 26px, transparent 26px 78px),
+      repeating-linear-gradient(90deg, rgba(143,116,55,0.55) 0 26px, transparent 26px 78px),
+      repeating-linear-gradient(0deg,  rgba(92,74,34,0.8) 0 8px, transparent 8px 39px),
+      repeating-linear-gradient(90deg, rgba(92,74,34,0.8) 0 8px, transparent 8px 39px);
+  }
+
+  /* gold panel */
+  #panel {
+    position:absolute; left:54px; top:54px; right:54px; bottom:54px;
+    background-color:#C5A253; border-radius:22px; overflow:hidden;
+    box-shadow: 0 36px 110px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,240,200,0.5);
+  }
+  #panel .tex {
+    position:absolute; inset:0;
+    background-image:
+      radial-gradient(rgba(122,98,48,0.22) 1.8px, transparent 1.8px),
+      radial-gradient(rgba(122,98,48,0.13) 1.8px, transparent 1.8px),
+      repeating-linear-gradient(45deg, rgba(143,116,55,0.10) 0 2px, transparent 2px 16px);
+    background-size: 28px 28px, 28px 28px, auto;
+    background-position: 0 0, 14px 14px, 0 0;
+  }
+
+  /* copy */
+  #copy { position:absolute; left:88px; top:104px; right:88px; }
+  #h1 {
+    font-size:88px; font-weight:700; letter-spacing:-0.025em; line-height:1.12;
+    color:#241B07;
+  }
+  #sub {
+    margin-top:48px; font-size:42px; font-weight:500; line-height:1.5;
+    color:#FBF4E2; max-width:830px; letter-spacing:-0.005em;
+    text-shadow:0 1px 2px rgba(74,59,27,0.3);
+  }
+
+  /* icon circles */
+  .ico { position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 18px 44px rgba(42,32,8,0.35), inset 0 2px 0 rgba(255,255,255,0.55); }
+  #ico-bolt { left:404px; top:712px; width:230px; height:230px;
+    background:radial-gradient(circle at 38% 30%, #FFF8E6, #F0E3BE 70%); border:7px solid #E4D29E; }
+  #ico-shield { left:128px; top:866px; width:196px; height:196px;
+    background:radial-gradient(circle at 38% 30%, #E9F3E9, #CFE3D2 70%); border:7px solid #BBD6C0; }
+  #ico-chart { right:120px; top:846px; width:204px; height:204px;
+    background:radial-gradient(circle at 38% 30%, #EAEFF8, #D2DCEE 70%); border:7px solid #BFCDE6; }
+
+  /* coin mound */
+  #hill { position:absolute; left:50%; bottom:-210px; transform:translateX(-50%);
+    width:880px; height:430px; border-radius:50% 50% 0 0 / 100% 100% 0 0;
+    background:#8F7437; }
+  #hill::after { content:""; position:absolute; inset:0; border-radius:inherit;
+    background-image: radial-gradient(rgba(255,235,190,0.14) 2px, transparent 2px);
+    background-size:24px 24px; }
+  .coin { position:absolute; border-radius:50%; }
+  .coin .shine { position:absolute; border-radius:50%; background:rgba(255,252,240,0.75); }
+
+  .sparkle { position:absolute; }
+
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="plaid"></div>
+  <div id="panel">
+    <div class="tex"></div>
+
+    <div id="copy">
+      <div id="h1">Give your agent<br/>more than just<br/>a brain.</div>
+      <div id="sub">Set an allowance, cap every transaction, approve the big ones — your agent spends within the rules you write.</div>
+    </div>
+
+    <!-- icon circles -->
+    <div id="ico-bolt" class="ico">
+      <svg width="104" height="124" viewBox="0 0 104 124">
+        <path d="M62 6 L18 70 L46 70 L40 118 L86 50 L56 50 Z" fill="#C5A253" stroke="#8F7437" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M58 14 L26 62 L50 62" fill="none" stroke="#F4E1AE" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div id="ico-shield" class="ico">
+      <svg width="92" height="104" viewBox="0 0 92 104">
+        <path d="M46 4 L86 20 L86 52 C86 78 68 94 46 100 C24 94 6 78 6 52 L6 20 Z" fill="#4D9B6A" stroke="#356E4A" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M28 50 L42 64 L66 36" fill="none" stroke="#EAF4EC" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div id="ico-chart" class="ico">
+      <svg width="96" height="92" viewBox="0 0 96 92">
+        <rect x="8"  y="48" width="20" height="38" rx="4" fill="#4A6FE0" stroke="#33509F" stroke-width="5"/>
+        <rect x="38" y="28" width="20" height="58" rx="4" fill="#4A6FE0" stroke="#33509F" stroke-width="5"/>
+        <rect x="68" y="6"  width="20" height="80" rx="4" fill="#4A6FE0" stroke="#33509F" stroke-width="5"/>
+      </svg>
+    </div>
+
+    <!-- coin mound -->
+    <div id="hill"></div>
+    <div class="coin" style="left:362px; bottom:-58px; width:356px; height:356px; z-index:3;
+      background:radial-gradient(circle at 40% 28%, #FFF6DC, #F0E0AC 52%, #D9BE78 100%);
+      border:10px solid #E4D29E; box-shadow:0 24px 60px rgba(42,32,8,0.4);">
+      <div class="shine" style="left:66px; top:48px; width:84px; height:84px;"></div>
+      <svg style="position:absolute; left:50%; top:50%; transform:translate(-50%,-54%)" width="120" height="128" viewBox="0 0 52 55">
+        <g fill="#8F7437">
+          <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+          <circle cx="41" cy="41.5" r="8.8"/>
+        </g>
+      </svg>
+    </div>
+    <div class="coin" style="left:148px; bottom:-96px; width:280px; height:280px;
+      background:radial-gradient(circle at 40% 28%, #F7E2EC, #E9C4D6 55%, #D5A3BC 100%);
+      border:9px solid #E0B4C9; box-shadow:0 20px 50px rgba(42,32,8,0.38);">
+      <div class="shine" style="left:50px; top:38px; width:62px; height:62px;"></div>
+      <div class="shine" style="left:170px; top:150px; width:34px; height:34px; opacity:0.5"></div>
+    </div>
+    <div class="coin" style="right:128px; bottom:-110px; width:300px; height:300px;
+      background:radial-gradient(circle at 40% 28%, #FBF4E2, #EFE3C2 55%, #DCC68C 100%);
+      border:9px solid #E8D8A8; box-shadow:0 20px 50px rgba(42,32,8,0.38);">
+      <div class="shine" style="left:56px; top:42px; width:66px; height:66px;"></div>
+      <div class="shine" style="left:188px; top:170px; width:36px; height:36px; opacity:0.5"></div>
+    </div>
+
+    <div class="sparkle" style="left:118px; top:760px;">
+      <svg width="34" height="34" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#FBF4E2"/></svg>
+    </div>
+    <div class="sparkle" style="right:96px; top:716px;">
+      <svg width="26" height="26" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#FBF4E2" opacity="0.85"/></svg>
+    </div>
+    <div class="sparkle" style="left:84px; bottom:120px; z-index:5">
+      <svg width="30" height="30" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#FFFDF6"/></svg>
+    </div>
+    <div class="sparkle" style="right:130px; bottom:96px; z-index:5">
+      <svg width="24" height="24" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#FFFDF6" opacity="0.9"/></svg>
+    </div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="3"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

@@ -25,7 +25,7 @@ const config: Config = {
         pending:  '#6B7FAF',
       },
       fontFamily: {
-        head: ['Space Grotesk', 'sans-serif'],
+        head: ['DM Sans', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },

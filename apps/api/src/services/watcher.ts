@@ -21,10 +21,9 @@
  * SCAN_INTERVAL_MS for new READY wallets that aren't yet being watched).
  */
 
-import { Horizon } from '@stellar/stellar-sdk'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
-import { HORIZON_URL, USDC_ASSET } from './stellar.js'
+import { server, USDC_ASSET } from './stellar.js'
 import { sendWalletFundedEmail } from './email.js'
 
 // ─── Config ─────────────────────────────────────────────────────────────────
@@ -82,7 +81,6 @@ async function scanAndSubscribe(): Promise<void> {
 }
 
 function subscribeToPayments(state: WatchState): void {
-  const server = new Horizon.Server(HORIZON_URL)
 
   let closeStream: (() => void) | undefined
 

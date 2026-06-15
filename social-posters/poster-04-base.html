@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#0C0B0A; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+
+  #tex {
+    position:absolute; inset:0;
+    background-image: radial-gradient(rgba(64,60,56,0.5) 1.3px, transparent 1.3px);
+    background-size: 44px 44px;
+  }
+  #glow-b {
+    position:absolute; right:-300px; bottom:-360px; width:1000px; height:1000px; border-radius:50%;
+    background: radial-gradient(circle, rgba(74,111,224,0.22) 0%, rgba(74,111,224,0) 62%);
+  }
+  #glow-g {
+    position:absolute; left:-260px; bottom:-200px; width:800px; height:800px; border-radius:50%;
+    background: radial-gradient(circle, rgba(197,162,83,0.14) 0%, rgba(197,162,83,0) 60%);
+  }
+
+  /* header lockup */
+  #lock { position:absolute; left:96px; top:108px; display:flex; align-items:center; gap:26px; }
+  #lock .x { font-family:"JetBrains Mono",monospace; font-size:26px; color:#706B65; }
+  #lock .base-chip { display:flex; align-items:center; gap:14px; }
+  #lock .base-sq { width:34px; height:34px; border-radius:50%; background:#4A6FE0; position:relative; }
+  #lock .base-sq::after { content:""; position:absolute; left:0; top:13px; width:20px; height:8px; background:#0C0B0A; border-radius:0 4px 4px 0; }
+  #lock .base-t { font-family:"JetBrains Mono",monospace; font-size:27px; letter-spacing:0.18em; color:#EDE9E3; font-weight:500; }
+  #lock .arg { display:flex; align-items:center; gap:12px; }
+  #lock .arg span { font-size:34px; font-weight:700; letter-spacing:-0.02em; color:#EDE9E3; }
+
+  /* headline */
+  #head {
+    position:absolute; left:96px; top:286px; width:900px;
+    font-size:92px; font-weight:700; letter-spacing:-0.03em; line-height:1.14; color:#EDE9E3;
+  }
+  #head .b { color:#7B96E8; }
+  #head .g { color:#C5A253; }
+  #sub {
+    position:absolute; left:96px; top:680px; width:640px;
+    font-size:38px; font-weight:500; line-height:1.55; color:#B0A99F; letter-spacing:-0.005em;
+  }
+  #cta { position:absolute; left:96px; top:1010px; font-family:"JetBrains Mono",monospace; }
+  #cta .lbl { font-size:24px; color:#C5A253; letter-spacing:0.06em; }
+  #cta .url { margin-top:10px; font-size:30px; color:#EDE9E3; letter-spacing:0.04em; }
+
+  /* coins bottom-right */
+  #coins { position:absolute; right:-160px; bottom:-200px; width:680px; height:660px; }
+  .bigcoin { position:absolute; border-radius:50%; }
+  #c-usdc {
+    left:0; top:130px; width:480px; height:480px;
+    background: radial-gradient(circle at 38% 30%, #2A2517, #1A1610 60%);
+    border:14px solid #C5A253;
+    box-shadow: 0 30px 90px rgba(0,0,0,0.7), inset 0 0 60px rgba(197,162,83,0.15);
+  }
+  #c-usdc .ring { position:absolute; inset:34px; border-radius:50%; border:5px dashed rgba(197,162,83,0.5); }
+  #c-usdc .sym { position:absolute; left:50%; top:50%; transform:translate(-50%,-52%);
+    font-size:200px; font-weight:700; color:#C5A253; }
+  #c-base {
+    left:220px; top:-90px; width:430px; height:430px;
+    background: radial-gradient(circle at 38% 30%, #15203F, #0E1526 60%);
+    border:14px solid #4A6FE0;
+    box-shadow: 0 30px 90px rgba(0,0,0,0.7), 0 0 90px rgba(74,111,224,0.35), inset 0 0 60px rgba(74,111,224,0.18);
+  }
+  #c-base .ring { position:absolute; inset:30px; border-radius:50%; border:5px dashed rgba(123,150,232,0.5); }
+  #c-base .core { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:190px; height:190px; border-radius:50%; background:#7B96E8; }
+  #c-base .core::after { content:""; position:absolute; left:-14px; top:79px; width:110px; height:32px;
+    background:#0E1526; border-radius:0 16px 16px 0; }
+
+  /* echo rings */
+  .echo { position:absolute; border-radius:50%; border:3px solid rgba(176,169,159,0.18); }
+
+  /* confetti */
+  .cf { position:absolute; border-radius:3px; }
+  .sp { position:absolute; }
+
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+  <div id="glow-b"></div>
+  <div id="glow-g"></div>
+
+  <div id="lock">
+    <div class="arg">
+      <svg width="40" height="42" viewBox="0 0 52 55"><g fill="#C5A253">
+        <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+        <circle cx="41" cy="41.5" r="8.8"/>
+      </g></svg>
+      <span>argens.</span>
+    </div>
+    <div class="x">×</div>
+    <div class="base-chip">
+      <div class="base-sq"></div>
+      <div class="base-t">BASE</div>
+    </div>
+  </div>
+
+  <div id="head">Your agent now settles <span class="g">USDC</span> natively on <span class="b">Base.</span></div>
+
+  <div id="sub">One <span style="font-family:'JetBrains Mono',monospace; font-size:32px; color:#EDE9E3;">POST /pay</span> from Stellar — burned, attested, and minted on Base via Circle CCTP V2. No bridges. No wrapped tokens.</div>
+
+  <div id="cta">
+    <div class="lbl">Get started now:</div>
+    <div class="url">www.argens.xyz</div>
+  </div>
+
+  <div class="echo" style="right:430px; bottom:430px; width:620px; height:620px;"></div>
+  <div class="echo" style="right:560px; bottom:560px; width:380px; height:380px; opacity:0.6"></div>
+
+  <div id="coins">
+    <div id="c-usdc" class="bigcoin">
+      <div class="ring"></div>
+      <div class="sym">$</div>
+    </div>
+    <div id="c-base" class="bigcoin">
+      <div class="ring"></div>
+      <div class="core"></div>
+    </div>
+  </div>
+
+  <div class="cf" style="left:170px; bottom:230px; width:30px; height:8px; background:#C5A253; transform:rotate(28deg)"></div>
+  <div class="cf" style="left:330px; bottom:140px; width:24px; height:7px; background:#4A6FE0; transform:rotate(-18deg)"></div>
+  <div class="cf" style="left:120px; bottom:120px; width:18px; height:6px; background:#EDE9E3; opacity:0.55; transform:rotate(8deg)"></div>
+  <div class="cf" style="right:200px; top:200px; width:26px; height:7px; background:#4A6FE0; transform:rotate(-30deg)"></div>
+  <div class="cf" style="right:120px; top:300px; width:20px; height:6px; background:#C5A253; transform:rotate(22deg)"></div>
+
+  <div class="sp" style="right:160px; bottom:620px;">
+    <svg width="34" height="34" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#7B96E8"/></svg>
+  </div>
+  <div class="sp" style="left:560px; bottom:340px;">
+    <svg width="26" height="26" viewBox="0 0 56 56"><path d="M28 0 L33 23 L56 28 L33 33 L28 56 L23 33 L0 28 L23 23 Z" fill="#F4E1AE" opacity="0.9"/></svg>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="5"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

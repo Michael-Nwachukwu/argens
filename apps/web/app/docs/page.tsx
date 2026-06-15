@@ -91,7 +91,7 @@ function DocsNav() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
         <a href="/SKILL.md" style={{ fontSize: 13, color: t.muted, textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace' }}>SKILL.md</a>
         <a href="/llms.txt" style={{ fontSize: 13, color: t.muted, textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace' }}>llms.txt</a>
-        <a href="/signup" style={{ fontSize: 13, fontWeight: 600, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 6, textDecoration: 'none', fontFamily: 'Space Grotesk, sans-serif' }}>
+        <a href="/signup" style={{ fontSize: 13, fontWeight: 600, color: t.bg, background: t.accent, padding: '7px 16px', borderRadius: 6, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>
           Get started
         </a>
       </div>
@@ -136,7 +136,7 @@ function Sidebar({ active }: { active: string }) {
         </div>
         <div style={{ marginTop: 28, padding: '0 16px' }}>
           <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: '14px 16px' }}>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 12, color: t.text, marginBottom: 8 }}>Quick onboard</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 12, color: t.text, marginBottom: 8 }}>Quick onboard</div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.text2, lineHeight: 1.6, background: t.bg, border: `1px solid ${t.border}`, borderRadius: 5, padding: '8px 10px', wordBreak: 'break-all' }}>
               Hi, read https://argens.xyz/SKILL.md and continue with the onboarding steps.
             </div>
@@ -174,7 +174,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(22px,3vw,34px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.15, marginBottom: 18, color: t.text }}>
+    <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(22px,3vw,34px)', fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.15, marginBottom: 18, color: t.text }}>
       {children}
     </h2>
   )
@@ -314,7 +314,7 @@ function InfoCard({ title, children, accent }: { title: string; children: React.
       borderRadius: 10, padding: 20,
       ...(accent ? { boxShadow: `0 0 0 1px ${t.accentLow}` } : {}),
     }}>
-      <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: accent ? t.accent : t.text, marginBottom: 8 }}>{title}</div>
+      <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: accent ? t.accent : t.text, marginBottom: 8 }}>{title}</div>
       <div style={{ fontSize: 13, color: t.text2, lineHeight: 1.7 }}>{children}</div>
     </div>
   )
@@ -352,7 +352,7 @@ function OverviewSection() {
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, animation: 'glow 2s infinite alternate' }}/>
           Live on Stellar mainnet · v1 API
         </div>
-        <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 'clamp(30px,4.5vw,56px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 20, color: t.text }}>
+        <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(30px,4.5vw,56px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 20, color: t.text }}>
           Argens API Documentation
         </h1>
         <p style={{ fontSize: 17, color: t.text2, lineHeight: 1.8, maxWidth: 660, marginBottom: 32 }}>
@@ -360,13 +360,13 @@ function OverviewSection() {
         </p>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
-          <a href="#quickstart" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.bg, background: t.accent, padding: '10px 22px', borderRadius: 7, textDecoration: 'none' }}>
+          <a href="#quickstart" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.bg, background: t.accent, padding: '10px 22px', borderRadius: 7, textDecoration: 'none' }}>
             Start here →
           </a>
-          <a href="/SKILL.md" style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, color: t.text2, border: `1px solid ${t.border2}`, padding: '10px 20px', borderRadius: 7, textDecoration: 'none' }}>
+          <a href="/SKILL.md" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 14, color: t.text2, border: `1px solid ${t.border2}`, padding: '10px 20px', borderRadius: 7, textDecoration: 'none' }}>
             Read SKILL.md
           </a>
-          <a href="/signup" style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, color: t.muted, border: `1px solid ${t.border}`, padding: '10px 20px', borderRadius: 7, textDecoration: 'none' }}>
+          <a href="/signup" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 14, color: t.muted, border: `1px solid ${t.border}`, padding: '10px 20px', borderRadius: 7, textDecoration: 'none' }}>
             Create account
           </a>
         </div>
@@ -381,7 +381,7 @@ function OverviewSection() {
             { v: '24h',     l: 'approval window for pauses' },
           ].map((s, i) => (
             <div key={i} style={{ background: t.bg2, padding: '20px 24px' }}>
-              <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: t.accent, marginBottom: 4 }}>{s.v}</div>
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: 22, color: t.accent, marginBottom: 4 }}>{s.v}</div>
               <div style={{ fontSize: 12, color: t.muted, lineHeight: 1.5 }}>{s.l}</div>
             </div>
           ))}
@@ -461,7 +461,7 @@ curl https://api.argens.xyz/v1/agent/status \\
             <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr minmax(0,420px)', gap: 36, padding: '36px 0', borderTop: `1px solid ${t.border}` }} className="docs-step-row">
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: t.accent, paddingTop: 3, letterSpacing: '0.04em' }}>{s.num}</div>
               <div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 18, letterSpacing: '-0.015em', marginBottom: 10, color: t.text }}>{s.title}</div>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 18, letterSpacing: '-0.015em', marginBottom: 10, color: t.text }}>{s.title}</div>
                 <p style={{ fontSize: 14, color: t.text2, lineHeight: 1.75, maxWidth: 440 }}>{s.desc}</p>
               </div>
               <div className="docs-step-code" style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, overflow: 'hidden', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
@@ -534,7 +534,7 @@ curl https://api.argens.xyz/v1/agent/status \\
             { title: 'Regenerate to rotate', desc: 'The API Keys page lets you regenerate at any time. The old key is immediately revoked. Keep the new key safe — it\'s shown once.' },
           ].map((c, i) => (
             <div key={i} style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18 }}>
-              <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 13, color: t.text, marginBottom: 8 }}>{c.title}</div>
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 13, color: t.text, marginBottom: 8 }}>{c.title}</div>
               <p style={{ fontSize: 12.5, color: t.muted, lineHeight: 1.65 }}>{c.desc}</p>
             </div>
           ))}
@@ -682,7 +682,7 @@ function PaymentsSection() {
 
       <FadeUp delay={0.1}>
         <div style={{ marginTop: 32 }}>
-          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 16 }}>Request fields</div>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 16 }}>Request fields</div>
           <SchemaTable rows={[
             { key: 'recipient',  type: 'string',  desc: 'Stellar G… address (56 chars) for direct Stellar payment, or 0x… EVM address (42 chars) for CCTP Base settlement.' },
             { key: 'amount',     type: 'string',  desc: 'USDC amount as a string with 7 decimal places. e.g. "25.0000000". Never a number.' },
@@ -720,7 +720,7 @@ function PoliciesSection() {
             <div key={r.n} style={{ display: 'grid', gridTemplateColumns: '48px 180px 1fr', gap: 20, padding: '18px 20px', borderBottom: i < 2 ? `1px solid ${t.border}` : 'none', alignItems: 'start' }}>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.accent }}>{r.n}</div>
               <div>
-                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, marginBottom: 5 }}>{r.name}</div>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text, marginBottom: 5 }}>{r.name}</div>
                 <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: t.muted }}>{r.code}</code>
               </div>
               <p style={{ fontSize: 13, color: t.text2, lineHeight: 1.65 }}>{r.desc}</p>
@@ -802,7 +802,7 @@ function ApprovalsSection() {
                 </div>
                 <div style={{ paddingTop: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>{r.step}</div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>{r.step}</div>
                     {r.badge === 'polling' && <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.pending, background: t.pendingLow, padding: '1px 7px', borderRadius: 4 }}>POLLING</span>}
                   </div>
                   <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.65, maxWidth: 520 }}>{r.desc}</p>
@@ -837,7 +837,7 @@ function MarketplaceSection() {
       <FadeUp delay={0.05}>
         <div style={{ marginTop: 32, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="docs-2col">
           <div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 10 }}>1. Discover services</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 10 }}>1. Discover services</div>
             <TerminalBlock file="GET /marketplace/services">
 {`# Optional filters
 ?search=image         → search by name or description
@@ -862,7 +862,7 @@ function MarketplaceSection() {
             </TerminalBlock>
           </div>
           <div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 10 }}>2. Enable in dashboard, then call</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 10 }}>2. Enable in dashboard, then call</div>
             <TerminalBlock file="POST /marketplace/call">
 {`{
   "service_id": "flux_schnell_generate",
@@ -920,7 +920,7 @@ function MarketplaceSection() {
       <FadeUp delay={0.14}>
         <div style={{ marginTop: 24, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Marketplace policy note</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14, color: t.text }}>Marketplace policy note</div>
             <StatusBadge status="confirmed" />
           </div>
           <p style={{ fontSize: 13, color: t.text2, lineHeight: 1.7 }}>
@@ -955,7 +955,7 @@ function DiscoverabilitySection() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: t.accentLow, border: `1px solid ${t.accentMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.accent, fontSize: 14 }}>▶</div>
             <div>
-              <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text }}>The one-line onboarding prompt</div>
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, color: t.text }}>The one-line onboarding prompt</div>
               <div style={{ fontSize: 12, color: t.accent, fontFamily: 'JetBrains Mono, monospace' }}>Works with Claude, ChatGPT, LangChain, CrewAI, any agent that reads a URL</div>
             </div>
           </div>
@@ -1055,7 +1055,7 @@ function ResponsesSection() {
 
       <FadeUp delay={0.1}>
         <div style={{ marginTop: 32 }}>
-          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 14 }}>Transaction record fields</div>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 14 }}>Transaction record fields</div>
           <SchemaTable rows={[
             { key: 'id',                type: 'string',   desc: 'CUID — the transaction ID. Use to poll for status updates.' },
             { key: 'status',            type: 'enum',     desc: 'SUCCESS | BLOCKED | PENDING_APPROVAL | APPROVED | REJECTED | FAILED' },
@@ -1156,7 +1156,7 @@ function LimitsSection() {
       <FadeUp delay={0.05}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 32 }} className="docs-2col">
           <div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 12 }}>API Limits</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 12 }}>API Limits</div>
             <SchemaTable rows={[
               { key: 'Rate limit',         type: 'hard', desc: '100 requests per minute per API key. Returns 429 when exceeded.' },
               { key: 'Memo length',         type: 'hard', desc: 'Max 28 bytes for Stellar transaction memo.' },
@@ -1167,7 +1167,7 @@ function LimitsSection() {
             ]} />
           </div>
           <div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 12 }}>Security model</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 15, color: t.text, marginBottom: 12 }}>Security model</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
                 { title: 'Agent-custodial',      desc: 'Argens holds your encrypted Stellar signing key so agents can spend autonomously. The key is AES-256-GCM encrypted at rest. You can export it anytime from the dashboard.' },
@@ -1176,7 +1176,7 @@ function LimitsSection() {
                 { title: 'Approval email safety', desc: 'Magic links go to a dashboard confirmation page, not a direct action endpoint. Email scanners cannot accidentally approve a payment.' },
               ].map((s, i) => (
                 <div key={i} style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: '14px 16px' }}>
-                  <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 13, color: t.accent, marginBottom: 5 }}>{s.title}</div>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 13, color: t.accent, marginBottom: 5 }}>{s.title}</div>
                   <p style={{ fontSize: 12.5, color: t.muted, lineHeight: 1.65 }}>{s.desc}</p>
                 </div>
               ))}
@@ -1188,14 +1188,14 @@ function LimitsSection() {
       <FadeUp delay={0.1}>
         <div style={{ marginTop: 32, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '24px 28px', display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' as const }}>
           <div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 8 }}>Ready to build?</div>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 8 }}>Ready to build?</div>
             <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.7, maxWidth: 460 }}>Create a free account, fund a wallet, and your agent can be spending in under 5 minutes. No blockchain knowledge required.</p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' as const }}>
-            <a href="/signup" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 13, color: t.bg, background: t.accent, padding: '9px 20px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>
+            <a href="/signup" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 13, color: t.bg, background: t.accent, padding: '9px 20px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>
               Create account
             </a>
-            <a href="/SKILL.md" style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, color: t.text2, border: `1px solid ${t.border2}`, padding: '9px 18px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>
+            <a href="/SKILL.md" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: t.text2, border: `1px solid ${t.border2}`, padding: '9px 18px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>
               Read SKILL.md
             </a>
           </div>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#0B0E16; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+  #tex { position:absolute; inset:0;
+    background-image: radial-gradient(rgba(82,94,128,0.35) 1.3px, transparent 1.3px);
+    background-size: 46px 46px; }
+  #glow { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%);
+    width:900px; height:900px; border-radius:50%;
+    background: radial-gradient(circle, rgba(197,162,83,0.16) 0%, rgba(197,162,83,0) 60%); }
+
+  #head { position:absolute; left:0; right:0; top:104px; text-align:center; }
+  #head .n {
+    font-size:230px; font-weight:700; letter-spacing:-0.04em; line-height:1;
+    background: linear-gradient(170deg, #F4E1AE 6%, #E8CC85 30%, #C5A253 60%, #8F7437 95%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter: drop-shadow(0 5px 0 #3A2E15) drop-shadow(0 20px 40px rgba(0,0,0,0.6));
+  }
+  #head .t { margin-top:6px; font-size:64px; font-weight:700; letter-spacing:-0.02em; color:#EDE9E3; }
+  #head .t .g { color:#C5A253; }
+
+  #orbit { position:absolute; left:50%; top:868px; transform:translate(-50%,-50%); }
+
+  #sub { position:absolute; left:0; right:0; top:1108px; text-align:center;
+    font-size:38px; font-weight:500; color:#9BA3B8; letter-spacing:-0.005em; }
+  #pill { position:absolute; left:50%; bottom:84px; transform:translateX(-50%);
+    font-family:"JetBrains Mono",monospace; font-size:25px; letter-spacing:0.1em;
+    color:#C5A253; background:#10141F; border:2px solid #232B3F; border-radius:999px;
+    padding:18px 40px; white-space:nowrap; }
+  #pill .dim { color:#5A6378; }
+
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+  <div id="glow"></div>
+
+  <div id="head">
+    <div class="n">86</div>
+    <div class="t">services. <span class="g">One key.</span></div>
+  </div>
+
+  <div id="orbit">
+    <svg width="980" height="560" viewBox="0 0 980 560">
+      <!-- orbit rings -->
+      <ellipse cx="490" cy="280" rx="436" ry="196" fill="none" stroke="#232B3F" stroke-width="3" stroke-dasharray="3 14"/>
+      <ellipse cx="490" cy="280" rx="312" ry="132" fill="none" stroke="#232B3F" stroke-width="3" stroke-dasharray="3 14"/>
+
+      <!-- service dots: outer ring -->
+      <g>
+        <circle cx="92"  cy="350" r="26" fill="#4A6FE0"/>
+        <circle cx="226" cy="138" r="20" fill="#4D9B6A"/>
+        <circle cx="490" cy="84"  r="24" fill="#D5739B"/>
+        <circle cx="772" cy="142" r="19" fill="#E8CC85"/>
+        <circle cx="900" cy="332" r="25" fill="#7B96E8"/>
+        <circle cx="700" cy="462" r="20" fill="#4D9B6A"/>
+        <circle cx="282" cy="464" r="22" fill="#C97B4A"/>
+      </g>
+      <!-- inner ring -->
+      <g opacity="0.92">
+        <circle cx="222" cy="318" r="15" fill="#E8CC85"/>
+        <circle cx="420" cy="152" r="14" fill="#7B96E8"/>
+        <circle cx="688" cy="190" r="15" fill="#D5739B"/>
+        <circle cx="758" cy="362" r="14" fill="#4D9B6A"/>
+        <circle cx="470" cy="410" r="13" fill="#C97B4A"/>
+      </g>
+
+      <!-- the key -->
+      <g transform="translate(490,278) rotate(-32)">
+        <!-- shadow -->
+        <g transform="translate(8,16)" opacity="0.45">
+          <circle cx="-118" cy="0" r="92" fill="#000"/>
+          <rect x="-40" y="-21" width="268" height="42" rx="21" fill="#000"/>
+        </g>
+        <!-- head: brand coin -->
+        <circle cx="-118" cy="0" r="92" fill="#C5A253"/>
+        <circle cx="-118" cy="0" r="92" fill="none" stroke="#8F7437" stroke-width="8"/>
+        <circle cx="-118" cy="0" r="64" fill="none" stroke="rgba(58,46,21,0.4)" stroke-width="5"/>
+        <ellipse cx="-152" cy="-38" rx="24" ry="36" fill="rgba(255,246,220,0.5)" transform="rotate(-30 -152 -38)"/>
+        <g fill="#3A2E15">
+          <rect x="-130" y="-40" width="12" height="74" rx="6" transform="rotate(30.5 -124 -3)"/>
+          <circle cx="-96" cy="26" r="11"/>
+        </g>
+        <!-- shaft -->
+        <rect x="-40" y="-21" width="268" height="42" rx="21"
+          fill="#C5A253" stroke="#8F7437" stroke-width="7"/>
+        <rect x="-30" y="-13" width="220" height="9" rx="4.5" fill="rgba(255,246,220,0.45)"/>
+        <!-- teeth -->
+        <g fill="#C5A253" stroke="#8F7437" stroke-width="7">
+          <rect x="150" y="14" width="34" height="58" rx="9"/>
+          <rect x="200" y="14" width="34" height="44" rx="9"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div id="sub">No accounts. No subscriptions. No invoices.</div>
+  <div id="pill">Authorization: Bearer argns_live_<span class="dim">••••••••••••</span></div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="23"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

@@ -17,6 +17,7 @@
 
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
+import type { ApprovalQueue, Transaction } from '@prisma/client'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
@@ -30,13 +31,12 @@ import { isEvmAddress } from '../services/stellar.js'
 import {
   burnUsdcOnStellar,
   encodeEvmRecipient,
-  pollAttestation,
-  relayOnBase,
   computeCctpFee,
   verifyCctpPreflightBalance,
   CCTP_FEE_RATE,
   BASE_DOMAIN,
 } from '../services/cctp.js'
+import { enqueueRelay } from '../services/cctp-relay.js'
 
 export const approveRouter: Router = ExpressRouter()
 
@@ -107,20 +107,14 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
   }
 
   try {
-    const entry = await findAndValidateToken(tokenParam)
+    const entry = await consumeToken(tokenParam, 'APPROVED')
     if (!entry) {
       sendError(res, 'Approval token is invalid, expired, or already used.', 'INVALID_TOKEN', 400)
       return
     }
 
-    const { queue, transaction } = entry
+    const { transaction } = entry
     const userId = transaction.userId
-
-    // Mark token consumed immediately (single-use)
-    await prisma.approvalQueue.update({
-      where: { id: queue.id },
-      data: { status: 'APPROVED', actedAt: new Date() },
-    })
 
     // Re-run policy check (amount could now violate a freshly changed policy)
     const amount = transaction.type === 'marketplace' && transaction.costPaid
@@ -304,27 +298,8 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
           poll_url: `/v1/transactions/${transaction.id}`,
         })
 
-        void (async () => {
-          try {
-            const { message, attestation } = await pollAttestation(stellarTxHash)
-            const { baseTxHash } = await relayOnBase(message, attestation)
-            await prisma.transaction.update({
-              where: { id: transaction.id },
-              data: { status: 'SUCCESS', destinationTxHash: baseTxHash },
-            })
-            await incrementTotalSpent(userId, amount)
-            logger.info('CCTP relay complete (approved path)', { txId: transaction.id, baseTxHash })
-          } catch (relayErr) {
-            await prisma.transaction.update({
-              where: { id: transaction.id },
-              data: { status: 'FAILED', blockedReason: (relayErr as Error).message },
-            })
-            logger.error('CCTP relay failed (approved path)', {
-              txId: transaction.id,
-              error: (relayErr as Error).message,
-            })
-          }
-        })()
+        // Approve path: incrementTotalSpent is handled inside runRelay on success.
+        void enqueueRelay(transaction.id, { incrementOnSuccess: true })
       } catch (burnErr) {
         const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
         const errStr = String(burnErr)
@@ -421,20 +396,14 @@ approveRouter.post('/reject/:token', async (req, res, next) => {
   }
 
   try {
-    const entry = await findAndValidateToken(tokenParam)
+    const entry = await consumeToken(tokenParam, 'REJECTED')
     if (!entry) {
       sendError(res, 'Approval token is invalid, expired, or already used.', 'INVALID_TOKEN', 400)
       return
     }
 
-    const { queue, transaction } = entry
+    const { transaction } = entry
     const userId = transaction.userId
-
-    // Mark rejected (single-use, consumed)
-    await prisma.approvalQueue.update({
-      where: { id: queue.id },
-      data: { status: 'REJECTED', actedAt: new Date() },
-    })
 
     await prisma.transaction.update({
       where: { id: transaction.id },
@@ -465,23 +434,33 @@ approveRouter.post('/reject/:token', async (req, res, next) => {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-async function findAndValidateToken(token: string) {
-  const queue = await prisma.approvalQueue.findUnique({
-    where: { token },
-    include: { transaction: true },
+/**
+ * Atomically consume a PENDING, unexpired token by flipping it to `nextStatus`.
+ * Returns the queue row (with transaction) if THIS call won the consume,
+ * or null if the token was missing, expired, or already consumed.
+ * updateMany's `count` is the atomic compare-and-swap result — exactly one
+ * concurrent caller wins; all others get null.
+ */
+async function consumeToken(
+  token: string,
+  nextStatus: 'APPROVED' | 'REJECTED',
+): Promise<{ queue: ApprovalQueue & { transaction: Transaction }; transaction: Transaction } | null> {
+  const consumed = await prisma.approvalQueue.updateMany({
+    where: { token, status: 'PENDING', expiresAt: { gt: new Date() } },
+    data: { status: nextStatus, actedAt: new Date() },
   })
-
-  // Token must exist, be PENDING, and not expired. (The token itself is the bearer
-  // authorisation — it is only ever sent to the account owner's email.)
-  if (!queue) return null
-  if (queue.status !== 'PENDING') return null
-  if (queue.expiresAt < new Date()) {
-    await prisma.approvalQueue.update({
-      where: { id: queue.id },
+  if (consumed.count !== 1) {
+    // Lazily mark expired-but-still-PENDING tokens so the GET endpoint shows the right state.
+    await prisma.approvalQueue.updateMany({
+      where: { token, status: 'PENDING', expiresAt: { lte: new Date() } },
       data: { status: 'EXPIRED' },
     })
     return null
   }
-
+  const queue = await prisma.approvalQueue.findUnique({
+    where: { token },
+    include: { transaction: true },
+  })
+  if (!queue) return null // deleted between update and read — treat as lost
   return { queue, transaction: queue.transaction }
 }

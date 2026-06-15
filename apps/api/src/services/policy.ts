@@ -16,6 +16,7 @@
  */
 
 import { Decimal } from '@prisma/client/runtime/library'
+import type { Policy } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { AppError } from '../lib/errors.js'
 
@@ -42,25 +43,13 @@ export interface PolicyResult {
   }
 }
 
-// ─── checkPolicy ────────────────────────────────────────────────────────────
+// ─── evaluatePolicy (pure, synchronous) ─────────────────────────────────────
 
 /**
- * Run all three policy checks against the stored policy for this user.
- * Returns a PolicyResult — never throws on a policy violation; callers
- * inspect the result and respond accordingly.
- *
- * Throws AppError only for infrastructure failures (policy not found).
+ * Pure synchronous evaluation of all three policy checks against a policy row.
+ * Shared by checkPolicy and checkPolicyAndReserve — do not add side effects here.
  */
-export async function checkPolicy(
-  userId: string,
-  amount: string,       // "25.0000000" — string, 7 decimals
-): Promise<PolicyResult> {
-  const policy = await prisma.policy.findUnique({ where: { userId } })
-
-  if (!policy) {
-    throw new AppError('Policy record not found for user', 'POLICY_NOT_FOUND', 500)
-  }
-
+export function evaluatePolicy(policy: Policy, amount: string): PolicyResult {
   const amt = new Decimal(amount)
   const totalSpent = policy.totalSpent
 
@@ -84,12 +73,7 @@ export async function checkPolicy(
   if (policy.maxTransactionLimit !== null) {
     if (amt.greaterThan(policy.maxTransactionLimit)) {
       detail.max_transaction = 'blocked'
-      return {
-        status: 'BLOCKED',
-        reason: 'max_transaction_exceeded',
-        detail,
-        policy: policySnapshot,
-      }
+      return { status: 'BLOCKED', reason: 'max_transaction_exceeded', detail, policy: policySnapshot }
     }
     detail.max_transaction = 'passed'
   }
@@ -99,12 +83,7 @@ export async function checkPolicy(
     const remaining = policy.allowanceLimit.minus(totalSpent)
     if (amt.greaterThan(remaining)) {
       detail.allowance = 'blocked'
-      return {
-        status: 'BLOCKED',
-        reason: 'allowance_exceeded',
-        detail,
-        policy: policySnapshot,
-      }
+      return { status: 'BLOCKED', reason: 'allowance_exceeded', detail, policy: policySnapshot }
     }
     detail.allowance = 'passed'
   }
@@ -113,21 +92,91 @@ export async function checkPolicy(
   if (policy.approvalThreshold !== null) {
     if (amt.greaterThanOrEqualTo(policy.approvalThreshold)) {
       detail.approval_threshold = 'pending'
-      return {
-        status: 'PENDING_APPROVAL',
-        detail,
-        policy: policySnapshot,
-      }
+      return { status: 'PENDING_APPROVAL', detail, policy: policySnapshot }
     }
     detail.approval_threshold = 'passed'
   }
 
   // ── 4. All checks passed ────────────────────────────────────────────────
-  return {
-    status: 'APPROVED',
-    detail,
-    policy: policySnapshot,
+  return { status: 'APPROVED', detail, policy: policySnapshot }
+}
+
+// ─── checkPolicy ────────────────────────────────────────────────────────────
+
+/**
+ * Run all three policy checks against the stored policy for this user.
+ * Returns a PolicyResult — never throws on a policy violation; callers
+ * inspect the result and respond accordingly.
+ *
+ * Throws AppError only for infrastructure failures (policy not found).
+ */
+export async function checkPolicy(
+  userId: string,
+  amount: string,       // "25.0000000" — string, 7 decimals
+): Promise<PolicyResult> {
+  const policy = await prisma.policy.findUnique({ where: { userId } })
+  if (!policy) {
+    throw new AppError('Policy record not found for user', 'POLICY_NOT_FOUND', 500)
   }
+  return evaluatePolicy(policy, amount)
+}
+
+// ─── checkPolicyAndReserve ───────────────────────────────────────────────────
+
+const MAX_RETRIES = 3
+
+/**
+ * Atomically re-check the allowance and reserve `amount` against it.
+ * Runs evaluatePolicy's logic and the totalSpent increment inside one
+ * SERIALIZABLE transaction, so concurrent payments cannot jointly exceed the
+ * allowance. Call releaseSpend() if the payment later fails.
+ *
+ * Returns the PolicyResult; increments totalSpent ONLY when status is APPROVED.
+ *
+ * Reservation semantics (since plan 002): increments totalSpent atomically at
+ * approval time, before Stellar submission, and releaseSpend decrements it if
+ * the submission fails. The settled invariant is unchanged — a transaction that
+ * ends BLOCKED/FAILED/PENDING contributes nothing to totalSpent — but in-flight
+ * payments briefly hold a reservation so concurrent requests cannot jointly
+ * exceed the allowance.
+ */
+export async function checkPolicyAndReserve(
+  userId: string,
+  amount: string,
+): Promise<PolicyResult> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const policy = await tx.policy.findUnique({ where: { userId } })
+          if (!policy) {
+            throw new AppError('Policy record not found for user', 'POLICY_NOT_FOUND', 500)
+          }
+          const result = evaluatePolicy(policy, amount)
+          if (result.status === 'APPROVED') {
+            await tx.policy.update({
+              where: { userId },
+              data: { totalSpent: { increment: new Decimal(amount) } },
+            })
+          }
+          return result
+        },
+        { isolationLevel: 'Serializable' },
+      )
+    } catch (e) {
+      // P2034: serialization conflict — safe to retry
+      if ((e as { code?: string }).code === 'P2034' && attempt < MAX_RETRIES) continue
+      throw e
+    }
+  }
+}
+
+/** Compensating action: release a reservation after a failed payment. */
+export async function releaseSpend(userId: string, amount: string): Promise<void> {
+  await prisma.policy.update({
+    where: { userId },
+    data: { totalSpent: { decrement: new Decimal(amount) } },
+  })
 }
 
 // ─── incrementTotalSpent ────────────────────────────────────────────────────

@@ -8,6 +8,7 @@
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { z } from 'zod'
+import { Decimal } from '@prisma/client/runtime/library'
 import { requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
@@ -63,24 +64,17 @@ agentRouter.get('/agent/status', requireJwtOrApiKey, async (req, res, next) => {
       }
     }
 
-    // Today's spend
+    // Today's spend — aggregate in DB to avoid float arithmetic
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 
-    const todayTxs = await prisma.transaction.findMany({
-      where: {
-        userId,
-        status: 'SUCCESS',
-        createdAt: { gte: todayStart },
-      },
-      select: { amount: true },
+    const todayAgg = await prisma.transaction.aggregate({
+      where: { userId, status: 'SUCCESS', createdAt: { gte: todayStart } },
+      _sum: { amount: true },
+      _count: { _all: true },
     })
-
-    const todaySpend = todayTxs
-      .reduce((sum, tx) => sum + parseFloat(tx.amount.toFixed(7)), 0)
-      .toFixed(7)
-
-    const todayCount = todayTxs.length
+    const todaySpend = (todayAgg._sum.amount ?? new Decimal(0)).toFixed(7)
+    const todayCount = todayAgg._count._all
 
     // Policy snapshot
     const policyData = policy
@@ -143,35 +137,40 @@ agentRouter.get('/spend/summary', requireJwtOrApiKey, async (req, res, next) => 
         break
     }
 
-    const [successTxs, blockedCount] = await Promise.all([
+    const [agg, successTxs, blockedCount] = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { userId, status: 'SUCCESS', createdAt: { gte: periodStart } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
       prisma.transaction.findMany({
         where: { userId, status: 'SUCCESS', createdAt: { gte: periodStart } },
         select: { amount: true, createdAt: true },
         orderBy: { createdAt: 'asc' },
+        take: 10000, // safety valve — prevents unbounded memory at high volume
       }),
       prisma.transaction.count({
         where: { userId, status: 'BLOCKED', createdAt: { gte: periodStart } },
       }),
     ])
 
-    const totalSpent = successTxs
-      .reduce((sum, tx) => sum + parseFloat(tx.amount.toFixed(7)), 0)
-      .toFixed(7)
+    const totalSpent = (agg._sum.amount ?? new Decimal(0)).toFixed(7)
 
-    // Group by date bucket (YYYY-MM-DD) for the chart breakdown
-    const buckets: Record<string, number> = {}
+    // Group by date bucket (YYYY-MM-DD) using Decimal arithmetic — no float errors
+    const buckets = new Map<string, { amount: Decimal; count: number }>()
     for (const tx of successTxs) {
       const key = tx.createdAt.toISOString().slice(0, 10)
-      buckets[key] = (buckets[key] ?? 0) + parseFloat(tx.amount.toFixed(7))
+      const cur = buckets.get(key) ?? { amount: new Decimal(0), count: 0 }
+      buckets.set(key, { amount: cur.amount.plus(tx.amount), count: cur.count + 1 })
     }
-    const breakdown = Object.entries(buckets)
+    const breakdown = [...buckets.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, amount]) => ({ date, amount: amount.toFixed(7), count: 1 }))
+      .map(([date, b]) => ({ date, amount: b.amount.toFixed(7), count: b.count }))
 
     sendSuccess(res, {
       period,
       total_spent: totalSpent,
-      transaction_count: successTxs.length,
+      transaction_count: agg._count._all,
       blocked_count: blockedCount,
       breakdown,
     })

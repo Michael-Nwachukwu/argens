@@ -12,7 +12,7 @@ export function Logo({ size = 'md', href = '/' }: { size?: 'sm' | 'md' | 'lg'; h
         <polygon points="10,6 14,10 10,14 6,10" fill="var(--bg)" />
       </svg> */}
       <Image src="/argens-icon.svg" alt="Argens" width={iconSize} height={iconSize} />
-      <span style={{ fontFamily: 'var(--font-head, "Space Grotesk", sans-serif)', fontSize: fs, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--text)' }}>
+      <span style={{ fontFamily: 'var(--font-head, "DM Sans", sans-serif)', fontSize: fs, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--text)' }}>
         argens
       </span>
     </Link>

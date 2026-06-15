@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#F4EFE2; }
+  body { font-family:"DM Sans",sans-serif; position:relative; color:#26221C; }
+  #tex { position:absolute; inset:0;
+    background-image:
+      radial-gradient(rgba(120,105,80,0.10) 1.4px, transparent 1.4px),
+      repeating-linear-gradient(0deg, rgba(120,105,80,0.04) 0 1px, transparent 1px 56px),
+      repeating-linear-gradient(90deg, rgba(120,105,80,0.04) 0 1px, transparent 1px 56px);
+    background-size: 24px 24px, auto, auto; }
+
+  #kick { position:absolute; left:84px; top:88px; font-family:"JetBrains Mono",monospace;
+    font-size:22px; letter-spacing:0.18em; text-transform:uppercase; color:#8A7A55; }
+  #h1 { position:absolute; left:84px; top:138px; width:920px;
+    font-size:88px; font-weight:700; letter-spacing:-0.028em; line-height:1.1; }
+  #h1 .red { color:#B4452F; }
+
+  /* loop diagram */
+  #loop { position:absolute; left:50%; top:478px; transform:translateX(-50%); }
+
+  /* resolution line */
+  #foot { position:absolute; left:0; right:0; bottom:96px; text-align:center; }
+  #foot .l1 { font-size:46px; font-weight:700; letter-spacing:-0.02em; }
+  #foot .l1 .g { color:#9A7A33; }
+  #foot .wm { margin-top:34px; }
+
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+
+  <div id="kick">// the irony of autonomy</div>
+  <div id="h1">You removed the human from the loop. <span class="red">Except at checkout.</span></div>
+
+  <div id="loop">
+    <svg width="900" height="600" viewBox="0 0 900 600">
+      <!-- loop path -->
+      <ellipse cx="450" cy="300" rx="330" ry="200" fill="none" stroke="#26221C" stroke-width="3.5" stroke-dasharray="14 12"/>
+      <!-- direction arrows on path -->
+      <g fill="#26221C">
+        <path d="M450 96 l-16 -11 v22 Z"/>
+        <path d="M769 358 l22 -3 l-14 17 Z"/>
+        <path d="M450 504 l16 11 v-22 Z"/>
+      </g>
+
+      <!-- automated nodes -->
+      <g font-family="JetBrains Mono" font-size="25" font-weight="500">
+        <g transform="translate(450,100)">
+          <rect x="-118" y="-40" width="236" height="80" rx="40" fill="#26221C"/>
+          <text x="-58" y="9" fill="#F4EFE2">plan</text>
+          <text x="48" y="10" fill="#7FD49B" font-size="30">✓</text>
+        </g>
+        <g transform="translate(782,300)">
+          <rect x="-128" y="-40" width="256" height="80" rx="40" fill="#26221C"/>
+          <text x="-74" y="9" fill="#F4EFE2">search</text>
+          <text x="62" y="10" fill="#7FD49B" font-size="30">✓</text>
+        </g>
+        <g transform="translate(450,500)">
+          <rect x="-122" y="-40" width="244" height="80" rx="40" fill="#26221C"/>
+          <text x="-66" y="9" fill="#F4EFE2">write</text>
+          <text x="54" y="10" fill="#7FD49B" font-size="30">✓</text>
+        </g>
+      </g>
+
+      <!-- the human checkpoint -->
+      <g transform="translate(124,300)">
+        <rect x="-106" y="-60" width="276" height="120" rx="26" fill="#FBF2EC" stroke="#B4452F" stroke-width="4" stroke-dasharray="10 8"/>
+        <text x="-80" y="-12" font-family="JetBrains Mono" font-size="28" font-weight="600" fill="#B4452F">$ pay</text>
+        <text x="-80" y="30" font-family="JetBrains Mono" font-size="19" fill="#B4452F" opacity="0.9">waiting for</text>
+        <text x="-80" y="-12" font-size="0"> </text>
+        <!-- human figure -->
+        <g transform="translate(110,2)" stroke="#B4452F" stroke-width="4.5" fill="none" stroke-linecap="round">
+          <circle cx="0" cy="-22" r="9"/>
+          <path d="M0 -13 V 8 M0 -6 L-12 4 M0 -6 L12 4 M0 8 L-9 24 M0 8 L9 24"/>
+        </g>
+        <text x="-80" y="54" font-family="JetBrains Mono" font-size="19" font-weight="600" fill="#B4452F">a human…</text>
+      </g>
+
+      <!-- stamp -->
+      <g transform="translate(648,440) rotate(-9)">
+        <rect x="-160" y="-44" width="320" height="88" rx="12" fill="none" stroke="#B4452F" stroke-width="5"/>
+        <text x="0" y="12" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="30" fill="#B4452F" letter-spacing="4">APPROVAL NEEDED</text>
+      </g>
+
+      <!-- mascot queued at the pay node -->
+      <g transform="translate(36,388)">
+        <g transform="translate(21,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+        <g transform="translate(49,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+        <rect x="35" y="0" width="14" height="7" fill="#3E4346"/><rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+        <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/><rect x="7" y="21" width="7" height="14" fill="#B0623A"/>
+        <rect x="77" y="21" width="7" height="14" fill="#B0623A"/><rect x="21" y="21" width="14" height="14" fill="#3E4346"/>
+        <rect x="49" y="21" width="14" height="14" fill="#3E4346"/><rect x="28" y="21" width="7" height="7" fill="#FFFFFF"/>
+        <rect x="49" y="21" width="7" height="7" fill="#FFFFFF"/><rect x="14" y="28" width="7" height="7" fill="#E0A096"/>
+        <rect x="70" y="28" width="7" height="7" fill="#E0A096"/><rect x="35" y="35" width="14" height="7" fill="#3E4346"/>
+        <rect x="28" y="42" width="35" height="7" fill="#3E4346"/><rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+        <rect x="63" y="56" width="7" height="7" fill="#3E4346"/>
+        <g transform="translate(0,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+        <g transform="translate(84,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+        <!-- thought dots -->
+        <circle cx="100" cy="-8" r="4" fill="#8A7A55"/><circle cx="112" cy="-20" r="5" fill="#8A7A55"/><circle cx="126" cy="-34" r="6" fill="#8A7A55"/>
+      </g>
+    </svg>
+  </div>
+
+  <div id="foot">
+    <div class="l1">Argens closes <span class="g">the loop.</span></div>
+    <div class="wm">
+      <svg width="180" height="40" viewBox="0 0 180 40">
+        <g transform="translate(0,3) scale(0.62)" fill="#9A7A33">
+          <rect x="14.5" y="0" width="14" height="50" rx="7" transform="rotate(30.5 21.5 25)"/>
+          <circle cx="40" cy="40.5" r="8.6"/>
+        </g>
+        <text x="44" y="29" font-family="DM Sans" font-weight="600" font-size="26" fill="#26221C">argens.</text>
+      </svg>
+    </div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="21"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.04"/>
+  </svg>
+</body>
+</html>

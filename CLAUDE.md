@@ -8,20 +8,20 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
-## Status — 2026-06-03
+## Status — 2026-06-12
 
 - **Network: Stellar MAINNET.** Live on mainnet. Testnet code paths exist for local-dev parity only.
 - **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` accessible at `argens.xyz/SKILL.md`. Vercel root directory set to `apps/web` for GitHub-triggered deployments.
-- **API: local only.** Railway deployment is the next infrastructure task. The live dashboard cannot call the API for external users until this is done.
+- **API: deployed.** Live on a VPS via Dokploy. The live dashboard calls the deployed API for external users.
 - **Cross-chain / CCTP V2: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. A 0.0100000 USDC mainnet Stellar → Base transfer completed burn, Iris attestation, Base relay, and transaction-history update on 2026-05-27. Direct and approval-token CCTP paths now share a fail-closed preflight: verify live USDC balance >= amount + Argens CCTP fee before sending the fee. Approval-token CCTP path compiles but still needs live approval-path verification.
 - **Marketplace: LIVE on mainnet.** 86 providers / 493 endpoints via MPP Router (`apiserver.mpprouter.dev`). Provider-level enablement toggles. Search/filter on `GET /marketplace/services`. All policy paths verified E2E. ~20% markup to `ARGENS_FEE_WALLET`.
-- **Marketplace credits: implemented locally.** Admin can grant expirable credits. Marketplace calls can consume credits via the credit-pool wallet, refund deductions on no-payment failure paths, and re-check credits at approval execution. Credit-pool env keys exist, but the credit-pool Stellar account is not created/funded on mainnet yet.
+- **Marketplace credits: LIVE.** Admin can grant expirable credits. Marketplace calls can consume credits via the credit-pool wallet, refund deductions on no-payment failure paths, and re-check credits at approval execution. The credit-pool Stellar account is bootstrapped and funded on mainnet and has been working well.
 - **Credit-grant emails: implemented locally.** Admin credit grants send an immediate user notification with amount, expiry, reason, and dashboard link after the DB transaction commits.
-- **Admin ops console: implemented locally.** Backend admin balance route was repaired on 2026-06-03. Ops wallet, fee wallet, and Base relayer balances read successfully; credit-pool wallet correctly reports account-not-found until it is bootstrapped/funded.
+- **Admin ops console: implemented.** Backend admin balance route was repaired on 2026-06-03. Ops wallet, fee wallet, Base relayer, and credit-pool wallet balances all read successfully.
 - **SKILL.md: v5 local.** Documents CCTP response shapes, Base recipient rules, fee behavior, per-service skill discovery, `/docs`, and `/llms.txt`.
 - **Approval flow: fixed.** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
 - **Email validation: live.** Signup rejects disposable domains and addresses that fail DNS MX check.
-- **What is NOT done yet:** Railway API deploy, credit-pool wallet bootstrap/funding, approval-token CCTP live verification, example payloads, demo Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E.
+- **What is NOT done yet:** approval-token CCTP live verification, example payloads, demo Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E.
 
 ---
 
@@ -316,7 +316,7 @@ tasks/
 | Blockchain | Stellar **mainnet** (live) | USDC only in V1; `STELLAR_NETWORK=mainnet` |
 | Auth | Custom JWT + bcrypt | No third-party auth in V1 |
 | Email | Resend | Transactional emails only |
-| Hosting | Vercel (frontend), Railway (backend) | |
+| Hosting | Vercel (frontend), VPS via Dokploy (backend) | |
 | Stellar SDK | @stellar/stellar-sdk | JavaScript/TypeScript |
 
 ---
@@ -908,6 +908,8 @@ First failure stops processing immediately. Checks run in this order:
 `policy.totalSpent` increments ONLY when a transaction reaches `SUCCESS` status. Never for `PENDING_APPROVAL`, `BLOCKED`, or `FAILED`. If a `PENDING_APPROVAL` transaction is later `APPROVED` and executes, increment `totalSpent` at execution time.
 
 `policy.totalSpent` tracks the **requested amount only**. There is no Argens fee on direct payments — nothing else to exclude.
+
+**Reservation semantics (implemented in `services/policy.ts`).** `checkPolicyAndReserve` atomically checks policy AND increments `totalSpent` in a single `Serializable` transaction so concurrent payments cannot both pass the allowance check independently. The increment happens at check time, not at Stellar submission time. If Stellar submission fails, `releaseSpend` decrements `totalSpent` as a compensating write. For CCTP cross-chain payments via `POST /pay`, the reservation is made at check time (`incrementOnSuccess: false` in the relay executor). For CCTP payments routed through the approval flow (`POST /approve/:token`), `totalSpent` is incremented inside the relay executor on SUCCESS (`incrementOnSuccess: true`). Do not add a second `incrementTotalSpent` call in either path — the relay executor (`services/cctp-relay.ts`) owns that call.
 
 ---
 
