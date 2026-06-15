@@ -21,11 +21,20 @@ export const metadata: Metadata = {
     url: 'https://argens.xyz',
     siteName: 'Argens',
     type: 'website',
+    images: [
+      {
+        url: '/icon.png',
+        width: 1024,
+        height: 1024,
+        alt: 'Argens',
+      },
+    ],
   },
   twitter: {
     card: 'summary',
     title: 'Argens — Programmable payments for AI agents',
     description: 'Give your AI agent the ability to pay. An API key that authorizes autonomous USDC spending on Stellar, within policies you define.',
+    images: ['/icon.png'],
   },
   metadataBase: new URL('https://argens.xyz'),
 }
