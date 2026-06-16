@@ -13,7 +13,6 @@ import {
   Keypair,
   Networks,
   TransactionBuilder,
-  BASE_FEE,
   Operation,
   Address,
   hash,
@@ -71,12 +70,12 @@ export const BASE_DOMAIN = 6
 // ─── Cross-chain fee (Argens revenue on CCTP transfers) ───────────────────────
 
 export const CCTP_FEE_RATE = new Decimal('0.005') // 0.5%
-export const CCTP_FEE_MIN  = new Decimal('0.05')  // $0.05 floor
+export const CCTP_FEE_MIN  = new Decimal('0.01')  // $0.01 floor
 export const CCTP_FEE_MAX  = new Decimal('2.00')  // $2.00 ceiling
 
 /**
  * Returns the Argens fee for a CCTP cross-chain transfer of `amount` USDC.
- * Hybrid model: `clamp(amount * 0.005, 0.05, 2.00)`.
+ * Hybrid model: `clamp(amount * 0.005, 0.01, 2.00)`.
  * Result is a Stellar-formatted amount string (7 decimals).
  */
 export function computeCctpFee(amount: string): string {
@@ -216,8 +215,38 @@ function makeNodeSigner(keypair: Keypair, networkPassphrase: string) {
  * the wallet via transfer_from. The USDC SAC has no on-chain contract spec, so
  * we build and submit the transaction manually with invokeContractFunction.
  */
+// Inclusion fee (stroops) bid for the Soroban approve. BASE_FEE (100 stroops)
+// loses the fee auction under any mempool contention, so the tx sits unincluded
+// until its validity window expires and validators drop it (observed in prod
+// 2026-06-16). 0.01 XLM is a strong inclusion bid; assembleTransaction adds the
+// resource fee on top. Stellar only charges the effective fee, not the full bid.
+const SOROBAN_APPROVE_INCLUSION_FEE = '100000' // 0.01 XLM
+
 async function approveUsdcSpend(keypair: Keypair, amountI128: string): Promise<void> {
   const rpcServer = new sorobanRpc.Server(SOROBAN_RPC_URL)
+
+  // A submitted-but-unincluded approve is the dominant failure mode. Rebuild
+  // with a fresh validity window and resubmit once before giving up.
+  const MAX_ATTEMPTS = 2
+  let lastErr: Error | null = null
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await submitApproveOnce(rpcServer, keypair, amountI128)
+      return
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err))
+      logger.warn('USDC approve attempt failed', { attempt, maxAttempts: MAX_ATTEMPTS, error: lastErr.message })
+      if (attempt < MAX_ATTEMPTS) await sleep(2000)
+    }
+  }
+  throw lastErr ?? new CctpError('USDC approve failed')
+}
+
+async function submitApproveOnce(
+  rpcServer: sorobanRpc.Server,
+  keypair: Keypair,
+  amountI128: string,
+): Promise<void> {
   const latestLedger = await rpcServer.getLatestLedger()
   const expirationLedger = latestLedger.sequence + 100_000
 
@@ -235,11 +264,11 @@ async function approveUsdcSpend(keypair: Keypair, amountI128: string): Promise<v
   })
 
   const tx = new TransactionBuilder(sourceAccount, {
-    fee: BASE_FEE,
+    fee: SOROBAN_APPROVE_INCLUSION_FEE,
     networkPassphrase: NETWORK_PASSPHRASE,
   })
     .addOperation(approveOp)
-    .setTimeout(30)
+    .setTimeout(60)
     .build()
 
   const simResult = await rpcServer.simulateTransaction(tx)
@@ -257,7 +286,8 @@ async function approveUsdcSpend(keypair: Keypair, amountI128: string): Promise<v
 
   logger.info('USDC approve submitted', { hash: sent.hash, amount: amountI128, expirationLedger })
 
-  // Poll until confirmed (max ~60s). Soroban RPC can lag Horizon by several ledgers.
+  // Poll until confirmed (max ~60s, matching the tx validity window). Soroban
+  // RPC can lag Horizon by several ledgers.
   for (let i = 0; i < 30; i++) {
     await sleep(2000)
     const result = await rpcServer.getTransaction(sent.hash)

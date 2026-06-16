@@ -173,7 +173,7 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     '## Call shape',
     '',
     '```http',
-    'POST https://api.argens.io/v1/marketplace/call',
+    'POST https://api.argens.xyz/v1/marketplace/call',
     'Authorization: Bearer <ARGENS_KEY>',
     'Content-Type: application/json',
     '```',
@@ -581,7 +581,7 @@ async function executeMarketplaceCallInternal(
         upstream_body: mppResult.body,
       })
       throw new AppError(
-        'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid — contact support@argens.io with the transaction_id for a full refund.',
+        'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid — contact support@argens.xyz with the transaction_id for a full refund.',
         'MARKETPLACE_SERVICE_UNAVAILABLE',
         503,
         { transaction_id: finalTxId, service_id: service.id },

@@ -178,7 +178,7 @@
 |---|---|
 | Package manager | pnpm workspaces |
 | Database | PostgreSQL local, Prisma ORM |
-| Email | Resend — noreply@argens.io sender |
+| Email | Resend — noreply@argens.xyz sender |
 | Auth | Custom JWT + bcrypt + email verification required |
 | Custody | Agent-custodial — AES-256-GCM encrypted secret key in Postgres |
 | Policy engine | TypeScript (permanent V1) |

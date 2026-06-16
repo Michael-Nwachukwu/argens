@@ -90,7 +90,7 @@ export default function SettingsPage() {
         {/* Password */}
         <Section title="Change password">
           <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: '1.6' }}>
-            Password changes are handled via email. Contact support at <a href="mailto:support@argens.io" style={{ color: 'var(--accent)', textDecoration: 'none' }}>support@argens.io</a> to reset your password.
+            Password changes are handled via email. Contact support at <a href="mailto:support@argens.xyz" style={{ color: 'var(--accent)', textDecoration: 'none' }}>support@argens.xyz</a> to reset your password.
           </div>
         </Section>
 
@@ -254,7 +254,7 @@ export default function SettingsPage() {
               Sign out
             </button>
             <button
-              onClick={() => alert('Contact support@argens.io to delete your account.')}
+              onClick={() => alert('Contact support@argens.xyz to delete your account.')}
               style={{ padding: '8px 16px', background: 'var(--error-low)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, color: 'var(--error)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}
             >
               Delete account…

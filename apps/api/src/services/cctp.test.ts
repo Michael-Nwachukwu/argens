@@ -13,8 +13,13 @@ describe('computeCctpFee', () => {
     expect(computeCctpFee('25.0000000')).toBe('0.1250000')
   })
 
-  it('clamps to minimum ($0.05) for a tiny amount', () => {
-    expect(computeCctpFee('1.0000000')).toBe('0.0500000')
+  it('clamps to minimum ($0.01) for a tiny amount', () => {
+    expect(computeCctpFee('1.0000000')).toBe('0.0100000')
+  })
+
+  it('applies the 0.5% rate above the $0.01 floor', () => {
+    // $5 × 0.005 = $0.025, above the floor — rate applies, not the minimum.
+    expect(computeCctpFee('5.0000000')).toBe('0.0250000')
   })
 
   it('clamps to maximum ($2.00) for a large amount', () => {

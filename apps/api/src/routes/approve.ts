@@ -193,7 +193,7 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
     const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
 
     if (isEvmAddress(transaction.recipientAddress)) {
-      // ── CCTP cross-chain (approved path): fee → burn → fire-and-forget relay ─
+      // ── CCTP cross-chain (approved path): burn → fee → fire-and-forget relay ─
       const mintRecipient32 = encodeEvmRecipient(transaction.recipientAddress)
       const feeAmount = computeCctpFee(amount)
       const feeWallet = process.env['ARGENS_FEE_WALLET']
@@ -235,7 +235,46 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
         throw preflightErr
       }
 
-      let feeTxHash: string
+      // Step 1 — Burn USDC on Stellar (approve + deposit_for_burn). The fee is
+      // charged ONLY after the burn is on-chain, so a failed burn costs no fee.
+      let stellarTxHash: string
+      try {
+        const burnResult = await burnUsdcOnStellar(
+          secretKey,
+          amount,
+          BASE_DOMAIN,
+          mintRecipient32,
+        )
+        stellarTxHash = burnResult.stellarTxHash
+      } catch (burnErr) {
+        const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
+        const errStr = String(burnErr)
+        const errJson = (() => { try { return JSON.stringify(burnErr) } catch { return null } })()
+        // Burn failed before any fee was taken. The approve path increments
+        // totalSpent only in runRelay on success, so nothing needs releasing.
+        logger.error('CCTP burn failed before fee (approved path) — no funds taken', {
+          userId, transactionId: transaction.id, error: errMsg, raw: errStr, json: errJson,
+        })
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'FAILED',
+            blockedReason: errMsg || errStr,
+            metadata: { failureReason: 'cctp_burn_failed' },
+          },
+        })
+        sendError(res, 'Cross-chain payment failed during burn on Stellar. No fee was charged.', 'CCTP_BURN_FAILED', 502, {
+          transaction_id: transaction.id,
+          error: errMsg,
+          raw: errStr,
+          json: errJson,
+        })
+        return
+      }
+
+      // Step 2 — Charge the Argens fee now the burn is irreversible. A failed
+      // fee leaves the transfer intact; log the miss rather than failing.
+      let feeTxHash: string | null = null
       try {
         const feeResult = await submitPayment({
           senderSecretKey: secretKey,
@@ -246,90 +285,46 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
         feeTxHash = feeResult.hash
       } catch (feeErr) {
         const errMsg = feeErr instanceof Error ? feeErr.message : String(feeErr)
-        logger.error('CCTP fee payment failed (approved path)', { userId, transactionId: transaction.id, error: errMsg })
-        await prisma.transaction.update({
-          where: { id: transaction.id },
-          data: { status: 'FAILED', blockedReason: `Fee payment failed: ${errMsg}` },
-        })
-        sendError(res, 'Cross-chain payment failed during fee step. No funds taken.', 'CCTP_FEE_FAILED', 502, {
-          error: errMsg,
-          transaction_id: transaction.id,
-        })
-        return
-      }
-
-      try {
-        const { stellarTxHash } = await burnUsdcOnStellar(
-          secretKey,
-          amount,
-          BASE_DOMAIN,
-          mintRecipient32,
-        )
-
-        await prisma.transaction.update({
-          where: { id: transaction.id },
-          data: {
-            stellarTxHash,
-            crossChain: true,
-            destinationChain: 'base',
-            metadata: {
-              cctpFee: {
-                rate: CCTP_FEE_RATE.toString(),
-                amount: feeAmount,
-                stellar_tx_hash: feeTxHash,
-              },
-            },
-          },
-        })
-
-        void sendApprovalActedEmail(userId, transaction.id, 'approved', amount).catch(
-          (e: unknown) =>
-            logger.error('Failed to send approval acted email', { userId, error: (e as Error).message }),
-        )
-
-        sendSuccess(res, {
-          status: 'cross_chain_pending',
-          transaction_id: transaction.id,
-          stellar_tx_hash: stellarTxHash,
-          destination_chain: 'base',
-          argens_fee: feeAmount,
-          fee_tx_hash: feeTxHash,
-          message: 'USDC burned on Stellar. Relay to Base is in progress.',
-          poll_url: `/v1/transactions/${transaction.id}`,
-        })
-
-        // Approve path: incrementTotalSpent is handled inside runRelay on success.
-        void enqueueRelay(transaction.id, { incrementOnSuccess: true })
-      } catch (burnErr) {
-        const errMsg = burnErr instanceof Error ? burnErr.message : JSON.stringify(burnErr)
-        const errStr = String(burnErr)
-        const errJson = (() => { try { return JSON.stringify(burnErr) } catch { return null } })()
-        logger.error('CCTP burn failed after fee was taken (approved path)', {
-          userId, transactionId: transaction.id, error: errMsg, raw: errStr, json: errJson, feeTxHash, feeAmount,
-        })
-        await prisma.transaction.update({
-          where: { id: transaction.id },
-          data: {
-            status: 'FAILED',
-            blockedReason: errMsg || errStr,
-            metadata: {
-              cctpFee: {
-                rate: CCTP_FEE_RATE.toString(),
-                amount: feeAmount,
-                stellar_tx_hash: feeTxHash,
-              },
-              failureReason: 'cctp_burn_failed_after_fee',
-            },
-          },
-        })
-        sendError(res, 'Cross-chain payment failed during burn on Stellar. Fee will be reconciled manually.', 'CCTP_BURN_FAILED', 502, {
-          transaction_id: transaction.id,
-          error: errMsg,
-          raw: errStr,
-          json: errJson,
-          fee_tx_hash: feeTxHash,
+        logger.error('CCTP fee charge failed AFTER burn (approved path) — transfer completes, fee uncollected', {
+          userId, transactionId: transaction.id, stellarTxHash, feeAmount, error: errMsg,
         })
       }
+
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          stellarTxHash,
+          crossChain: true,
+          destinationChain: 'base',
+          metadata: {
+            cctpFee: {
+              rate: CCTP_FEE_RATE.toString(),
+              amount: feeAmount,
+              stellar_tx_hash: feeTxHash,
+              ...(feeTxHash ? {} : { uncollected: true }),
+            },
+          },
+        },
+      })
+
+      void sendApprovalActedEmail(userId, transaction.id, 'approved', amount).catch(
+        (e: unknown) =>
+          logger.error('Failed to send approval acted email', { userId, error: (e as Error).message }),
+      )
+
+      sendSuccess(res, {
+        status: 'cross_chain_pending',
+        transaction_id: transaction.id,
+        stellar_tx_hash: stellarTxHash,
+        destination_chain: 'base',
+        argens_fee: feeAmount,
+        fee_tx_hash: feeTxHash,
+        message: 'USDC burned on Stellar. Relay to Base is in progress.',
+        poll_url: `/v1/transactions/${transaction.id}`,
+      })
+
+      // Approve path: incrementTotalSpent is handled inside runRelay on success.
+      void enqueueRelay(transaction.id, { incrementOnSuccess: true })
     } else {
       // ── Stellar direct payment ───────────────────────────────────────────────
       try {

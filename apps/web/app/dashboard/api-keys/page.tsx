@@ -108,7 +108,7 @@ export default function ApiKeysPage() {
             <span style={{ color: 'var(--faint)' }}># Set in your agent&apos;s environment:</span><br />
             <span style={{ color: 'var(--accent)' }}>ARGENS_KEY</span>=your_key_here<br /><br />
             <span style={{ color: 'var(--faint)' }}># Call the payments API:</span><br />
-            <span style={{ color: 'var(--success)' }}>POST</span> https://api.argens.io/v1/pay<br />
+            <span style={{ color: 'var(--success)' }}>POST</span> https://api.argens.xyz/v1/pay<br />
             <span style={{ color: 'var(--faint)' }}>Authorization: Bearer $ARGENS_KEY</span>
           </div>
         </div>
