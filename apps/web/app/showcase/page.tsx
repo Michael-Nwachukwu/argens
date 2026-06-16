@@ -254,7 +254,7 @@ export default function ShowcasePage() {
               <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 16, fontWeight: 600, marginBottom: 6, color: t.text }}>Built something with Argens?</div>
               <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>Ship it here. Send us a note with your project name, a short description, and a thumbnail.</div>
             </div>
-            <a href="mailto:hello@argens.io?subject=Showcase submission" style={{ padding: '10px 22px', background: t.accent, borderRadius: 8, fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 600, color: t.bg, textDecoration: 'none', flexShrink: 0 }}>
+            <a href="mailto:hello@argens.xyz?subject=Showcase submission" style={{ padding: '10px 22px', background: t.accent, borderRadius: 8, fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 600, color: t.bg, textDecoration: 'none', flexShrink: 0 }}>
               Submit your project →
             </a>
           </div>

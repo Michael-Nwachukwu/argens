@@ -1025,7 +1025,7 @@ function CrossChain() {
     { icon: '◈', title: 'No bridges', desc: 'Circle CCTP V2 burns on Stellar and mints on Base. Native USDC only — no synthetic assets, no wrapped tokens.' },
     { icon: '⌘', title: 'Zero config', desc: 'Pass any 0x... address to POST /pay. Chain detection is automatic — no extra params needed.' },
     { icon: '◇', title: '~8–20 seconds', desc: 'Fast Transfer on CCTP V2. Argens uses Fast Transfer by default for near-instant cross-chain settlement.' },
-    { icon: '◎', title: '0.5% fee · capped', desc: 'Cross-chain fee is 0.5% of amount, min $0.05, max $2.00 USDC. Direct Stellar payments remain $0 fee.' },
+    { icon: '◎', title: '0.5% fee · capped', desc: 'Cross-chain fee is 0.5% of amount, min $0.01, max $2.00 USDC. Direct Stellar payments remain $0 fee.' },
   ]
 
   const nodeCss = (delay: number, glow?: string): React.CSSProperties => ({
@@ -1061,7 +1061,7 @@ function CrossChain() {
               Pay any Base address.<br/>From Stellar, in one call.
             </h2>
             <p style={{ fontSize: 16, color: t.muted, lineHeight: 1.75, maxWidth: 480, margin: '0 auto' }}>
-              Argens auto-routes <code style={{ fontFamily: 'monospace', color: t.text2 }}>0x...</code> recipients via Circle CCTP V2. Burn on Stellar, mint natively on Base — no bridge, no wrapping, one API call. <span style={{ color: t.text2 }}>0.5% fee · min $0.05 · max $2.</span>
+              Argens auto-routes <code style={{ fontFamily: 'monospace', color: t.text2 }}>0x...</code> recipients via Circle CCTP V2. Burn on Stellar, mint natively on Base — no bridge, no wrapping, one API call. <span style={{ color: t.text2 }}>0.5% fee · min $0.01 · max $2.</span>
             </p>
           </div>
         </FadeUp>

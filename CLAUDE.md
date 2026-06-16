@@ -592,7 +592,7 @@ model AuditLog {
 
 ### Base URL
 - Development: `http://localhost:3001/v1`
-- Production: `https://api.argens.io/v1`
+- Production: `https://api.argens.xyz/v1`
 
 ### Authentication
 
@@ -838,7 +838,7 @@ The agent fetches the file, loads it into its context, and now understands the f
 
 - One-paragraph product overview ("Argens is a payment API for AI agents…")
 - Authentication — *"Ask the user for their `ARGENS_KEY` (format: `argns_live_...`). Set it as `Authorization: Bearer <key>`."*
-- Base URL — `https://api.argens.io/v1`
+- Base URL — `https://api.argens.xyz/v1`
 - The five endpoints an agent actually needs: `POST /pay`, `POST /quote`, `GET /wallet/balance`, `GET /agent/status`, `GET /transactions/:id`. Full request and response shapes in JSON.
 - Amount format rule (strings, 7 decimals).
 - Chain detection rule: `G...` Stellar address → Stellar payment; `0x...` EVM address → Base USDC via CCTP V2. Agent passes the recipient address as-is — Argens routes automatically.
@@ -930,7 +930,7 @@ All notifications are sent via Resend. Every notification is idempotent (same tr
 
 **Wallet-funded detection mechanism.** Argens subscribes to Horizon's payments SSE stream per active wallet: `/accounts/{publicKey}/payments?cursor=now`. On an incoming USDC payment, it invalidates `balanceCache`, writes an AuditLog entry, and sends the email (subject to rate limit). If the SSE stream drops, a 60s fallback poller reads `/accounts/{publicKey}/payments?cursor={lastSeen}` to catch missed events. Never rely on polling alone — SSE gives sub-second latency, poll is a backstop.
 
-**Approval email security.** Emails **must not** contain direct `GET` action URLs. The email contains a link to a dashboard confirmation page (`https://app.argens.io/approve/confirm?token=...`) that renders the transaction detail and submits `POST /approve/:token` or `POST /reject/:token` from a form. See [Security Rules](#security-rules--non-negotiable).
+**Approval email security.** Emails **must not** contain direct `GET` action URLs. The email contains a link to a dashboard confirmation page (`https://app.argens.xyz/approve/confirm?token=...`) that renders the transaction detail and submits `POST /approve/:token` or `POST /reject/:token` from a form. See [Security Rules](#security-rules--non-negotiable).
 
 ---
 
@@ -1278,7 +1278,7 @@ SOROBAN_RPC_URL="https://soroban-testnet.stellar.org"   # unused in V1 — Sorob
 ENCRYPTION_KEY="generate-with: openssl rand -hex 32"
 
 RESEND_API_KEY="re_..."
-RESEND_FROM_EMAIL="noreply@argens.io"
+RESEND_FROM_EMAIL="noreply@argens.xyz"
 
 API_PORT=3001
 FRONTEND_URL="http://localhost:3000"

@@ -5,6 +5,24 @@
 
 ---
 
+## Active 2026-06-16 — CCTP fee-after-burn + approve hardening
+
+**Goal:** A failed cross-chain burn must never cost the user a fee; harden the fragile Soroban approve; lower CCTP fee floor to $0.01; fix stale api.argens.xyz base URLs.
+**Root cause (verified on-chain):** approve tx `b460ef…` submitted PENDING but never included (Horizon 404, Soroban RPC NOT_FOUND) — dropped by 100-stroop inclusion fee + 30s validity window. Fee tx `5794a7…` succeeded, so the user lost $0.05 on a transfer that delivered nothing to Base.
+**Files affected:** `apps/api/src/services/cctp.ts`, `apps/api/src/routes/transactions.ts`, `apps/web/app/dashboard/api-keys/page.tsx`, `apps/api/src/services/marketplace.ts`, `CLAUDE.md`, `AGENTS.md`.
+**Steps:**
+- [x] cctp.ts: `CCTP_FEE_MIN` 0.05 → 0.01 (+ docstring, test)
+- [x] cctp.ts: harden `approveUsdcSpend` — 0.01 XLM inclusion fee, 60s window, retry once on drop
+- [x] transactions.ts: reorder to burn → fee. Burn failure releases reservation + FAILED + "no fee charged". Fee failure after burn is non-fatal (transfer completes; fee logged uncollected)
+- [x] approve.ts: identical burn → fee reorder (approval-token CCTP path; no releaseSpend since totalSpent increments in runRelay)
+- [x] Fix `api.argens.xyz` → `api.argens.xyz` (api-keys page, marketplace.ts, CLAUDE.md, AGENTS.md)
+- [x] Update fee-floor docs: SKILL.md (v6), LandingPage.tsx
+- [x] tsc --noEmit clean; 50/50 tests pass
+**Risks:** Live mainnet payment path. New non-atomic gap is "burn ok, fee fails" — favors the user (transfer completes, Argens misses the fee). Inclusion-fee bump must stay a sane XLM cost.
+**Done when:** check passes; burn-failure path charges no fee and releases reservation; fee floor is $0.01.
+
+---
+
 ## Active 2026-06-03 — Credits, CCTP, Admin Hardening
 
 **Goal:** Finish the beta rollout repair cleanly: make admin balances reliable, fail CCTP safely before non-atomic fee/burn execution, notify users when credits are granted, and audit every endpoint touched by credits/CCTP/admin work.

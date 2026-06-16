@@ -50,7 +50,7 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
     const apiKey = process.env['RESEND_API_KEY']
     if (!apiKey) throw new Error('RESEND_API_KEY not set')
     const resend = new Resend(apiKey)
-    const from = process.env['RESEND_FROM_EMAIL'] ?? 'noreply@argens.io'
+    const from = process.env['RESEND_FROM_EMAIL'] ?? 'noreply@argens.xyz'
     // In dev without a verified domain, override `to` so emails actually arrive.
     const overrideRaw = process.env['NODE_ENV'] !== 'production' ? process.env['RESEND_DEV_OVERRIDE_TO'] : undefined
     const devOverride = overrideRaw && overrideRaw.length > 0 ? overrideRaw : undefined
@@ -64,7 +64,7 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
   // Ethereal — catches all emails in a test inbox, shows preview URL in console.
   const transport = await getEtherealTransport()
   const info = await transport.sendMail({
-    from: '"Argens" <noreply@argens.io>',
+    from: '"Argens" <noreply@argens.xyz>',
     ...payload,
   })
   const previewUrl = nodemailer.getTestMessageUrl(info)
@@ -143,7 +143,7 @@ function buildEmailHtml(content: string): string {
               <p style="margin:0;font-size:12px;color:#8C8480;line-height:1.5;">
                 <a href="${FRONTEND_URL}" style="color:#8C8480;text-decoration:underline;">argens.xyz</a>
                 &nbsp;·&nbsp;
-                <a href="mailto:hello@argens.io" style="color:#8C8480;text-decoration:underline;">hello@argens.io</a>
+                <a href="mailto:hello@argens.xyz" style="color:#8C8480;text-decoration:underline;">hello@argens.xyz</a>
               </p>
             </td>
           </tr>
@@ -239,10 +239,10 @@ export function sendApiKeyRegeneratedEmail(to: string): Promise<void> {
     ${bodyText("Any agents or integrations using the previous API key will stop working immediately. Update them with the new key from your dashboard.")}
     ${ctaButton('Go to API keys', `${FRONTEND_URL}/api-keys`)}
     ${divider()}
-    ${mutedText("If you did not regenerate this key, someone else may have access to your account. Contact us immediately at <a href='mailto:hello@argens.io' style='color:#9C9490;'>hello@argens.io</a>.")}
+    ${mutedText("If you did not regenerate this key, someone else may have access to your account. Contact us immediately at <a href='mailto:hello@argens.xyz' style='color:#9C9490;'>hello@argens.xyz</a>.")}
   `)
 
-  const text = `Your Argens API key was regenerated.\n\nAny agents using the old key will stop working. Update them with the new key from your dashboard.\n\n${FRONTEND_URL}/api-keys\n\nIf you didn't do this, contact hello@argens.io immediately.`
+  const text = `Your Argens API key was regenerated.\n\nAny agents using the old key will stop working. Update them with the new key from your dashboard.\n\n${FRONTEND_URL}/api-keys\n\nIf you didn't do this, contact hello@argens.xyz immediately.`
 
   return sendEmail({ to, subject: 'Your Argens API key was regenerated', html, text })
 }
@@ -500,10 +500,10 @@ export async function sendPolicyChangedEmail(
     ${summaryHtml}
     ${ctaButton('Review your policies', `${FRONTEND_URL}/policies`)}
     ${divider()}
-    ${mutedText("If you did not make this change, contact us immediately at <a href='mailto:hello@argens.io' style='color:#9C9490;'>hello@argens.io</a>.")}
+    ${mutedText("If you did not make this change, contact us immediately at <a href='mailto:hello@argens.xyz' style='color:#9C9490;'>hello@argens.xyz</a>.")}
   `)
 
-  const text = `Your Argens spending policies were updated.\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n') || 'All limits cleared.'}\n\nIf you didn't make this change, contact hello@argens.io immediately.\n\n${FRONTEND_URL}/policies`
+  const text = `Your Argens spending policies were updated.\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n') || 'All limits cleared.'}\n\nIf you didn't make this change, contact hello@argens.xyz immediately.\n\n${FRONTEND_URL}/policies`
 
   return sendEmail({ to, subject: 'Spending policies updated', html, text })
 }
