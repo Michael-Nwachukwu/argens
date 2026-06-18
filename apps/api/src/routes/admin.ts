@@ -28,6 +28,14 @@ import { validate } from '../middleware/validate.js'
 import { CREDIT_DEFAULT_EXPIRY_DAYS } from '../services/credits.js'
 import { getWalletBalancesReport } from '../services/admin-balances.js'
 import { sendCreditsGrantedEmail } from '../services/email.js'
+import { setGlobalServiceEnabled } from '../services/marketplace.js'
+import {
+  listMppRouterServices,
+  providerKey,
+  providerKeyFromServiceId,
+  providerDisplayName,
+} from '../services/mpp-router.js'
+import { AppError } from '../lib/errors.js'
 
 export const adminRouter: Router = ExpressRouter()
 
@@ -445,6 +453,104 @@ adminRouter.get('/transactions/failed', async (req, res) => {
   } catch (e) {
     logger.error('Admin failed-tx list failed', { error: (e as Error).message })
     sendError(res, 'Could not list failed transactions.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// ─── Marketplace global kill-switch (Track A) ──────────────────────────────────
+
+// GET /admin/marketplace/services — every provider with its global enabled state,
+// note, endpoint count, and FAILED / refund-required transaction counts for triage.
+adminRouter.get('/marketplace/services', async (_req, res) => {
+  try {
+    const [services, settings, failedByService, refundByService] = await Promise.all([
+      listMppRouterServices(),
+      prisma.globalServiceSetting.findMany(),
+      prisma.transaction.groupBy({
+        by: ['serviceId'],
+        where: { type: 'marketplace', status: 'FAILED', serviceId: { not: null } },
+        _count: { _all: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ['serviceId'],
+        where: {
+          type: 'marketplace',
+          status: 'FAILED',
+          serviceId: { not: null },
+          metadata: { path: ['refund', 'required'], equals: true },
+        },
+        _count: { _all: true },
+      }),
+    ])
+
+    const settingByProvider = new Map(settings.map((s) => [s.providerId, s]))
+
+    // Endpoint serviceId → provider key, then aggregate counts to the provider.
+    const failedByProvider = new Map<string, number>()
+    for (const row of failedByService) {
+      if (!row.serviceId) continue
+      const key = providerKeyFromServiceId(row.serviceId)
+      failedByProvider.set(key, (failedByProvider.get(key) ?? 0) + row._count._all)
+    }
+    const refundByProvider = new Map<string, number>()
+    for (const row of refundByService) {
+      if (!row.serviceId) continue
+      const key = providerKeyFromServiceId(row.serviceId)
+      refundByProvider.set(key, (refundByProvider.get(key) ?? 0) + row._count._all)
+    }
+
+    const groups = new Map<string, { name: string; count: number }>()
+    for (const svc of services) {
+      const key = providerKey(svc)
+      const g = groups.get(key)
+      if (g) g.count += 1
+      else groups.set(key, { name: providerDisplayName(svc), count: 1 })
+    }
+
+    const providers = [...groups.entries()]
+      .map(([id, g]) => {
+        const setting = settingByProvider.get(id)
+        return {
+          provider_id: id,
+          name: g.name,
+          endpoint_count: g.count,
+          enabled: setting ? setting.enabled : true, // absence = enabled
+          note: setting?.note ?? null,
+          failed_count: failedByProvider.get(id) ?? 0,
+          refund_required_count: refundByProvider.get(id) ?? 0,
+          updated_at: setting?.updatedAt ?? null,
+        }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    sendSuccess(res, { providers, total: providers.length })
+  } catch (e) {
+    logger.error('Admin marketplace services list failed', { error: (e as Error).message })
+    sendError(res, 'Could not list marketplace services.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+const toggleServiceSchema = z.object({
+  enabled: z.boolean(),
+  note: z.string().max(280).optional(),
+})
+
+// POST /admin/marketplace/services/:providerId — pause/resume a provider platform-wide.
+adminRouter.post('/marketplace/services/:providerId', validate(toggleServiceSchema), async (req, res) => {
+  const { providerId } = req.params as { providerId: string }
+  const { enabled, note } = req.body as z.infer<typeof toggleServiceSchema>
+  try {
+    const result = await setGlobalServiceEnabled(providerId, enabled, note)
+    // No AuditLog row: AuditLog.userId is a required FK to User and a global
+    // toggle has no associated user. The structured log below is the audit trail.
+    logger.info('Admin toggled global marketplace service', { providerId, enabled, note: note ?? null })
+    sendSuccess(res, result)
+  } catch (e) {
+    if (e instanceof AppError) {
+      sendError(res, e.message, e.code, e.statusCode, e.details)
+      return
+    }
+    logger.error('Admin marketplace toggle failed', { providerId, error: (e as Error).message })
+    sendError(res, 'Could not update marketplace service.', 'INTERNAL_ERROR', 500)
   }
 })
 

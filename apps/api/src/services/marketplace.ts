@@ -23,8 +23,9 @@ import {
   providerKey,
   type MppRouterService,
 } from './mpp-router.js'
-import { sendBlockedEmail, sendPendingApprovalEmail } from './email.js'
+import { sendBlockedEmail, sendPendingApprovalEmail, sendMarketplaceRefundAlertEmail } from './email.js'
 import { consumeCredits, getActiveCreditsBalance, refundCredits } from './credits.js'
+import { examplePayloadFor } from './marketplace-examples.js'
 
 const MARKUP_RATE = new Decimal('0.20')
 const MPP_USDC_BASE_UNITS = new Decimal('10000000')
@@ -79,15 +80,17 @@ interface ApprovedMarketplaceTransaction {
  * a `MarketplaceServiceSetting` row is keyed by the provider key, not the operation id.
  */
 export async function getMarketplaceServicesForResponse(userId: string) {
-  const [services, settings] = await Promise.all([
+  const [services, settings, globallyDisabled] = await Promise.all([
     listMppRouterServices(),
     prisma.marketplaceServiceSetting.findMany({ where: { userId } }),
+    getGloballyDisabledProviderIds(),
   ])
   const enabledByProvider = new Map(settings.map((s) => [s.serviceId, s.enabled]))
 
   const groups = new Map<string, MppRouterService[]>()
   for (const svc of services) {
     const key = providerKey(svc)
+    if (globallyDisabled.has(key)) continue // hidden platform-wide
     const arr = groups.get(key)
     if (arr) arr.push(svc)
     else groups.set(key, [svc])
@@ -127,7 +130,7 @@ export async function getMarketplaceServicesForResponse(userId: string) {
           path: o.public_path,
           description: o.description,
           price: o.price,
-          example_payload: null as Record<string, unknown> | null,
+          example_payload: examplePayloadFor(o.id, id),
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     }
@@ -182,7 +185,7 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     JSON.stringify(
       {
         service_id: first.id,
-        payload: {},
+        payload: examplePayloadFor(first.id, providerId) ?? {},
         query: {},
       },
       null,
@@ -190,21 +193,29 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     ),
     '```',
     '',
-    'Use `payload` for the upstream JSON body and `query` for URL query parameters. Omit either field when the endpoint does not need it.',
+    'Use `payload` for the upstream JSON body and `query` for URL query parameters. Omit either field when the endpoint does not need it. Where an endpoint below shows an example payload, copy it and adjust the values.',
     '',
     '## Endpoints',
     '',
-    ...ops.flatMap((op) => [
-      `### ${operationLabel(op)}`,
-      '',
-      `- Endpoint id: \`${op.id}\``,
-      `- Method: \`${op.method}\``,
-      `- Upstream path: \`${op.public_path}\``,
-      `- Price shown by provider: ${op.price}`,
-      op.description ? `- Description: ${op.description}` : null,
-      op.docs_url ? `- Docs: ${op.docs_url}` : null,
-      '',
-    ]),
+    ...ops.flatMap((op) => {
+      const example = examplePayloadFor(op.id, providerId)
+      return [
+        `### ${operationLabel(op)}`,
+        '',
+        `- Endpoint id: \`${op.id}\``,
+        `- Method: \`${op.method}\``,
+        `- Upstream path: \`${op.public_path}\``,
+        `- Price shown by provider: ${op.price}`,
+        op.description ? `- Description: ${op.description}` : null,
+        op.docs_url ? `- Docs: ${op.docs_url}` : null,
+        example ? '' : null,
+        example ? 'Example payload:' : null,
+        example ? '```json' : null,
+        example ? JSON.stringify(example, null, 2) : null,
+        example ? '```' : null,
+        '',
+      ]
+    }),
     docs.length ? '## Upstream Docs' : null,
     '',
     ...docs.map((url) => `- ${url}`),
@@ -226,6 +237,46 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
   ]
     .filter((line): line is string => line !== null)
     .join('\n')
+}
+
+// ─── Global (platform-wide) kill-switch ─────────────────────────────────────
+//
+// A provider with no GlobalServiceSetting row is enabled. Admin writes a row
+// only to pause a provider. We cache the small set of paused ids briefly so the
+// per-request lookup doesn't hit the DB on every catalog read / marketplace call.
+
+let disabledCache: { ids: Set<string>; expiresAt: number } | null = null
+const DISABLED_CACHE_TTL_MS = 30_000
+
+/** Provider ids that are globally paused (enabled = false). Cached ~30s. */
+export async function getGloballyDisabledProviderIds(): Promise<Set<string>> {
+  if (disabledCache && Date.now() < disabledCache.expiresAt) return disabledCache.ids
+  const rows = await prisma.globalServiceSetting.findMany({
+    where: { enabled: false },
+    select: { providerId: true },
+  })
+  const ids = new Set(rows.map((r) => r.providerId))
+  disabledCache = { ids, expiresAt: Date.now() + DISABLED_CACHE_TTL_MS }
+  return ids
+}
+
+/** Pause or resume a provider platform-wide. Invalidates the disabled cache. */
+export async function setGlobalServiceEnabled(
+  providerId: string,
+  enabled: boolean,
+  note?: string,
+) {
+  const services = await listMppRouterServices()
+  const exists = services.some((s) => providerKey(s) === providerId)
+  if (!exists) throw new AppError('Marketplace provider not found', 'SERVICE_NOT_FOUND', 404)
+
+  const setting = await prisma.globalServiceSetting.upsert({
+    where: { providerId },
+    update: { enabled, note: note ?? null },
+    create: { providerId, enabled, note: note ?? null },
+  })
+  disabledCache = null
+  return { provider_id: setting.providerId, enabled: setting.enabled, note: setting.note }
 }
 
 /** Enable or disable a whole provider (all of its endpoints) for a user. */
@@ -313,6 +364,18 @@ async function executeMarketplaceCallInternal(
 
   const service = await findMppRouterService(input.serviceId)
   if (!service) throw new AppError('Marketplace service not found', 'SERVICE_NOT_FOUND', 404)
+
+  // Global kill-switch wins over per-user enablement. A paused provider is fully
+  // off for everyone — reject before any wallet/credit/policy work happens.
+  const globallyDisabled = await getGloballyDisabledProviderIds()
+  if (globallyDisabled.has(providerKey(service))) {
+    throw new AppError(
+      'This marketplace service is temporarily paused by Argens.',
+      'MARKETPLACE_SERVICE_PAUSED',
+      503,
+      { service_id: service.id, provider: providerKey(service) },
+    )
+  }
 
   await assertServiceEnabled(userId, service)
 
@@ -554,6 +617,11 @@ async function executeMarketplaceCallInternal(
     // an upstream-service issue (handled by markMarketplaceFailed). If no receipt
     // exists, the payment likely never went through — refund credits.
     const paymentCommitted = Boolean(mppResult.receipt)
+
+    // The silent-loss case: the user's OWN USDC was pulled on-chain (receipt present)
+    // but the service failed. Credits auto-refund below, so only flag the USDC path.
+    const refundRequired = paymentCommitted && !state.paidWithCredits
+
     if (state.paidWithCredits && state.creditDeductions?.length && !paymentCommitted) {
       await refundCredits(state.creditDeductions).catch((refundErr) =>
         logger.error('Credit refund failed after MPP upstream failure — manual reconciliation needed', {
@@ -564,7 +632,58 @@ async function executeMarketplaceCallInternal(
         }),
       )
     }
-    await markMarketplaceFailed(finalTxId, `MPP Router returned HTTP ${mppResult.status}`, mppResult)
+
+    const failureReason = `MPP Router returned HTTP ${mppResult.status}`
+    await markMarketplaceFailed(
+      finalTxId,
+      failureReason,
+      mppResult,
+      refundRequired ? { refundRequired: true, refundAmount: finalCost.totalString } : undefined,
+    )
+
+    if (refundRequired) {
+      // Operator-facing: write an audit trail and alert so the manual refund happens.
+      // Both are best-effort — never block or swallow.
+      await prisma.auditLog
+        .create({
+          data: {
+            userId,
+            eventType: 'MARKETPLACE_REFUND_REQUIRED',
+            eventData: {
+              transactionId: finalTxId,
+              serviceId: service.id,
+              amount: finalCost.totalString,
+              upstreamStatus: mppResult.status,
+              reason: failureReason,
+            },
+          },
+        })
+        .catch((e: unknown) =>
+          logger.error('Audit write failed for MARKETPLACE_REFUND_REQUIRED', {
+            userId,
+            transactionId: finalTxId,
+            error: (e as Error).message,
+          }),
+        )
+
+      void (async () => {
+        const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
+        await sendMarketplaceRefundAlertEmail({
+          transactionId: finalTxId,
+          userEmail: u?.email ?? userId,
+          serviceId: service.id,
+          amount: finalCost.totalString,
+          upstreamStatus: mppResult.status,
+          reason: failureReason,
+        })
+      })().catch((e: unknown) =>
+        logger.error('Marketplace refund alert email failed', {
+          userId,
+          transactionId: finalTxId,
+          error: (e as Error).message,
+        }),
+      )
+    }
 
     // Detect "channel not installed" — this is an Argens-side infrastructure gap, not a
     // caller error. Give a clear message so the agent isn't confused about its own request.
@@ -788,6 +907,7 @@ async function markMarketplaceFailed(
   transactionId: string,
   reason: string,
   mppResult?: MppRequestResult,
+  refund?: { refundRequired: boolean; refundAmount?: string },
 ): Promise<void> {
   await prisma.transaction.update({
     where: { id: transactionId },
@@ -801,6 +921,20 @@ async function markMarketplaceFailed(
           upstream_status: mppResult?.status ?? null,
           upstream_body: mppResult?.body ?? null,
         },
+        // Marks the paid-but-undelivered case for the operator's manual-refund queue.
+        // Surfaced in the Ops Console (GET /admin/transactions/failed) and aggregated
+        // per provider in GET /admin/marketplace/services.
+        ...(refund?.refundRequired
+          ? {
+              refund: {
+                required: true,
+                amount: refund.refundAmount ?? null,
+                reason,
+                receipt_reference: mppResult?.receipt?.reference ?? null,
+                upstream_status: mppResult?.status ?? null,
+              },
+            }
+          : {}),
       } as unknown as Prisma.InputJsonValue,
     },
   })

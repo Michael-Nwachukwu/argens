@@ -473,6 +473,44 @@ export async function sendOpsAlertEmail(alerts: Array<{
   await sendEmail({ to: adminEmail, subject: '[Argens Ops] Wallet balance alert', html, text })
 }
 
+/**
+ * Sent to the operator (ADMIN_ALERT_EMAIL) when a marketplace call pulled the
+ * user's USDC on-chain but the upstream service relay failed — the user paid and
+ * got nothing. Flags a manual refund. Not sent to end users.
+ */
+export async function sendMarketplaceRefundAlertEmail(params: {
+  transactionId: string
+  userEmail: string
+  serviceId: string
+  amount: string
+  upstreamStatus: number | null
+  reason: string
+}): Promise<void> {
+  const adminEmail = process.env['ADMIN_ALERT_EMAIL']
+  if (!adminEmail) return
+
+  const html = buildEmailHtml(`
+    ${statusBadge('Refund required', '#A04848', '#FAF0F0')}
+    <div style="height:14px;"></div>
+    ${sectionHeading('Marketplace call charged but not delivered')}
+    ${bodyText("A user's USDC was pulled on-chain for a marketplace call, but the upstream service did not deliver. Refund the user manually and consider pausing the provider from the Ops Console.")}
+    ${dataTable([
+      ['Transaction', escapeHtml(params.transactionId)],
+      ['User', escapeHtml(params.userEmail)],
+      ['Service', escapeHtml(params.serviceId)],
+      ['Amount to refund', `${escapeHtml(params.amount)} USDC`],
+      ['Upstream status', params.upstreamStatus != null ? String(params.upstreamStatus) : 'unknown'],
+      ['Reason', escapeHtml(params.reason)],
+    ])}
+    ${divider()}
+    ${mutedText("Refunds are manual: send the amount back to the user's wallet and note both transaction ids. Repeated failures for one provider mean it should be paused platform-wide.")}
+  `)
+
+  const text = `Argens marketplace refund required.\n\nTransaction: ${params.transactionId}\nUser: ${params.userEmail}\nService: ${params.serviceId}\nAmount: ${params.amount} USDC\nUpstream status: ${params.upstreamStatus ?? 'unknown'}\nReason: ${params.reason}`
+
+  await sendEmail({ to: adminEmail, subject: '[Argens Ops] Marketplace refund required', html, text })
+}
+
 export async function sendPolicyChangedEmail(
   userId: string,
   policies: {

@@ -1,4 +1,4 @@
-# Argens Skill — v6 — updated 2026-06-16
+# Argens Skill — v7 — updated 2026-06-17
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -264,6 +264,21 @@ The Argens Marketplace connects agents to 80+ paid AI services (LLMs, web search
 
 ---
 
+### Before calling any marketplace service — read its skill file
+
+The catalog does **not** include request schemas, so you cannot infer a valid request body from `GET /marketplace/services` alone. Two sources tell you the exact body shape — use them before you call:
+
+1. **`example_payload`** — every endpoint in `GET /marketplace/services` now carries an `endpoints[].example_payload` field (may be `null` if not yet authored). When present, copy it and adjust the values.
+2. **The per-service skill file** — every provider has a dedicated skill file listing its endpoints, prices, example payloads, and response rules:
+   - `https://argens.xyz/SKILL/{provider_id}.md` (public)
+   - `https://api.argens.xyz/v1/marketplace/services/{provider_id}/skill.md` (same content from the API)
+
+   **Always fetch the provider skill file before constructing a `/marketplace/call` body.** It is the authoritative per-provider guide. The `skill_url` and `api_skill_url` fields on each provider in the catalog link straight to it.
+
+A provider can also be paused platform-wide by Argens (e.g. while a provider is broken upstream). Paused providers do not appear in the catalog and return `503 MARKETPLACE_SERVICE_PAUSED` if called directly — do not retry; tell the user it's temporarily unavailable.
+
+---
+
 ### Step 1 — Discover services
 
 ```
@@ -375,9 +390,10 @@ POST /marketplace/call
 | Code | Meaning |
 |---|---|
 | `SERVICE_NOT_FOUND` | `service_id` doesn't match any endpoint in the catalog |
-| `SERVICE_DISABLED` | Provider not enabled — user must enable from dashboard |
+| `SERVICE_DISABLED` | Provider not enabled by the developer — user must enable from dashboard |
+| `MARKETPLACE_SERVICE_PAUSED` | Provider paused platform-wide by Argens (broken upstream) — do not retry |
 | `MARKETPLACE_NOT_MPP` | Upstream service rejected before payment — no USDC charged, fix the request |
-| `MARKETPLACE_UPSTREAM_FAILED` | Payment sent but upstream service errored — see `upstream_body` in details |
+| `MARKETPLACE_UPSTREAM_FAILED` | Payment sent but upstream service errored — see `upstream_body` in details; the developer is auto-notified for a refund |
 
 ---
 
@@ -415,8 +431,9 @@ POST /marketplace/call
 - `0x...` (42 chars) = Base EVM address → CCTP cross-chain, poll for `destination_tx_hash`
 - A `cross_chain_pending` response means the burn succeeded — poll `poll_url` until `SUCCESS`
 - `service_id` in `/marketplace/call` is the **endpoint id** (`endpoints[].id`), not the provider `id`
-- Fetch `/SKILL/{provider_id}.md` after service discovery when you need endpoint-specific marketplace instructions
+- Always fetch `/SKILL/{provider_id}.md` (or read the endpoint's `example_payload`) before building a `/marketplace/call` body — the catalog has no schemas
 - A `SERVICE_DISABLED` error means the provider is off in the user's dashboard — do not retry; tell the user to enable it
+- A `MARKETPLACE_SERVICE_PAUSED` error means Argens paused the provider platform-wide — do not retry; it's temporarily unavailable
 - A `MARKETPLACE_NOT_MPP` error means no USDC was charged — the request payload was wrong; fix it and retry
 
 ---

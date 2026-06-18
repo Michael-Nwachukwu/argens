@@ -147,6 +147,20 @@ model MarketplaceServiceSetting {
   @@index([userId])
 }
 
+// Global (platform-wide) marketplace kill-switch, keyed by provider id.
+// Absence of a row = provider is enabled. Admin writes a row only to PAUSE a
+// provider (enabled = false), e.g. when it's broken upstream. A paused provider
+// is hidden from GET /marketplace/services and rejected by POST /marketplace/call,
+// overriding any per-user MarketplaceServiceSetting.
+model GlobalServiceSetting {
+  id         String   @id @default(cuid())
+  providerId String   @unique           // provider key, e.g. "exa", "alchemy"
+  enabled    Boolean  @default(true)
+  note       String?                     // admin context: why paused
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
 // Beta access codes — floating, single-use. Admin issues; user redeems at signup.
 model AccessCode {
   id          String    @id @default(cuid())
