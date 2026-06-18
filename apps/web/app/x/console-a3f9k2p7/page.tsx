@@ -49,7 +49,7 @@ interface Stats {
   transactions: { total: number; failed: number; pending_approval: number }
 }
 
-type Tab = 'users' | 'codes' | 'credits' | 'failed'
+type Tab = 'users' | 'codes' | 'credits' | 'failed' | 'services'
 
 interface UserRow {
   id: string
@@ -91,6 +91,20 @@ interface FailedTxRow {
   blockedReason: string | null
   createdAt: string
   user: { email: string }
+  type?: string
+  serviceId?: string | null
+  metadata?: { refund?: { required?: boolean; amount?: string | null } } | null
+}
+
+interface AdminServiceRow {
+  provider_id: string
+  name: string
+  endpoint_count: number
+  enabled: boolean
+  note: string | null
+  failed_count: number
+  refund_required_count: number
+  updated_at: string | null
 }
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -258,6 +272,7 @@ function Console({ onLogout }: { onLogout: () => void }) {
             ['codes', 'Access codes'],
             ['credits', 'Credits'],
             ['failed', 'Failed txns'],
+            ['services', 'Marketplace'],
           ] as Array<[Tab, string]>).map(([key, label]) => (
             <button
               key={key}
@@ -278,10 +293,11 @@ function Console({ onLogout }: { onLogout: () => void }) {
           ))}
         </div>
 
-        {tab === 'users'   && <UsersPanel />}
-        {tab === 'codes'   && <CodesPanel onChanged={loadOverview} />}
-        {tab === 'credits' && <CreditsPanel onChanged={loadOverview} />}
-        {tab === 'failed'  && <FailedPanel />}
+        {tab === 'users'    && <UsersPanel />}
+        {tab === 'codes'    && <CodesPanel onChanged={loadOverview} />}
+        {tab === 'credits'  && <CreditsPanel onChanged={loadOverview} />}
+        {tab === 'failed'   && <FailedPanel />}
+        {tab === 'services' && <ServicesPanel />}
 
       </main>
     </div>
@@ -648,22 +664,135 @@ function FailedPanel() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ background: t.bg3 }}>
-              {['User', 'Type', 'Amount', 'Recipient', 'Reason', 'When'].map(h => (
+              {['User', 'Type', 'Amount', 'Recipient', 'Refund', 'Reason', 'When'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.faint, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: `1px solid ${t.border}` }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={7} style={{ padding: 18, textAlign: 'center', color: t.faint }}>Loading…</td></tr>}
+            {!loading && rows.length === 0 && <tr><td colSpan={7} style={{ padding: 18, textAlign: 'center', color: t.muted }}>Nothing failed recently. ✓</td></tr>}
+            {rows.map(r => {
+              const refundNeeded = Boolean(r.metadata?.refund?.required)
+              const refundAmount = r.metadata?.refund?.amount
+              return (
+              <tr key={r.id} style={{ borderBottom: `1px solid ${t.border}`, background: refundNeeded ? t.errorLow : 'transparent' }}>
+                <td style={{ padding: '10px 14px', color: t.text }}>{r.user.email}</td>
+                <td style={{ padding: '10px 14px', color: r.crossChain ? '#5B8EFF' : r.type === 'marketplace' ? t.accent : t.text2, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{r.crossChain ? 'cctp' : r.type === 'marketplace' ? 'mkt' : 'direct'}</td>
+                <td style={{ padding: '10px 14px', color: t.text2, fontFamily: 'JetBrains Mono, monospace' }}>${parseFloat(r.amount).toFixed(2)}</td>
+                <td style={{ padding: '10px 14px', color: t.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{r.serviceId ? r.serviceId : `${r.recipientAddress.slice(0, 8)}…${r.recipientAddress.slice(-4)}`}</td>
+                <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 10 }}>
+                  {refundNeeded
+                    ? <span style={{ color: t.error, border: '1px solid rgba(160,72,72,0.4)', background: t.errorLow, borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>● REFUND NEEDED{refundAmount ? ` $${parseFloat(refundAmount).toFixed(4)}` : ''}</span>
+                    : <span style={{ color: t.faint }}>—</span>}
+                </td>
+                <td style={{ padding: '10px 14px', color: t.error, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 320, wordBreak: 'break-word' }}>{r.blockedReason ?? '—'}</td>
+                <td style={{ padding: '10px 14px', color: t.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{new Date(r.createdAt).toLocaleString()}</td>
+              </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+  )
+}
+
+// ─── Marketplace services panel (global kill-switch) ──────────────────────────
+function ServicesPanel() {
+  const [rows, setRows] = useState<AdminServiceRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [onlyIssues, setOnlyIssues] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const r = await adminFetch<{ providers: AdminServiceRow[] }>('/admin/marketplace/services')
+    setLoading(false)
+    if (!isErr(r) && r.providers) setRows(r.providers)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const toggle = async (row: AdminServiceRow) => {
+    const next = !row.enabled
+    let note: string | undefined
+    if (!next) {
+      note = window.prompt(`Pause "${row.name}" platform-wide. Optional note (why):`, row.note ?? '') ?? undefined
+    }
+    setBusyId(row.provider_id)
+    const r = await adminFetch<{ enabled: boolean }>(`/admin/marketplace/services/${encodeURIComponent(row.provider_id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled: next, ...(note ? { note } : {}) }),
+    })
+    setBusyId(null)
+    if (!isErr(r)) {
+      setRows(cur => cur.map(x => x.provider_id === row.provider_id ? { ...x, enabled: next, note: note ?? x.note } : x))
+    }
+  }
+
+  const filtered = rows.filter(r => {
+    if (onlyIssues && r.failed_count === 0 && r.refund_required_count === 0 && r.enabled) return false
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return r.name.toLowerCase().includes(q) || r.provider_id.toLowerCase().includes(q)
+  })
+
+  const pausedCount = rows.filter(r => !r.enabled).length
+
+  return (
+    <Section
+      title={`Marketplace providers (${rows.length} · ${pausedCount} paused)`}
+      action={
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: t.muted, fontFamily: 'JetBrains Mono, monospace', cursor: 'pointer' }}>
+            <input type="checkbox" checked={onlyIssues} onChange={e => setOnlyIssues(e.target.checked)} />
+            issues only
+          </label>
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="filter providers…"
+            style={{ background: t.bg, border: `1px solid ${t.border2}`, borderRadius: 6, padding: '6px 10px', fontSize: 12, color: t.text, fontFamily: 'Inter, sans-serif', width: 200, outline: 'none' }}
+          />
+          <button onClick={load} style={{ padding: '6px 12px', background: 'transparent', border: `1px solid ${t.border2}`, borderRadius: 6, color: t.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, cursor: 'pointer' }}>↻</button>
+        </div>
+      }
+    >
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: t.bg3 }}>
+              {['Provider', 'Endpoints', 'Failed', 'Refunds', 'Note', 'State'].map(h => (
                 <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.faint, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: `1px solid ${t.border}` }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading && <tr><td colSpan={6} style={{ padding: 18, textAlign: 'center', color: t.faint }}>Loading…</td></tr>}
-            {!loading && rows.length === 0 && <tr><td colSpan={6} style={{ padding: 18, textAlign: 'center', color: t.muted }}>Nothing failed recently. ✓</td></tr>}
-            {rows.map(r => (
-              <tr key={r.id} style={{ borderBottom: `1px solid ${t.border}` }}>
-                <td style={{ padding: '10px 14px', color: t.text }}>{r.user.email}</td>
-                <td style={{ padding: '10px 14px', color: r.crossChain ? '#5B8EFF' : t.text2, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{r.crossChain ? 'cctp' : 'direct'}</td>
-                <td style={{ padding: '10px 14px', color: t.text2, fontFamily: 'JetBrains Mono, monospace' }}>${parseFloat(r.amount).toFixed(2)}</td>
-                <td style={{ padding: '10px 14px', color: t.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{r.recipientAddress.slice(0, 8)}…{r.recipientAddress.slice(-4)}</td>
-                <td style={{ padding: '10px 14px', color: t.error, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 360, wordBreak: 'break-word' }}>{r.blockedReason ?? '—'}</td>
-                <td style={{ padding: '10px 14px', color: t.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{new Date(r.createdAt).toLocaleString()}</td>
+            {!loading && filtered.length === 0 && <tr><td colSpan={6} style={{ padding: 18, textAlign: 'center', color: t.muted }}>No providers match.</td></tr>}
+            {filtered.map(r => (
+              <tr key={r.provider_id} style={{ borderBottom: `1px solid ${t.border}`, background: !r.enabled ? t.errorLow : r.refund_required_count > 0 ? t.warningLow : 'transparent' }}>
+                <td style={{ padding: '10px 14px', color: t.text }}>
+                  {r.name}
+                  <div style={{ fontSize: 10, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>{r.provider_id}</div>
+                </td>
+                <td style={{ padding: '10px 14px', color: t.muted, fontFamily: 'JetBrains Mono, monospace' }}>{r.endpoint_count}</td>
+                <td style={{ padding: '10px 14px', color: r.failed_count > 0 ? t.error : t.muted, fontFamily: 'JetBrains Mono, monospace' }}>{r.failed_count}</td>
+                <td style={{ padding: '10px 14px', color: r.refund_required_count > 0 ? t.warning : t.muted, fontFamily: 'JetBrains Mono, monospace' }}>{r.refund_required_count}</td>
+                <td style={{ padding: '10px 14px', color: t.muted, fontSize: 11, maxWidth: 240, wordBreak: 'break-word' }}>{r.note ?? '—'}</td>
+                <td style={{ padding: '10px 14px' }}>
+                  <button
+                    onClick={() => toggle(r)}
+                    disabled={busyId === r.provider_id}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: 'none', cursor: busyId === r.provider_id ? 'wait' : 'pointer', padding: 0, opacity: busyId === r.provider_id ? 0.5 : 1 }}
+                  >
+                    <span style={{ position: 'relative', width: 34, height: 18, borderRadius: 999, background: r.enabled ? t.success : t.bg3, transition: 'background 0.15s', flexShrink: 0 }}>
+                      <span style={{ position: 'absolute', top: 2, left: r.enabled ? 18 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
+                    </span>
+                    <span style={{ fontSize: 11, color: r.enabled ? t.success : t.muted, fontFamily: 'JetBrains Mono, monospace' }}>{r.enabled ? 'live' : 'paused'}</span>
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
