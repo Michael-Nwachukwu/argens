@@ -258,7 +258,11 @@ Returns full transaction detail including current status. Use to poll a `pending
 
 The Argens Marketplace connects agents to 80+ paid AI services (LLMs, web search, email, data APIs, and more). You call a service and pay for it in a single API call — Argens handles the USDC payment automatically.
 
+**Payment is fully abstracted.** Argens handles the MPP 402 probe-then-pay challenge cycle on your behalf. You never implement credential negotiation or Soroban signing — submit your request body to `POST /v1/marketplace/call` and Argens manages the rest.
+
 **Pricing:** Services show their provider price. The `cost_paid` field in the response is the total amount debited for a completed marketplace call. The same policy rules apply to marketplace calls.
+
+**Idempotency:** Pass `X-Request-Id: <uuid>` on `POST /v1/marketplace/call` for at-most-once semantics on network retries. Safe to use — the same `X-Request-Id` on a successful call returns a cached response and does not double-charge.
 
 **Prerequisite:** The developer must enable a provider from their dashboard before agents can call it. If a provider is disabled, calls return `403 SERVICE_DISABLED`.
 
@@ -394,13 +398,13 @@ POST /marketplace/call
 
 **Common errors:**
 
-| Code | Meaning |
-|---|---|
-| `SERVICE_NOT_FOUND` | `service_id` doesn't match any endpoint in the catalog |
-| `SERVICE_DISABLED` | Provider not enabled by the developer — user must enable from dashboard |
-| `MARKETPLACE_SERVICE_PAUSED` | Provider paused platform-wide by Argens (broken upstream) — do not retry |
-| `MARKETPLACE_NOT_MPP` | Upstream service rejected before payment — no USDC charged, fix the request |
-| `MARKETPLACE_UPSTREAM_FAILED` | Payment sent but upstream service errored — see `upstream_body` in details; the developer is auto-notified for a refund |
+| Code | USDC charged? | Meaning |
+|---|---|---|
+| `SERVICE_NOT_FOUND` | No | `service_id` doesn't match any endpoint in the catalog |
+| `SERVICE_DISABLED` | No | Provider not enabled by the developer — user must enable from dashboard |
+| `MARKETPLACE_SERVICE_PAUSED` | No | Provider paused platform-wide by Argens — do not retry; temporarily unavailable |
+| `MARKETPLACE_NOT_MPP` | **No** | Upstream rejected before payment — fix the request payload or query and retry |
+| `MARKETPLACE_UPSTREAM_FAILED` | **Yes** | Payment sent; upstream service errored — do not retry immediately; developer auto-notified; check `upstream_body` in error details |
 
 ---
 
@@ -424,7 +428,8 @@ POST /marketplace/call
    200 → success, read "data.result" for the upstream response
    402 → blocked by policy, report to user, do not retry
    202 → pending approval, poll /v1/transactions/{id}
-   502 MARKETPLACE_NOT_MPP → payload was wrong, no charge — fix payload and retry
+   MARKETPLACE_NOT_MPP → payload was wrong, no USDC charged — fix payload and retry
+   MARKETPLACE_UPSTREAM_FAILED → USDC was charged, upstream errored — do not retry; developer auto-notified
    503 MARKETPLACE_SERVICE_PAUSED → provider temporarily unavailable, do not retry
 ```
 
@@ -444,7 +449,8 @@ POST /marketplace/call
 - Always fetch `/SKILL/{provider_id}.md` (or read the endpoint's `example_payload`) before building a `/marketplace/call` body — the catalog has no schemas
 - A `SERVICE_DISABLED` error means the provider is off in the user's dashboard — do not retry; tell the user to enable it
 - A `MARKETPLACE_SERVICE_PAUSED` error means Argens paused the provider platform-wide — do not retry; it's temporarily unavailable
-- A `MARKETPLACE_NOT_MPP` error means no USDC was charged — the request payload was wrong; fix it and retry
+- A `MARKETPLACE_NOT_MPP` error means **no USDC was charged** — the request payload was wrong; fix it and retry
+- A `MARKETPLACE_UPSTREAM_FAILED` error means **USDC was charged** — the upstream service errored after payment; do not retry immediately; the developer is auto-notified
 
 ---
 

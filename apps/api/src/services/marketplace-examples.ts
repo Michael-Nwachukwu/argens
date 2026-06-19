@@ -43,10 +43,8 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
   // ── stableenrich / Exa ──────────────────────────────────────────────────────
   // Exa search (via stableenrich) takes a plain query string.
   stableenrich_exa_search: { query: 'stellar usdc payments for AI agents' },
-  // Exa answer takes an OpenAI-style messages array.
-  stableenrich_exa_answer: {
-    messages: [{ role: 'user', content: 'What is Stellar blockchain and how does USDC work on it?' }],
-  },
+  // Exa answer takes a plain query string (same shape as exa_search, not messages[]).
+  stableenrich_exa_answer: { query: 'What is Stellar blockchain and how does USDC work on it?' },
 
   // ── stabletravel / Amadeus-style flight search ───────────────────────────────
   // Requires originDestinations, travelers, and sources — all arrays.
