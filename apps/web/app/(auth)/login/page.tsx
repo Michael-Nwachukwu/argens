@@ -9,12 +9,17 @@ import { useAuth } from '@/lib/auth-context'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login } = useAuth()
+  const { login, token, loading: authLoading } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Already authenticated → skip the form, go straight to the dashboard.
+  useEffect(() => {
+    if (!authLoading && token) router.replace('/dashboard')
+  }, [authLoading, token, router])
 
   // Prefill email from localStorage
   useEffect(() => {
@@ -122,6 +127,11 @@ export default function LoginPage() {
               placeholder="••••••••"
               autoComplete="current-password"
             />
+            <div style={{ textAlign: 'right', marginTop: 8 }}>
+              <Link href="/auth/forgot-password" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           <button

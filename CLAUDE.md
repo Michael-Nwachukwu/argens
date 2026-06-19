@@ -8,20 +8,23 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
-## Status — 2026-06-12
+## Status — 2026-06-19
 
 - **Network: Stellar MAINNET.** Live on mainnet. Testnet code paths exist for local-dev parity only.
 - **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` accessible at `argens.xyz/SKILL.md`. Vercel root directory set to `apps/web` for GitHub-triggered deployments.
-- **API: deployed.** Live on a VPS via Dokploy. The live dashboard calls the deployed API for external users.
-- **Cross-chain / CCTP V2: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. A 0.0100000 USDC mainnet Stellar → Base transfer completed burn, Iris attestation, Base relay, and transaction-history update on 2026-05-27. Direct and approval-token CCTP paths now share a fail-closed preflight: verify live USDC balance >= amount + Argens CCTP fee before sending the fee. Approval-token CCTP path compiles but still needs live approval-path verification.
-- **Marketplace: LIVE on mainnet.** 86 providers / 493 endpoints via MPP Router (`apiserver.mpprouter.dev`). Provider-level enablement toggles. Search/filter on `GET /marketplace/services`. All policy paths verified E2E. ~20% markup to `ARGENS_FEE_WALLET`.
-- **Marketplace credits: LIVE.** Admin can grant expirable credits. Marketplace calls can consume credits via the credit-pool wallet, refund deductions on no-payment failure paths, and re-check credits at approval execution. The credit-pool Stellar account is bootstrapped and funded on mainnet and has been working well.
-- **Credit-grant emails: implemented locally.** Admin credit grants send an immediate user notification with amount, expiry, reason, and dashboard link after the DB transaction commits.
-- **Admin ops console: implemented.** Backend admin balance route was repaired on 2026-06-03. Ops wallet, fee wallet, Base relayer, and credit-pool wallet balances all read successfully.
-- **SKILL.md: v5 local.** Documents CCTP response shapes, Base recipient rules, fee behavior, per-service skill discovery, `/docs`, and `/llms.txt`.
-- **Approval flow: fixed.** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
-- **Email validation: live.** Signup rejects disposable domains and addresses that fail DNS MX check.
-- **What is NOT done yet:** approval-token CCTP live verification, example payloads, demo Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E.
+- **API: deployed on a VPS via Dokploy** (NOT Railway). The live dashboard calls the deployed API for external users. The Dockerfile CMD runs `prisma migrate deploy` on container start, so schema migrations apply automatically on redeploy.
+- **Cross-chain / CCTP V2: LIVE & available.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. A 0.0100000 USDC mainnet Stellar → Base transfer completed burn, Iris attestation, Base relay, and transaction-history update on 2026-05-27. Argens charges a CCTP fee `clamp(amount × 0.5%, $0.01, $2.00)`; direct and approval-token CCTP paths share a fail-closed preflight that verifies live USDC balance >= amount + fee before sending the fee. Approval-token CCTP path still needs live approval-path verification.
+- **Marketplace: LIVE on mainnet.** 86 providers / 493 endpoints via MPP Router (`apiserver.mpprouter.dev`). Per-user provider enablement toggles **plus a platform-wide kill-switch** (`GlobalServiceSetting`): globally paused providers are hidden from `GET /marketplace/services` and rejected at `POST /marketplace/call` with `503 MARKETPLACE_SERVICE_PAUSED`. Search/filter on `GET /marketplace/services`. ~20% markup to `ARGENS_FEE_WALLET`.
+- **Marketplace refund flagging: LIVE.** Paid-but-upstream-failed calls (MPP pulled USDC, receipt present, upstream relay failed, not credit-funded) write `metadata.refund.required=true` + `AuditLog MARKETPLACE_REFUND_REQUIRED` + an ops-alert email. Ops Console Failed tab shows a "REFUND NEEDED" badge. Refunds stay manual.
+- **Marketplace example payloads + skill coupling: LIVE.** `services/marketplace-examples.ts` provides per-endpoint/provider `example_payload`s (surfaced in the catalog, embedded in per-provider skill markdown, used by the catalog test harness). The dashboard marketplace detail view prefills the payload box and has a `skill.md` button (view/download). `apps/api/scripts/marketplace-catalog-test.ts` is a committed catalog health harness.
+- **Marketplace credits: LIVE.** Admin can grant expirable credits. Marketplace calls consume credits via the credit-pool wallet, refund deductions on no-payment failure paths, and re-check credits at approval execution. The credit-pool Stellar account is bootstrapped and funded on mainnet.
+- **Auth: password reset LIVE.** `POST /auth/forgot-password` + `POST /auth/reset-password` (single-use 1h token in `User.passwordResetToken`/`passwordResetExpiry`), `sendPasswordResetEmail`, web pages at `/auth/forgot-password` + `/auth/reset-password`. Beta signup requires an `AccessCode`. Email validation rejects disposable domains and MX-less addresses.
+- **Dashboard: dismiss pending approvals.** `POST /transactions/:id/dismiss` (JWT) rejects a PENDING_APPROVAL tx the owner no longer wants, even after the approval token has expired. `/login` redirects already-authenticated users to `/dashboard`.
+- **Admin ops console: implemented.** Stats, wallet balances (ops/fee/Base relayer/credit-pool), users, access codes, credit grants, failed transactions (+ refund-needed), and the marketplace pause tab.
+- **SKILL.md: v7.** Per-service skill discovery is a mandatory pre-call step (`GET /SKILL/{provider}.md`); documents example payloads, `MARKETPLACE_SERVICE_PAUSED`, CCTP response shapes/fee, Base recipient rules, `/docs`, and `/llms.txt`.
+- **Approval flow:** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
+- **Schema beyond the schema block below:** `MarketplaceServiceSetting`, `GlobalServiceSetting`, `AccessCode`, `CreditGrant`; `User.accessCodeId`, `User.passwordResetToken`, `User.passwordResetExpiry`.
+- **What is NOT done yet:** approval-token CCTP live verification, demo Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E. (16 marketplace providers fail at the MPP payment layer — flagged for global pause + MPP Router escalation.)
 
 ---
 
@@ -1150,11 +1153,10 @@ function detectChain(recipient: string): 'stellar' | 'base' {
 
 ### Fee handling for cross-chain payments
 
-Circle's CCTP V2 can charge a protocol fee depending on route and amount. V1 does **not** add an Argens direct-payment fee to CCTP payments. Marketplace markup remains marketplace-only.
+CCTP cross-chain payments **do** carry an Argens fee (this is the one exception to "$0 on direct payments" — direct *Stellar* payments remain free). The fee is `clamp(amount × 0.5%, $0.01, $2.00)`, computed by `computeCctpFee()` in `services/cctp.ts` (`CCTP_FEE_RATE=0.005`, `CCTP_FEE_MIN=0.01`, `CCTP_FEE_MAX=2.00`). The user's wallet is debited `amount + fee`; the Base recipient receives the full `amount`. Both the direct and approval CCTP paths run `verifyCctpPreflightBalance()` before sending the fee and fail closed (`402 INSUFFICIENT_FUNDS_PLUS_FEES`, or `503 CCTP_PREFLIGHT_UNAVAILABLE` if balance can't be read). Circle's own CCTP protocol fee is handled inside the burn via `max_fee`.
 
 ```
-total_debited = amount
-// Any CCTP protocol fee is handled inside the burn/mint path via max_fee.
+total_debited = amount + clamp(amount * 0.005, 0.01, 2.00)
 ```
 
 ### Cross-chain success response
@@ -1490,8 +1492,8 @@ Do not re-litigate these. They are settled.
 | Source | Closed source | Commercial product |
 | Agent-to-agent | Supported — any Stellar address is valid recipient | Core differentiator |
 | x402 | Leverage where applicable, not compete | Additive to ecosystem |
-| Cross-chain | **Deferred** to a later version (was planned as V1 Base settlement via CCTP V2). Not in the current build. | Refocused on mainnet direct payments + the MPP marketplace; cross-chain picked up later |
-| CCTP fee handling | Argens absorbs Circle's CCTP protocol fee within its 0.5% cut | Agent sees one clean number; no surprise fee line items |
+| Cross-chain | **LIVE** — Stellar → Base USDC settlement via CCTP V2 is callable through `POST /pay` with a `0x...` recipient. Full multi-chain (Ethereum, Solana, etc.) + hooks remain V2. | Base covers x402 paywalls; direct path verified twice on mainnet |
+| CCTP fee handling | Argens charges `clamp(amount × 0.5%, $0.01, $2.00)` on CCTP payments and absorbs Circle's protocol fee within it. Direct Stellar payments stay $0. | Agent sees one clean number; cross-chain settlement has real cost |
 | Chain detection | Auto-detected from address format — `G...` = Stellar, `0x...` = Base. No explicit `chain:` param in V1. | Zero friction for agents |
 | CCTP V2 prep | Nullable `destinationChain`, `destinationTxHash`, `crossChain` already in schema | No migration needed when V2 adds more chains |
 | Decimal handling | Strings for Stellar + API request/response, Prisma Decimal for DB | No floating point errors |
@@ -1510,7 +1512,7 @@ Do not re-litigate these. They are settled.
 - Not a crypto exchange
 - Not a KYC / AML compliance product
 - Not an agent creation or hosting platform
-- Not a multi-chain router — Stellar USDC only; cross-chain (Base/CCTP V2) is deferred to a later version
+- Not a full multi-chain router in V1 — Stellar USDC + Stellar → Base settlement via CCTP V2 are live; Ethereum/Solana/Avalanche and CCTP hooks are V2
 - Not open source
 - Not a bridge — CCTP V2 uses burn-and-mint, not bridging
 - Not responsible for what the AI agent does with the payment capability — that is the developer's responsibility

@@ -213,7 +213,17 @@ export default function OverviewPage() {
   const [todaySpend, setTodaySpend]       = useState('0.0000000')
   const [addFundsOpen, setAddFundsOpen]   = useState(false)
   const [approveModal, setApproveModal]   = useState<Transaction | null>(null)
+  const [dismissingId, setDismissingId]   = useState<string | null>(null)
   const [loading, setLoading]             = useState(true)
+
+  const handleDismiss = async (id: string) => {
+    setDismissingId(id)
+    const res = await txApi.dismiss(id)
+    setDismissingId(null)
+    if (!isError(res)) {
+      setPendingTxs(cur => cur.filter(t => t.id !== id))
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -329,6 +339,21 @@ export default function OverviewPage() {
               }}
             >
               Review
+            </button>
+            <button
+              onClick={() => void handleDismiss(tx.id)}
+              disabled={dismissingId === tx.id}
+              title="Dismiss — rejects this payment, no funds are sent"
+              aria-label="Dismiss pending payment"
+              style={{
+                padding: '5px 10px', background: 'transparent',
+                border: '1px solid var(--border2)', borderRadius: 5,
+                color: 'var(--muted)', fontSize: 12, fontFamily: 'var(--font-mono)',
+                cursor: dismissingId === tx.id ? 'wait' : 'pointer',
+                opacity: dismissingId === tx.id ? 0.5 : 1,
+              }}
+            >
+              {dismissingId === tx.id ? '…' : 'Dismiss'}
             </button>
           </div>
         ))}

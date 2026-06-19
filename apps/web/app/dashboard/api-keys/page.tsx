@@ -19,9 +19,11 @@ export default function ApiKeysPage() {
       ? 'argns_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
       : 'argns_live_••••••••••••••••••••••••••••••••'
 
+  const canCopy = Boolean(newKey)
+
   const copy = () => {
-    const val = newKey ?? displayKey
-    navigator.clipboard?.writeText(val).catch(() => {})
+    if (!newKey) return
+    navigator.clipboard?.writeText(newKey).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
   }
@@ -65,16 +67,22 @@ export default function ApiKeysPage() {
             </button>
             <button
               onClick={copy}
-              style={{ padding: '10px 12px', background: 'transparent', border: 'none', borderLeft: '1px solid var(--border)', color: copied ? 'var(--success)' : 'var(--muted)', cursor: 'pointer', transition: 'color 0.15s', fontSize: 12, fontFamily: 'var(--font-mono)' }}
+              disabled={!canCopy}
+              title={canCopy ? 'Copy API key' : 'Regenerate your key to copy it — the full key is only available immediately after generation'}
+              style={{ padding: '10px 12px', background: 'transparent', border: 'none', borderLeft: '1px solid var(--border)', color: copied ? 'var(--success)' : canCopy ? 'var(--muted)' : 'var(--faint, var(--border))', cursor: canCopy ? 'pointer' : 'default', transition: 'color 0.15s', fontSize: 12, fontFamily: 'var(--font-mono)', opacity: canCopy ? 1 : 0.4 }}
             >
               {copied ? '✓' : 'copy'}
             </button>
           </div>
 
-          {newKey && (
+          {newKey ? (
             <div style={{ padding: '10px 14px', background: 'var(--accent-low)', border: '1px solid var(--accent-mid)', borderRadius: 7, fontSize: 13, color: 'var(--text2)', marginBottom: 14 }}>
               <span style={{ color: 'var(--accent)', marginRight: 8 }}>◈</span>
               Save this key now — it won&apos;t be shown again.
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 14, opacity: 0.7 }}>
+              The full key is only available immediately after generation. Regenerate to get a copyable key.
             </div>
           )}
 

@@ -13,7 +13,7 @@
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { z } from 'zod'
-import { requireApiKey, requireJwtOrApiKey } from '../middleware/auth.js'
+import { requireApiKey, requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError, sendPaginated } from '../lib/response.js'
 import { AppError, NotFoundError } from '../lib/errors.js'
@@ -655,6 +655,56 @@ transactionsRouter.get('/transactions/:id', requireJwtOrApiKey, async (req, res,
           }
         : null,
       created_at: tx.createdAt,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /transactions/:id/dismiss — reject a pending approval from the dashboard ──
+// JWT only (dashboard action). Works for any PENDING_APPROVAL transaction the user owns,
+// including ones whose 24h approval token has already expired (unlike POST /reject/:token,
+// which requires a live token). Moves the transaction to REJECTED — no payment is made.
+transactionsRouter.post('/transactions/:id/dismiss', requireJwt, async (req, res, next) => {
+  const userId = req.userId!
+  const idParam = req.params.id
+  const id = Array.isArray(idParam) ? idParam[0] : idParam
+
+  try {
+    const tx = await prisma.transaction.findFirst({
+      where: { id, userId },
+      include: { approvalQueue: true },
+    })
+
+    if (!tx) throw new NotFoundError('Transaction')
+
+    if (tx.status !== 'PENDING_APPROVAL') {
+      throw new AppError(
+        'Only transactions awaiting approval can be dismissed.',
+        'INVALID_STATE',
+        409,
+      )
+    }
+
+    // Atomically flip the transaction and (if present) its approval-queue row.
+    await prisma.$transaction(async (db) => {
+      await db.transaction.update({
+        where: { id: tx.id },
+        data: { status: 'REJECTED', blockedReason: 'dismissed_by_user' },
+      })
+      if (tx.approvalQueue && tx.approvalQueue.status === 'PENDING') {
+        await db.approvalQueue.update({
+          where: { id: tx.approvalQueue.id },
+          data: { status: 'REJECTED', actedAt: new Date() },
+        })
+      }
+    })
+
+    logger.info('Pending approval dismissed by user', { userId, transactionId: tx.id })
+    sendSuccess(res, {
+      status: 'rejected',
+      transaction_id: tx.id,
+      message: 'Pending payment dismissed. No payment was made.',
     })
   } catch (err) {
     next(err)

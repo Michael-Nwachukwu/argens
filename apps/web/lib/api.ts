@@ -86,6 +86,18 @@ export const auth = {
       body: JSON.stringify({ email }),
     }),
 
+  forgotPassword: (email: string) =>
+    apiFetch<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    apiFetch<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    }),
+
   me: () => authFetch<MeResponse>('/auth/me'),
 }
 
@@ -200,6 +212,11 @@ export const transactions = {
     return authFetch<Transaction[]>(`/transactions?${qs.toString()}`)
   },
   get: (id: string) => authFetch<Transaction>(`/transactions/${id}`),
+  // Reject a pending-approval transaction from the dashboard (works even after the token expires).
+  dismiss: (id: string) =>
+    authFetch<{ status: string; transaction_id: string; message: string }>(`/transactions/${id}/dismiss`, {
+      method: 'POST',
+    }),
 }
 
 // ─── Marketplace ──────────────────────────────────────────────────────────────
@@ -257,6 +274,13 @@ export const marketplace = {
       '/marketplace/call',
       { method: 'POST', body: JSON.stringify(data) },
     ),
+  skillMarkdown: async (providerId: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`${BASE}/marketplace/services/${providerId}/skill.md`)
+      if (!res.ok) return null
+      return res.text()
+    } catch { return null }
+  },
 }
 
 // ─── Agent status ─────────────────────────────────────────────────────────────

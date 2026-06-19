@@ -35,6 +35,33 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
   coingecko_coingecko_simple_price: { ids: 'bitcoin,stellar', vs_currencies: 'usd' },
   // AlphaVantage intraday needs a symbol and an interval.
   alphavantage_alphavantage_time_series_intraday: { symbol: 'AAPL', interval: '5min' },
+  // AlphaVantage commodity price needs a commodity code (not a stock symbol).
+  // Catalog ID may use a hyphen or underscore depending on the MPP Router version.
+  'alphavantage_alphavantage_commodity-price': { commodity: 'WTI' },
+  alphavantage_alphavantage_commodity_price: { commodity: 'WTI' },
+
+  // ── stableenrich / Exa ──────────────────────────────────────────────────────
+  // Exa search (via stableenrich) takes a plain query string.
+  stableenrich_exa_search: { query: 'stellar usdc payments for AI agents' },
+  // Exa answer takes an OpenAI-style messages array.
+  stableenrich_exa_answer: {
+    messages: [{ role: 'user', content: 'What is Stellar blockchain and how does USDC work on it?' }],
+  },
+
+  // ── stabletravel / Amadeus-style flight search ───────────────────────────────
+  // Requires originDestinations, travelers, and sources — all arrays.
+  stabletravel_flights_ava: {
+    originDestinations: [
+      {
+        id: '1',
+        originLocationCode: 'JFK',
+        destinationLocationCode: 'LHR',
+        departureDateTimeRange: { date: '2026-09-01' },
+      },
+    ],
+    travelers: [{ id: '1', travelerType: 'ADULT' }],
+    sources: ['GDS'],
+  },
 }
 
 /** Provider-level fallback examples, keyed by the provider id (the toggle key). */
@@ -84,6 +111,23 @@ export const PROVIDER_EXAMPLES: Record<string, Record<string, unknown>> = {
   // ── Translation / NLP / media gen ───────────────────────────────────────────
   deepl: { text: 'Hello, world.', target_lang: 'DE' },
   'stability-ai': { prompt: 'a serene mountain lake at sunset, photorealistic' },
+
+  // ── Travel / flights ────────────────────────────────────────────────────────
+  stabletravel: {
+    originDestinations: [
+      {
+        id: '1',
+        originLocationCode: 'JFK',
+        destinationLocationCode: 'LHR',
+        departureDateTimeRange: { date: '2026-09-01' },
+      },
+    ],
+    travelers: [{ id: '1', travelerType: 'ADULT' }],
+    sources: ['GDS'],
+  },
+
+  // ── stableenrich (Exa search) ────────────────────────────────────────────────
+  stableenrich: { query: 'stellar usdc payments for AI agents' },
 
   // ── Misc with documented numeric/array bodies ───────────────────────────────
   'stripe-climate': { amount: 100 },

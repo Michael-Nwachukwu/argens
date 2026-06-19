@@ -4,6 +4,22 @@ Format: most recent first.
 
 ---
 
+## Lesson 2026-06-19 — `credentials: 'include'` breaks fetches to wildcard-CORS endpoints
+
+**What went wrong:** The dashboard's new marketplace `skill.md` button always showed "No skill file available," even though `GET /v1/marketplace/services/:id/skill.md` returned 200 with content when curled.
+**Root cause:** The web fetch passed `credentials: 'include'`, but that endpoint is intentionally public and returns `Access-Control-Allow-Origin: *`. Browsers forbid the combination of a wildcard ACAO with credentialed requests, so the response was blocked client-side (the curl had no such constraint, which masked it).
+**Rule going forward:** Public, wildcard-CORS endpoints (SKILL.md, provider skill markdown, llms.txt) must be fetched **without** `credentials`. Only send credentials to same-origin or explicitly-whitelisted-origin endpoints. When a fetch "fails" but curl succeeds, suspect a CORS/credentials mismatch before anything else.
+
+---
+
+## Lesson 2026-06-19 — Docs drift: AGENTS.md lagged reality by weeks
+
+**What went wrong:** AGENTS.md still said "API: local only, Railway is the #1 blocker" and described CCTP as having no Argens fee, long after the API shipped on Dokploy and CCTP gained a 0.5%/$0.01/$2.00 fee. CLAUDE.md even contradicted itself (Status said CCTP live; Key Decisions said deferred).
+**Root cause:** Multiple near-duplicate source-of-truth files (CLAUDE.md for Claude Code, AGENTS.md for Codex, PROJECT_STATE.md) updated independently; feature work updated code + SKILL.md but not all the agent guides.
+**Rule going forward:** When a shipped change alters deployment, fees, or the schema, update the Status section of **every** agent guide (CLAUDE.md, AGENTS.md) and PROJECT_STATE.md in the same pass — not just the one you happen to be reading. Treat a self-contradiction within one file as a hard bug.
+
+---
+
 ## Lesson 2026-05-26 — Email delivery must surface provider setup errors
 
 **What went wrong:** Approval/blocked/low-balance emails appeared not to send, while the API continued the main flow and only logged the failure.
