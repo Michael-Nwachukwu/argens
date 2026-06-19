@@ -39,6 +39,46 @@ const MarketplaceServicesQuerySchema = z.object({
   enabled: z.enum(['true', 'false']).optional(),
 })
 
+// Field weights for relevance scoring — name/category are stronger signals than
+// a match buried in an endpoint description.
+const SEARCH_WEIGHTS = { name: 4, category: 4, description: 2, endpoint: 1 } as const
+
+type SearchableProvider = {
+  name: string
+  description: string
+  categories: string[]
+  endpoints: Array<{ label: string; description: string }>
+}
+
+/** Split a query into lowercased tokens (drops punctuation and 1-char noise). */
+function tokenizeSearch(input: string | undefined): string[] {
+  if (!input) return []
+  return input
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2)
+}
+
+/** Sum the field weight of every token that hits, across all weighted fields. */
+function scoreProvider(p: SearchableProvider, terms: string[]): number {
+  const name = p.name.toLowerCase()
+  const description = p.description.toLowerCase()
+  const categories = p.categories.join(' ').toLowerCase()
+  const endpoints = p.endpoints
+    .map((e) => `${e.label} ${e.description}`)
+    .join(' ')
+    .toLowerCase()
+
+  let score = 0
+  for (const term of terms) {
+    if (name.includes(term)) score += SEARCH_WEIGHTS.name
+    if (categories.includes(term)) score += SEARCH_WEIGHTS.category
+    if (description.includes(term)) score += SEARCH_WEIGHTS.description
+    if (endpoints.includes(term)) score += SEARCH_WEIGHTS.endpoint
+  }
+  return score
+}
+
 marketplaceRouter.get('/marketplace/services', requireJwtOrApiKey, async (req, res, next) => {
   try {
     const parsed = MarketplaceServicesQuerySchema.safeParse(req.query)
@@ -50,27 +90,22 @@ marketplaceRouter.get('/marketplace/services', requireJwtOrApiKey, async (req, r
 
     let providers = await getMarketplaceServicesForResponse(req.userId!)
 
-    if (search) {
-      const q = search.toLowerCase()
-      providers = providers.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q) ||
-          p.categories.some((c) => c.toLowerCase().includes(q)) ||
-          p.endpoints.some(
-            (e) => e.label.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
-          ),
-      )
-    }
-
-    if (category) {
-      const cat = category.toLowerCase()
-      providers = providers.filter((p) => p.categories.some((c) => c.toLowerCase().includes(cat)))
-    }
-
     if (enabled !== undefined) {
       const want = enabled === 'true'
       providers = providers.filter((p) => p.is_enabled === want)
+    }
+
+    // Tokenized, relevance-ranked search: a multi-word query like "crypto market
+    // data" matches providers hitting ANY token, ranked by how many tokens hit and
+    // where. This replaces the old exact-substring match on the whole query string,
+    // which returned nothing for any multi-word search.
+    const terms = [...tokenizeSearch(search), ...tokenizeSearch(category)]
+    if (terms.length > 0) {
+      providers = providers
+        .map((p) => ({ p, score: scoreProvider(p, terms) }))
+        .filter((r) => r.score > 0)
+        .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
+        .map((r) => r.p)
     }
 
     sendSuccess(res, providers)

@@ -57,6 +57,9 @@ export default function MarketplacePage() {
   const [search, setSearch] = useState('')
   const [copied, setCopied] = useState(false)
   const [endpointsExpanded, setEndpointsExpanded] = useState(false)
+  const [skillOpen, setSkillOpen] = useState(false)
+  const [skillContent, setSkillContent] = useState<string | null>(null)
+  const [skillLoading, setSkillLoading] = useState(false)
 
   const ENDPOINT_PREVIEW_COUNT = 3
 
@@ -107,6 +110,7 @@ export default function MarketplacePage() {
   const openProvider = (p: MarketplaceService) => {
     setSelectedId(p.id)
     setEndpointsExpanded(false)
+    setSkillContent(null)
     selectEndpoint(p.endpoints[0] ?? null)
   }
 
@@ -173,6 +177,30 @@ export default function MarketplacePage() {
     setTimeout(() => setCopied(false), 1800)
   }
 
+  const openSkill = async () => {
+    if (!selected) return
+    setSkillOpen(true)
+    if (skillContent === null || skillLoading) {
+      setSkillLoading(true)
+      const md = await marketplace.skillMarkdown(selected.id)
+      setSkillContent(md)
+      setSkillLoading(false)
+    }
+  }
+
+  const closeSkill = () => setSkillOpen(false)
+
+  const downloadSkill = () => {
+    if (!skillContent || !selected) return
+    const blob = new Blob([skillContent], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selected.id}-skill.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ─── Detail view ───────────────────────────────────────────────────────────
   if (selected) {
     const totalEps = selected.endpoints.length
@@ -237,12 +265,12 @@ export default function MarketplacePage() {
                     <span style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{selected.display_price}</span>
                     <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
                     <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{selected.endpoint_count} endpoint{selected.endpoint_count === 1 ? '' : 's'}</span>
-                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
-                    <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>20% Argens markup</span>
                     {selected.docs_url && (<>
                       <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
                       <a href={selected.docs_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}>docs ↗</a>
                     </>)}
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
+                    <button onClick={() => void openSkill()} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px', fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)', cursor: 'pointer', textDecoration: 'none' }}>skill.md</button>
                   </div>
                   {selected.availability_note && (
                     <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', opacity: 0.8 }}>{selected.availability_note}</div>
@@ -395,6 +423,16 @@ export default function MarketplacePage() {
             <RecentList recent={recent} />
           </main>
         </div>
+
+        {skillOpen && (
+          <SkillDialog
+            providerName={selected.name}
+            content={skillContent}
+            loading={skillLoading}
+            onClose={closeSkill}
+            onDownload={downloadSkill}
+          />
+        )}
       </div>
     )
   }
@@ -490,6 +528,63 @@ function Switch({ enabled, loading, onClick }: { enabled: boolean; loading: bool
     >
       <span style={{ position: 'absolute', top: 2, left: enabled ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
     </button>
+  )
+}
+
+// ─── Skill dialog ─────────────────────────────────────────────────────────────
+
+function SkillDialog({ providerName, content, loading, onClose, onDownload }: {
+  providerName: string
+  content: string | null
+  loading: boolean
+  onClose: () => void
+  onDownload: () => void
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, width: '100%', maxWidth: 760, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px' }}>skill.md</span>
+            <span style={{ fontFamily: 'var(--font-head)', fontSize: 15, color: 'var(--text)', fontWeight: 600 }}>{providerName}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {content && (
+              <button
+                onClick={onDownload}
+                style={{ border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text2)', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              >
+                ↓ download
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{ border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted)', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+            >
+              ✕ close
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 18 }}>
+          {loading ? (
+            <div style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>Loading skill file…</div>
+          ) : content === null ? (
+            <div style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>No skill file available for this provider.</div>
+          ) : (
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.65, color: 'var(--text2)' }}>{content}</pre>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 

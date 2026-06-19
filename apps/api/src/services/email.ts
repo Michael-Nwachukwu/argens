@@ -210,6 +210,24 @@ export function sendVerificationEmail(to: string, token: string): Promise<void> 
   return sendEmail({ to, subject: 'Verify your Argens account', html, text })
 }
 
+export function sendPasswordResetEmail(to: string, token: string): Promise<void> {
+  const link = `${FRONTEND_URL}/auth/reset-password?token=${token}`
+
+  const html = buildEmailHtml(`
+    ${statusBadge('Security', '#7A4F1A', '#FDF4E7')}
+    <div style="height:14px;"></div>
+    ${sectionHeading('Reset your password')}
+    ${bodyText('We received a request to reset the password on your Argens account. Click the button below to choose a new one.')}
+    ${ctaButton('Reset password', link)}
+    ${divider()}
+    ${mutedText("This link expires in <strong>1 hour</strong> and can be used once. If you didn't request a password reset, you can safely ignore this email — your password will not change.")}
+  `)
+
+  const text = `Reset your Argens password.\n\nChoose a new password using this link (expires in 1 hour, single use):\n\n${link}\n\nIf you didn't request this, ignore this email — your password will not change.`
+
+  return sendEmail({ to, subject: 'Reset your Argens password', html, text })
+}
+
 export function sendWalletReadyEmail(to: string, publicKey: string): Promise<void> {
   const html = buildEmailHtml(`
     ${statusBadge('Wallet active', '#2E7D53', '#EAF4ED')}

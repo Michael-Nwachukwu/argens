@@ -4,6 +4,26 @@ Format: most recent first. Do not re-litigate these without a strong reason.
 
 ---
 
+## 2026-06-19 — Password reset uses a raw single-use token (mirrors email verification)
+**Decision:** `POST /auth/forgot-password` writes a `crypto`-random `passwordResetToken` + 1h `passwordResetExpiry` on the User row; `POST /auth/reset-password` validates token+expiry, sets the new bcrypt(12) hash, and clears both. Token is stored raw (not hashed), single-use, and `forgot-password` always returns the same response to avoid email enumeration.
+**Reason:** Consistency with the existing `emailVerificationToken` pattern; the token is short-lived, single-use, and unique-indexed. Hashing the reset token is a V2 hardening, not a V1 blocker.
+
+## 2026-06-19 — "Dismiss" pending approval = reject-by-id, JWT only
+**Decision:** Added `POST /transactions/:id/dismiss` (JWT) that moves a user-owned PENDING_APPROVAL tx to REJECTED and flips its ApprovalQueue row, **regardless of token expiry**. Kept separate from `POST /reject/:token` (which requires a live magic-link token).
+**Reason:** The dashboard user is already authenticated by JWT and owns the tx, so a token isn't needed. Expired pending approvals can never be actioned via the token path, so the dashboard needs an id-based path to clear them.
+
+## 2026-06-17 — Marketplace global kill-switch: absence = enabled
+**Decision:** `GlobalServiceSetting` rows are written only to *pause* a provider. No row = enabled, so we never seed 86 rows. Globally paused providers are hidden from the catalog AND rejected at call time (`503 MARKETPLACE_SERVICE_PAUSED`). Global pause wins over per-user enablement. Cached ~30s.
+**Reason:** A buggy upstream provider must be takeable-offline platform-wide without touching every user's settings; default-on keeps the table tiny.
+
+## 2026-06-17 — Paid-but-upstream-failed: flag for manual refund, never auto
+**Decision:** When MPP pulls USDC (receipt present) but the upstream relay fails and it wasn't credit-funded, write `metadata.refund.required=true` + `AuditLog MARKETPLACE_REFUND_REQUIRED` + ops-alert email, and surface a "REFUND NEEDED" badge in the Ops Console. No auto-refund, no auto-disable.
+**Reason:** Refund correctness needs a human (verify with MPP Router whether the charge was actually captured); auto-disable on a single failure is too blunt — the operator decides via the kill-switch.
+
+## 2026-06-16 — CCTP fee is a hybrid clamp, and cross-chain is LIVE
+**Decision:** CCTP cross-chain payments charge `clamp(amount × 0.5%, $0.01, $2.00)` (`computeCctpFee`), debited as `amount + fee`; Argens absorbs Circle's protocol fee within it. Direct Stellar payments stay $0. Stellar → Base via CCTP V2 is a shipped, callable feature (supersedes any earlier "cross-chain deferred" note).
+**Reason:** A pure 0.5% gives near-zero revenue on tiny payments and unbounded fees on large ones; the floor/ceiling make the fee sane at both ends. Base settlement unlocks x402 paywalls and is verified on mainnet.
+
 ## 2026-05-03 — SKILL.md deferred to Phase 5
 **Decision:** Write SKILL.md content after all Phase 2 APIs are tested on testnet.
 **Reason:** Examples in the file must reflect real API behaviour. Writing it first risks inaccurate request/response shapes that mislead agents.

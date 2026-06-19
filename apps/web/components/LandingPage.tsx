@@ -1390,9 +1390,17 @@ function CtaFooter() {
           <div className="lp-footer-inner" style={{ borderTop: `1px solid ${t.border}`, paddingTop: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 24 }}>
             <Logo />
             <div className="lp-footer-links" style={{ display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' as const }}>
-              {([['Services', '/services'], ['Docs', '/docs'], ['GitHub', '#'], ['Twitter / X', '#'], ['Privacy', '#'], ['Terms', '#']] as [string, string][]).map(([l, href]) => (
-                <a key={l} href={href} style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}>{l}</a>
-              ))}
+              {([['Services', '/services'], ['Docs', '/docs'], ['X', 'https://x.com/argensonline'], ['Privacy', '#'], ['Terms', '#']] as [string, string][]).map(([l, href]) => {
+                const external = href.startsWith('http')
+                return (
+                  <a
+                    key={l}
+                    href={href}
+                    {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                    style={{ fontSize: 13, color: t.muted, textDecoration: 'none' }}
+                  >{l}</a>
+                )
+              })}
             </div>
             <div style={{ fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>© 2026 Argens Inc.</div>
           </div>

@@ -264,18 +264,25 @@ The Argens Marketplace connects agents to 80+ paid AI services (LLMs, web search
 
 ---
 
-### Before calling any marketplace service — read its skill file
+### Before calling any marketplace service
 
-The catalog does **not** include request schemas, so you cannot infer a valid request body from `GET /marketplace/services` alone. Two sources tell you the exact body shape — use them before you call:
+**Step 0 — fetch the provider skill file.** This is mandatory, not optional. The catalog (`GET /marketplace/services`) returns no request schemas — you cannot build a valid `payload` from it alone.
 
-1. **`example_payload`** — every endpoint in `GET /marketplace/services` now carries an `endpoints[].example_payload` field (may be `null` if not yet authored). When present, copy it and adjust the values.
-2. **The per-service skill file** — every provider has a dedicated skill file listing its endpoints, prices, example payloads, and response rules:
-   - `https://argens.xyz/SKILL/{provider_id}.md` (public)
-   - `https://api.argens.xyz/v1/marketplace/services/{provider_id}/skill.md` (same content from the API)
+Every provider has a dedicated skill file. Fetch it as soon as you identify which provider you need:
 
-   **Always fetch the provider skill file before constructing a `/marketplace/call` body.** It is the authoritative per-provider guide. The `skill_url` and `api_skill_url` fields on each provider in the catalog link straight to it.
+```
+GET https://api.argens.xyz/v1/marketplace/services/{provider_id}/skill.md
+```
 
-A provider can also be paused platform-wide by Argens (e.g. while a provider is broken upstream). Paused providers do not appear in the catalog and return `503 MARKETPLACE_SERVICE_PAUSED` if called directly — do not retry; tell the user it's temporarily unavailable.
+(Also accessible publicly at `https://argens.xyz/SKILL/{provider_id}.md` — same content.)
+
+The skill file contains: all endpoint ids, HTTP methods, upstream paths, per-endpoint prices, example `payload` bodies you can copy directly, and response-handling notes. The `provider_id` is the `id` field on a provider returned by `GET /marketplace/services`. Each provider in the catalog also carries `api_skill_url` and `skill_url` fields that link directly to its skill file — use those links rather than constructing the URL manually.
+
+**Additionally**, each endpoint in the catalog carries an `endpoints[].example_payload` field. When non-null, this is a ready-to-use starting body — copy it and adjust the values. The skill file contains the same examples in context with descriptions.
+
+**Do not attempt to call `POST /marketplace/call` until you have read the skill file or found a non-null `example_payload` for the endpoint.** A missing or wrong `payload` returns `MARKETPLACE_NOT_MPP` (no charge, but the call fails).
+
+A provider can be paused platform-wide by Argens (e.g. while a provider is broken upstream). Paused providers do not appear in the catalog and return `503 MARKETPLACE_SERVICE_PAUSED` if called directly — do not retry; tell the user it is temporarily unavailable.
 
 ---
 
@@ -401,21 +408,24 @@ POST /marketplace/call
 
 ```
 1. GET /marketplace/services?search=<what you need>
-   → find the right provider and its endpoints
-   → note the endpoint's "id" field
+   → find the right provider; note the provider "id" and the endpoint "id" you want
 
-2. Fetch /SKILL/{provider_id}.md for provider-specific endpoint guidance
+2. GET /v1/marketplace/services/{provider_id}/skill.md   ← mandatory before step 4
+   → read the endpoint ids, example payloads, and any response notes
+   → alternatively use the endpoint's "example_payload" field from step 1
 
-3. Confirm provider "is_enabled": true
+3. Confirm provider "is_enabled": true in the step 1 response
    → if false, tell the user to enable it from https://argens.xyz/dashboard/marketplace
 
 4. POST /marketplace/call
-   { "service_id": "<endpoint id>", "payload": { ...per service docs... } }
+   { "service_id": "<endpoint id from step 1>", "payload": { ...from skill file or example_payload... } }
 
 5. Handle the response:
-   200 → success, read "result" for the upstream response
+   200 → success, read "data.result" for the upstream response
    402 → blocked by policy, report to user, do not retry
    202 → pending approval, poll /v1/transactions/{id}
+   502 MARKETPLACE_NOT_MPP → payload was wrong, no charge — fix payload and retry
+   503 MARKETPLACE_SERVICE_PAUSED → provider temporarily unavailable, do not retry
 ```
 
 ---

@@ -9,7 +9,7 @@ import { signJwt, requireJwt } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { authLimiter, emailResendLimiter, resetPinAttempts } from '../middleware/ratelimit.js'
 import { bootstrapWallet } from '../services/wallet.js'
-import { sendVerificationEmail, sendWalletReadyEmail } from '../services/email.js'
+import { sendVerificationEmail, sendWalletReadyEmail, sendPasswordResetEmail } from '../services/email.js'
 import { createApiKey } from '../services/apikey.js'
 import { assertDeliverableEmail, EmailRejectedError } from '../services/email-validation.js'
 import { logger } from '../lib/logger.js'
@@ -40,6 +40,15 @@ const pinSetSchema = z.object({
 
 const pinRemoveSchema = z.object({
   password: z.string().min(1, 'Password is required'),
+})
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+})
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
 // ─── POST /auth/signup ─────────────────────────────────────────────────────────
@@ -263,6 +272,64 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res) =
 // JWT is stateless — client discards the token. This endpoint is a signal only.
 authRouter.post('/logout', requireJwt, (_req, res) => {
   sendSuccess(res, { message: 'Logged out.' })
+})
+
+// ─── POST /auth/forgot-password ──────────────────────────────────────────────────
+// Generates a single-use, 1h reset token and emails the reset link.
+// Always returns the same response regardless of whether the email exists (no enumeration).
+authRouter.post('/forgot-password', emailResendLimiter, validate(forgotPasswordSchema), async (req, res) => {
+  const { email } = req.body as z.infer<typeof forgotPasswordSchema>
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+
+    if (user) {
+      const passwordResetToken = generateSecureToken()
+      const passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetToken, passwordResetExpiry },
+      })
+
+      sendPasswordResetEmail(email, passwordResetToken).catch((e) =>
+        logger.error('Failed to send password reset email', { userId: user.id, error: (e as Error).message }),
+      )
+    }
+
+    sendSuccess(res, { message: 'If that email is registered, a password reset link has been sent.' })
+  } catch (e) {
+    logger.error('Forgot password error', { error: (e as Error).message })
+    sendError(res, 'Failed to process request. Please try again.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// ─── POST /auth/reset-password ───────────────────────────────────────────────────
+// Validates the single-use token + expiry, sets the new password, clears the token.
+authRouter.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
+  const { token, password } = req.body as z.infer<typeof resetPasswordSchema>
+
+  try {
+    const user = await prisma.user.findUnique({ where: { passwordResetToken: token } })
+
+    if (!user || !user.passwordResetExpiry || user.passwordResetExpiry < new Date()) {
+      sendError(res, 'This password reset link is invalid or has expired.', 'INVALID_TOKEN', 400)
+      return
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12)
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, passwordResetToken: null, passwordResetExpiry: null },
+    })
+
+    logger.info('Password reset completed', { userId: user.id })
+    sendSuccess(res, { message: 'Password updated. You can now log in with your new password.' })
+  } catch (e) {
+    logger.error('Reset password error', { error: (e as Error).message })
+    sendError(res, 'Failed to reset password. Please try again.', 'INTERNAL_ERROR', 500)
+  }
 })
 
 // ─── POST /auth/api-keys ───────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 # Argens — Project State
 
-> Last updated: 2026-06-03
+> Last updated: 2026-06-19
 > Current phase: **Phase 4 complete → Phase 5 / beta rollout hardening**
 
 ---
@@ -11,15 +11,32 @@
 |---|---|---|
 | Network | ✅ Mainnet live | STELLAR_NETWORK=mainnet |
 | Web app | ✅ Live on Vercel | argens.xyz — landing + full dashboard |
-| API | ✅ Deployed | Live on a VPS via Dokploy |
-| SKILL.md | ✅ v5 local | v5 adds CCTP fee guidance on top of per-service skill discovery, docs, and llms.txt |
-| Phase 1 — Foundation | ✅ Complete | Auth, wallet bootstrap, API keys |
+| API | ✅ Deployed | Live on a VPS via **Dokploy** (NOT Railway). Migrations run on container start via `prisma migrate deploy` in the Dockerfile CMD. |
+| SKILL.md | ✅ v7 | v7 tightens per-service skill discovery (mandatory `GET /SKILL/{provider}.md` step), documents marketplace example payloads, the global pause (`MARKETPLACE_SERVICE_PAUSED`), and the refund-flag behaviour. CCTP fee documented (0.5% / $0.01 / $2.00). |
+| Phase 1 — Foundation | ✅ Complete | Auth, wallet bootstrap, API keys. **Password reset flow added 2026-06-19** (`/auth/forgot-password`, `/auth/reset-password`). |
 | Phase 2 — Core API | ✅ Complete | All payment/policy/transaction endpoints |
-| Phase 3 — Dashboard | ✅ Complete | All pages built and functional |
-| Phase 4 — Marketplace | ✅ Complete | 86 providers, E2E verified on mainnet |
+| Phase 3 — Dashboard | ✅ Complete | All pages built and functional. Dismiss-pending-approval, marketplace skill.md dialog, example-payload prefills added. |
+| Phase 4 — Marketplace | ✅ Complete | 86 providers / 493 endpoints, E2E verified on mainnet. Hardened with global kill-switch + paid-but-failed refund flagging (see below). |
 | Phase 5 — Polish & Demo | 🔄 In progress | Partially done; see below |
-| CCTP Stellar → Base | ✅ Direct path verified twice; preflight hardened | Latest 0.0100000 USDC mainnet burn + Base relay succeeded locally on 2026-05-27. On 2026-06-03, direct and approval-token paths were patched to fail closed before fee payment when live `amount + fee` balance cannot be verified. |
-| Phase 6 — Mainnet infra | ⚠️ Partial | API deployed (VPS/Dokploy); alerting pending |
+| CCTP Stellar → Base | ✅ Live & available | Direct path verified twice on mainnet (latest 0.0100000 USDC burn + Base relay, 2026-05-27). Argens fee `clamp(amount × 0.5%, $0.01, $2.00)`; both direct and approval paths fail closed before the fee when live `amount + fee` balance cannot be verified. Approval-token path still needs live verification. |
+| Phase 6 — Mainnet infra | ⚠️ Partial | API deployed (VPS/Dokploy); credit-pool funded; alerting pending |
+
+---
+
+## Recent additions (2026-06-17 → 2026-06-19)
+
+- **Marketplace global kill-switch** — `GlobalServiceSetting` model. Globally paused providers are hidden from `GET /marketplace/services` and rejected at `POST /marketplace/call` with `503 MARKETPLACE_SERVICE_PAUSED`. Managed from the Ops Console "Marketplace" tab and `POST /admin/marketplace/services/:providerId`.
+- **Paid-but-upstream-failed refund flagging** — when MPP pulls the USDC (receipt present) but the upstream relay fails and it wasn't credit-funded, the FAILED tx gets `metadata.refund.required=true`, an `AuditLog MARKETPLACE_REFUND_REQUIRED`, and an ops-alert email. Ops Console Failed tab shows a "REFUND NEEDED" badge. Refunds stay manual.
+- **Marketplace example payloads** — `services/marketplace-examples.ts` provides per-endpoint/per-provider `example_payload`s, surfaced in the catalog (dashboard prefills the body), embedded in per-provider skill markdown, and used by the catalog test harness.
+- **Per-service skill discovery in dashboard** — marketplace detail view has a `skill.md` button that opens/downloads the provider skill file. SKILL.md v7 makes fetching `/SKILL/{provider}.md` a mandatory pre-call step for agents.
+- **Catalog health test** — `apps/api/scripts/marketplace-catalog-test.ts` (committed) calls each provider's cheapest endpoint through Argens' own `/marketplace/call`, with a hard spend cap; writes `tasks/marketplace-catalog-report.md`. 16 providers fail at the MPP payment layer (`verification-failed`/504/channel) — flagged for global pause and an MPP Router escalation.
+- **Password reset flow** — `User.passwordResetToken` + `passwordResetExpiry` (single-use, 1h). `POST /auth/forgot-password` + `POST /auth/reset-password`; `sendPasswordResetEmail`; web pages `/auth/forgot-password` + `/auth/reset-password`; "Forgot password?" link on login.
+- **Dismiss pending approvals** — `POST /transactions/:id/dismiss` (JWT) rejects a PENDING_APPROVAL tx the user owns even after its token expired; overview page has a Dismiss button next to Review.
+- **Login redirect** — `/login` now redirects already-authenticated users straight to `/dashboard`.
+- **Misc UI** — removed the "20% Argens markup" label from the marketplace detail view; API-key copy button gated to a freshly-generated key (the full key is never retrievable later); X link (`https://x.com/argensonline`) added to the landing footer.
+
+### Schema models beyond the original CLAUDE.md schema
+`MarketplaceServiceSetting` (per-user provider enablement), `GlobalServiceSetting` (platform-wide pause), `AccessCode` (beta gating), `CreditGrant` (expirable marketplace credits). `User` also has `accessCodeId`, `passwordResetToken`, `passwordResetExpiry`.
 
 ---
 

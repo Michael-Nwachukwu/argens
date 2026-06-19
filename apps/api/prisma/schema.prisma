@@ -14,6 +14,8 @@ model User {
   emailVerified           Boolean       @default(false)
   emailVerificationToken  String?       @unique
   emailVerificationExpiry DateTime?
+  passwordResetToken      String?       @unique // raw single-use reset token; cleared on use
+  passwordResetExpiry     DateTime?     // reset token expiry (1h); null = no active reset
   transferPinHash         String?       // bcrypt hash of 4-digit transfer PIN; null = no PIN set
   accessCodeId            String?       @unique // the AccessCode redeemed at signup, if any
   createdAt               DateTime      @default(now())
