@@ -22,6 +22,7 @@ export interface MppRouterService {
   asset: string
   status: 'active' | 'limited'
   status_note?: string
+  verified_mode?: string  // e.g. "charge" — operator-tested payment mode
   docs_url?: string
   methods?: {
     stellar?: { intents?: string[] }
