@@ -62,6 +62,7 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
   stableenrich_exa_search: { query: 'stellar usdc payments for AI agents' },
   stableenrich_exa_answer: { query: 'What is Stellar blockchain and how does USDC work on it?' },
   stableenrich_exa_contents: { urls: ['https://stellar.org'] },
+  'stableenrich_exa_find-similar': { url: 'https://stellar.org' },
 
   // ── stabletravel / Amadeus-style flight search ───────────────────────────────
   stabletravel_flights_ava: {
@@ -183,7 +184,8 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
   conduit_network: { network: 'conduit-mainnet', jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 },
   tempo_rpc: { jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 },
   quicknode_network: { network: 'eth-mainnet', jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 },
-  quicknode_session_network: { network: 'eth-mainnet', jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 },
+  // NOTE: network goes in the `query` field of POST /v1/marketplace/call, not payload — it substitutes into the URL path
+  quicknode_session_network: { jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 },
 
   // ── StableSocial — TikTok / Instagram / Facebook / Reddit ───────────────────
   stablesocial_tiktok_profile: { username: 'nasa' },
@@ -259,7 +261,10 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
 
   // ── Tako — data visualization ────────────────────────────────────────────────
   tako_mpp_v1_visualize: { query: 'GDP by country 2025' },
-  'tako_mpp_v1_thinviz_create': { prompt: 'Show cryptocurrency market cap trend for 2024', query: 'crypto market cap 2024' },
+  'tako_mpp_v1_thinviz_create': { prompt: 'Show cryptocurrency market cap trend for 2024', query: 'crypto market cap 2024', components: ['chart'] },
+  'tako_mpp_v1_search_deep': { query: 'bitcoin price trend 2024' },
+  'tako_mpp_v1_threads_deep': { query: 'cryptocurrency market cap 2024' },
+  'tako_mpp_v1_reports_generate': { query: 'global crypto market overview 2024' },
   'tako_mpp_v1_charts_edit': { chart_id: 'placeholder-chart-id', prompt: 'change the chart type to bar' },
 
   // ── Replicate — ML model inference ───────────────────────────────────────────
@@ -617,5 +622,46 @@ export function examplePayloadFor(
   providerId: string,
 ): Record<string, unknown> | null {
   const hit = ENDPOINT_EXAMPLES[endpointId] ?? PROVIDER_EXAMPLES[providerId] ?? null
+  return hit ? { ...hit } : null
+}
+
+/**
+ * Endpoint-specific query params (sent as ?key=value in the MPP Router URL).
+ * These are path placeholders that MPP Router substitutes into the upstream URL.
+ * The dashboard pre-fills its "Path parameters" box from this map.
+ */
+export const ENDPOINT_QUERY_PARAMS: Record<string, Record<string, string>> = {
+  // ── QuickNode ────────────────────────────────────────────────────────────────
+  quicknode_session_network: { network: 'eth-mainnet' },
+
+  // ── Conduit ──────────────────────────────────────────────────────────────────
+  conduit_network: { network: 'conduit-mainnet' },
+
+  // ── Alchemy ──────────────────────────────────────────────────────────────────
+  alchemy_network_nft_v3_endpoint: { network: 'eth-mainnet', endpoint: 'getNFTsForOwner' },
+
+  // ── fal.ai dynamic model routes ──────────────────────────────────────────────
+  fal_model: { model: 'fal-ai/flux/dev' },
+  fal_namespace_model: { namespace: 'fal-ai', model: 'flux/dev' },
+
+  // ── Gemini file upload ────────────────────────────────────────────────────────
+  gemini_version_files: { version: 'v1beta' },
+
+  // ── moltycash tip-by-username ────────────────────────────────────────────────
+  moltycash_username_a2a: { username: 'argensonline' },
+
+  // ── AutoExchange agent run ────────────────────────────────────────────────────
+  autoexchange_agents_id_run: { id: 'placeholder-agent-id' },
+
+  // ── Allium async query by id ──────────────────────────────────────────────────
+  'allium_explorer_queries_query_id_run-async': { query_id: 'placeholder-query-id' },
+
+  // ── Browserbase session extend ────────────────────────────────────────────────
+  'browserbase_browser_session_id_extend': { id: 'placeholder-session-id' },
+}
+
+/** Returns example query params for a path-placeholder endpoint, or null. */
+export function exampleQueryFor(endpointId: string): Record<string, string> | null {
+  const hit = ENDPOINT_QUERY_PARAMS[endpointId] ?? null
   return hit ? { ...hit } : null
 }

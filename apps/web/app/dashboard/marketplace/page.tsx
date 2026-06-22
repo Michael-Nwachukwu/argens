@@ -25,19 +25,6 @@ function isUpstreamErrorDetails(d: unknown): d is UpstreamErrorDetails {
   return typeof d === 'object' && d !== null
 }
 
-/**
- * MPP operation ids encode path placeholders as `_<name>_id_` segments
- * (e.g. `agentmail_inboxes_inbox_id_messages_send` needs ?inbox_id=…).
- * Returns the detected placeholder names with empty-string defaults.
- */
-function detectPlaceholders(operationId: string): Record<string, string> {
-  if (!operationId) return {}
-  const out: Record<string, string> = {}
-  for (const m of operationId.matchAll(/_([a-z]+_id)_/g)) {
-    if (m[1]) out[m[1]] = ''
-  }
-  return out
-}
 
 const MPP_BASE = 'https://apiserver.mpprouter.dev'
 
@@ -97,13 +84,12 @@ export default function MarketplacePage() {
     () => selected?.endpoints.find(e => e.id === endpointId) ?? selected?.endpoints[0] ?? null,
     [selected, endpointId],
   )
-  const placeholderKeys = useMemo(() => Object.keys(detectPlaceholders(endpoint?.id ?? '')), [endpoint])
+  const placeholderKeys = useMemo(() => Object.keys(endpoint?.example_query ?? {}), [endpoint])
 
   const selectEndpoint = (e: MarketplaceEndpoint | null) => {
     setEndpointId(e?.id ?? null)
     setPayloadText(JSON.stringify(e?.example_payload ?? {}, null, 2))
-    const ph = detectPlaceholders(e?.id ?? '')
-    setQueryText(Object.keys(ph).length > 0 ? JSON.stringify(ph, null, 2) : '{}')
+    setQueryText(e?.example_query && Object.keys(e.example_query).length > 0 ? JSON.stringify(e.example_query, null, 2) : '{}')
     setResult(null); setError(null); setErrorDetails(null)
   }
 
