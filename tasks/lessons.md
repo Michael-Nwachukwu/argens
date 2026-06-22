@@ -4,6 +4,19 @@ Format: most recent first.
 
 ---
 
+## Lesson 2026-06-21 — Misdiagnosed marketplace failures as "unfixable downstream"; real cause was a stale client SDK
+
+**What went wrong (in two stages — I jumped to a conclusion *twice*):**
+
+1. First diagnosed the marketplace failures (`verification-failed: memo is not bound`, `Invalid base64 JSON header`) as MPP Router's "unfixable downstream Tempo settlement" — wrote that into `decisions.md`. Wrong.
+2. Then, after MPP Router said they pushed a breaking protocol change, I concluded a **drop-in SDK version bump** (`@stellar/mpp` 0.5.1→0.7.0, `mppx`→0.7.0) was "the fix" and recorded *that* before live-testing it. **Also wrong** — and it's exactly the mistake this very lesson warns about.
+
+**What live testing actually showed** (local harness against mainnet, using the funded `bldn.inc` wallet `GDCO2A…K4H` decrypted from the local DB + `performMppRequest`): the legacy `@stellar/mpp` `stellar.charge` (Payment-auth/mppx scheme) credential is now **rejected server-side** — full flow `challenge→signing→signed` completes, then MPP Router returns `502 Invalid base64 JSON header` on our credential. MPP Router has migrated to **x402 v2**: their 402 now carries an `payment-required: <base64 x402 JSON>` header and expects the credential in a `payment-signature` header. `mppx` (both 0.6.31 and 0.7.0) even *throws while parsing their x402 challenge header* (`HeaderCodec.decode` → `InvalidJsonHeaderError`). So the real fix is an **x402 v2 client migration** (Coinbase `@x402/core` + `@x402/stellar`, v2.16.0 — the packages the MPP integration guide recommends), not a version bump.
+**Root cause:** Concluding before verifying — twice. The vendor deprecated a payment scheme server-side; only a live call against their server reveals that, not reading SDK types or version peers.
+**Rule going forward:** For a payment/credential protocol break, **make a real call against the vendor and read the actual 402 challenge + the actual rejection before claiming any fix** — version peers and type signatures don't tell you which scheme the server still honors. The local harness (decrypt a funded wallet from the DB, call `performMppRequest` directly against mainnet MPP Router) is the verification tool — use it *before* writing "the fix is X," not after. And confirm whether USDC actually moved (`stellar_tx_hash`+`receipt` non-null) before calling a failure "paid"; the optimistic `cost_paid` field misleads.
+
+---
+
 ## Lesson 2026-06-19 — `credentials: 'include'` breaks fetches to wildcard-CORS endpoints
 
 **What went wrong:** The dashboard's new marketplace `skill.md` button always showed "No skill file available," even though `GET /v1/marketplace/services/:id/skill.md` returned 200 with content when curled.
