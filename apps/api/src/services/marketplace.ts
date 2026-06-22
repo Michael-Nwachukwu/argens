@@ -233,7 +233,7 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     '- `403 SERVICE_DISABLED` — the user must enable this provider from the Argens dashboard.',
     '- `503 MARKETPLACE_SERVICE_PAUSED` — Argens paused this provider platform-wide (broken upstream). Do not retry; tell the user it is temporarily unavailable.',
     '- `MARKETPLACE_NOT_MPP` — upstream rejected the request **before** payment was processed. **No USDC was charged.** Fix the request payload or query and retry.',
-    '- `MARKETPLACE_UPSTREAM_FAILED` — payment was sent to the upstream but the service errored. **USDC was charged.** Do not retry immediately. The developer is auto-notified. Check `GET /v1/transactions/{id}` for the `upstream_body` error detail and refund status.',
+    '- `MARKETPLACE_UPSTREAM_FAILED` — the upstream provider errored. Check the response `payment_committed` field: if `true`, USDC was charged and a refund will be issued; if `false`, no USDC was taken (safe to retry). Check `GET /v1/transactions/{id}` for `upstream_body` detail.',
     '',
     '## More Argens context',
     '',
@@ -714,10 +714,14 @@ async function executeMarketplaceCallInternal(
       )
     }
 
-    throw new AppError('Marketplace service call failed after payment attempt.', 'MARKETPLACE_UPSTREAM_FAILED', 502, {
+    const upstreamMsg = paymentCommitted
+      ? 'Marketplace service call failed after payment. USDC was charged — a refund will be issued.'
+      : 'Marketplace service call failed. No payment was taken (the provider errored before payment settled).'
+    throw new AppError(upstreamMsg, 'MARKETPLACE_UPSTREAM_FAILED', 502, {
       transaction_id: finalTxId,
       upstream_status: mppResult.status,
       upstream_body: mppResult.body,
+      payment_committed: paymentCommitted,
     })
   }
 
