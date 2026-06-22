@@ -71,7 +71,6 @@ export async function listMppRouterServices(): Promise<MppRouterService[]> {
   const services = json.services
     .filter((service) => service.payment_method === 'stellar')
     .filter((service) => service.network === 'stellar-mainnet')
-    .filter((service) => service.methods?.stellar?.intents?.includes('charge'))
     .filter((service) => service.method === 'POST')
 
   catalogCache = { services, expiresAt: Date.now() + 60_000 }

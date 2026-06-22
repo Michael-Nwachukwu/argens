@@ -231,6 +231,7 @@ export interface MarketplaceEndpoint {
   description: string
   price: string                 // e.g. "$0.010/request"
   example_payload: Record<string, unknown> | null
+  example_query: Record<string, string> | null
 }
 
 // `MarketplaceService` is the PROVIDER (kept this name for continuity).

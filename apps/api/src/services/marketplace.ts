@@ -25,7 +25,7 @@ import {
 } from './mpp-router.js'
 import { sendBlockedEmail, sendPendingApprovalEmail, sendMarketplaceRefundAlertEmail } from './email.js'
 import { consumeCredits, getActiveCreditsBalance, refundCredits } from './credits.js'
-import { examplePayloadFor } from './marketplace-examples.js'
+import { examplePayloadFor, exampleQueryFor } from './marketplace-examples.js'
 
 const MARKUP_RATE = new Decimal('0.20')
 const MPP_USDC_BASE_UNITS = new Decimal('10000000')
@@ -131,6 +131,7 @@ export async function getMarketplaceServicesForResponse(userId: string) {
           description: o.description,
           price: o.price,
           example_payload: examplePayloadFor(o.id, id),
+          example_query: exampleQueryFor(o.id),
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     }
