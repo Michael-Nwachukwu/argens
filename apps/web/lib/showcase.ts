@@ -45,4 +45,16 @@ export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
       'all routed through one shared client with spending caps and per-call AgentRun audit rows'
     ],
   },
+  {
+    name: 'Radiant',
+    description: "Radiant isn't a chatbot, a DeFi app, or a no-code builder — it's all of that in one personal agent that acts, remembers, builds, trades, and earns on your behalf. Talk to it in plain language. It researches, automates, and moves onchain when you need to. When a task repeats, Radiant builds you a personal app — private tools for yourself, or fan apps and mini apps you can share on Radiant. Every app exposes an API, so other users and other agents can call it. List what you build in the explorer, set a fee, and earn. Radiant is your agent — and the start of an agent economy.",
+    thumbnail: '/showcase/radiant/radiant-thumb.png',
+    logo: '/showcase/radiant/radiant-icon.png',
+    url: 'https://useradiant.xyz/',
+    tag: 'AI Agent',
+    howUsed: [
+      'AI-powered web search via marketplace endpoints.',
+      'Autonomous onchain payments for agent tasks and API calls.',
+    ],
+  },
 ]
