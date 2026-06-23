@@ -38,8 +38,27 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
   // ── Codex (GraphQL) ─────────────────────────────────────────────────────────
   codex_graphql: { query: '{ getNetworks { name networkId } }' },
 
+  // ── StableEmail ───────────────────────────────────────────────────────────────
+  // Shared relay: sends from relay@stableemail.dev. Requires `html` or `text`.
+  stableemail_send: { to: ['recipient@example.com'], subject: 'Hello from Argens', text: 'Sent via the Argens marketplace using StableEmail.' },
+  // Custom subdomain: $5 to buy yourname.stableemail.dev.
+  stableemail_subdomain_buy: { subdomain: 'yourname' },
+  stableemail_subdomain_send: { from: 'you@yourname.stableemail.dev', to: ['recipient@example.com'], subject: 'Hello', text: 'Sent from my StableEmail subdomain.' },
+  stableemail_subdomain_inbox_create: { subdomain: 'yourname', localPart: 'agent', forwardTo: 'you@gmail.com' },
+  stableemail_subdomain_inbox_messages: { subdomain: 'yourname', localPart: 'agent', limit: 20 },
+  stableemail_subdomain_inbox_messages_read: { messageId: 'replace-with-message-id' },
+  // Forwarding inbox: username@stableemail.dev, $1/30 days.
+  stableemail_inbox_buy: { username: 'alice', forwardTo: 'alice@gmail.com' },
+  stableemail_inbox_topup: { username: 'alice' },
+  stableemail_inbox_topup_quarter: { username: 'alice' },
+  stableemail_inbox_topup_year: { username: 'alice' },
+  stableemail_inbox_send: { username: 'alice', to: ['recipient@example.com'], subject: 'Hello', text: 'Sent from my StableEmail inbox address.' },
+  stableemail_inbox_messages: { username: 'alice', limit: 20 },
+  stableemail_inbox_messages_read: { messageId: 'replace-with-message-id' },
+
   // ── CoinGecko ───────────────────────────────────────────────────────────────
-  coingecko_coingecko_simple_price: { ids: 'bitcoin,stellar', vs_currencies: 'usd' },
+  coingecko_simple_price: { ids: 'bitcoin', vs_currencies: 'usd' },
+  coingecko_coingecko_simple_price: { ids: 'bitcoin', vs_currencies: 'usd' },
 
   // ── AlphaVantage ────────────────────────────────────────────────────────────
   alphavantage_alphavantage_time_series_intraday: { symbol: 'AAPL', interval: '5min' },
@@ -474,7 +493,7 @@ export const PROVIDER_EXAMPLES: Record<string, Record<string, unknown>> = {
   brave: { q: 'stellar usdc payments' },
   builtwith: { LOOKUP: 'shopify.com' },
   clado: { query: 'AI infrastructure engineers in San Francisco' },
-  coingecko: { vs_currency: 'usd' },
+  coingecko: { ids: 'bitcoin', vs_currencies: 'usd' },
   diffbot: { url: 'https://www.example.com/article' },
   'diffbot-kg': { type: 'Organization', name: 'Stripe' },
   'diffbot-nl': { content: 'Stripe is a financial infrastructure company headquartered in San Francisco.' },
@@ -517,6 +536,9 @@ export const PROVIDER_EXAMPLES: Record<string, Record<string, unknown>> = {
 
   // ── stableenrich (Exa search) ────────────────────────────────────────────────
   stableenrich: { query: 'stellar usdc payments for AI agents' },
+
+  // ── stableemail ───────────────────────────────────────────────────────────────
+  stableemail: { to: ['recipient@example.com'], subject: 'Hello from Argens', text: 'Sent via the Argens marketplace using StableEmail.' },
 
   // ── Exa (standalone) ────────────────────────────────────────────────────────
   exa: { query: 'stellar blockchain usdc payments' },

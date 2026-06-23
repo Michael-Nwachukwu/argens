@@ -15,6 +15,7 @@ interface RawService {
   network: string
   status: 'active' | 'limited'
   status_note?: string
+  payment_status?: 'verified' | 'available' | 'unavailable'
   docs_url?: string
   docs?: { homepage?: string; llms_txt?: string; api_reference?: string }
   methods?: { stellar?: { intents?: string[] } }
@@ -191,8 +192,8 @@ export async function GET() {
     const filtered = json.services
       .filter((s) => s.payment_method === 'stellar')
       .filter((s) => s.network === 'stellar-mainnet')
-      .filter((s) => s.methods?.stellar?.intents?.includes('charge'))
       .filter((s) => s.method === 'POST')
+      .filter((s) => s.payment_status !== 'unavailable')
 
     const groups = new Map<string, RawService[]>()
     for (const svc of filtered) {
