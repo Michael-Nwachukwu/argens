@@ -23,6 +23,11 @@ export interface MppRouterService {
   status: 'active' | 'limited'
   status_note?: string
   verified_mode?: string  // e.g. "charge" — operator-tested payment mode
+  // MPP Router's "opt-in honesty" signal (added 2026-06-23):
+  //   verified    — operator-tested with real money, has a methods.stellar block, safe to pay
+  //   untested    — listed for discovery only; POSTing returns 403 "Route not enabled for payment"
+  //   unavailable — known-broken upstream; not payable
+  payment_status?: 'verified' | 'untested' | 'unavailable'
   docs_url?: string
   methods?: {
     stellar?: { intents?: string[] }
@@ -68,10 +73,16 @@ export async function listMppRouterServices(): Promise<MppRouterService[]> {
   }
 
   const json = await res.json() as CatalogResponse
+  // MPP Router flipped the catalog to "opt-in honesty" (2026-06-23): only
+  // `payment_status: 'verified'` entries are operator-tested and actually payable.
+  // `untested`/`unavailable` routes return a clean 403 "Route not enabled for payment"
+  // if POSTed to, so we never surface them. As MPP verifies more providers they flip
+  // to `verified` and appear here automatically — no code change needed.
   const services = json.services
     .filter((service) => service.payment_method === 'stellar')
     .filter((service) => service.network === 'stellar-mainnet')
     .filter((service) => service.method === 'POST')
+    .filter((service) => service.payment_status === 'verified')
 
   catalogCache = { services, expiresAt: Date.now() + 60_000 }
   return services
