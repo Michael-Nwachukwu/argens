@@ -38,6 +38,13 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
   // ── Codex (GraphQL) ─────────────────────────────────────────────────────────
   codex_graphql: { query: '{ getNetworks { name networkId } }' },
 
+  // ── Firecrawl (v2) — only `url`/`query`/`urls` is required per endpoint ────────
+  firecrawl_scrape: { url: 'https://stellar.org', formats: ['markdown'], onlyMainContent: true },
+  firecrawl_crawl: { url: 'https://stellar.org', limit: 10, scrapeOptions: { formats: ['markdown'] } },
+  firecrawl_map: { url: 'https://stellar.org' },
+  firecrawl_search: { query: 'stellar usdc payments for AI agents', limit: 5 },
+  firecrawl_extract: { urls: ['https://stellar.org'], prompt: 'Extract the main product name and one-line description.' },
+
   // ── StableEmail ───────────────────────────────────────────────────────────────
   // Shared relay: sends from relay@stableemail.dev. Requires `html` or `text`.
   stableemail_send: { to: ['recipient@example.com'], subject: 'Hello from Argens', text: 'Sent via the Argens marketplace using StableEmail.' },
@@ -539,6 +546,9 @@ export const PROVIDER_EXAMPLES: Record<string, Record<string, unknown>> = {
 
   // ── stableemail ───────────────────────────────────────────────────────────────
   stableemail: { to: ['recipient@example.com'], subject: 'Hello from Argens', text: 'Sent via the Argens marketplace using StableEmail.' },
+
+  // ── Firecrawl ─────────────────────────────────────────────────────────────────
+  firecrawl: { url: 'https://stellar.org', formats: ['markdown'], onlyMainContent: true },
 
   // ── Exa (standalone) ────────────────────────────────────────────────────────
   exa: { query: 'stellar blockchain usdc payments' },
