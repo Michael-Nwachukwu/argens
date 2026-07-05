@@ -35,6 +35,11 @@ export const ENDPOINT_EXAMPLES: Record<string, Record<string, unknown>> = {
   'deepgram_deepgram_speak': { text: 'Hello from an autonomous AI agent powered by Argens.', model: 'aura-asteria-en' },
   'deepgram_deepgram_transcribe': { url: 'https://static.deepgram.com/examples/Bueller-Life-moves-pretty-fast.wav', model: 'nova-2', language: 'en' },
 
+  // ── Anthropic ─────────────────────────────────────────────────────────────────
+  // chat_completions is OpenAI-compatible (auto-converted to Anthropic format).
+  // anthropic_messages is unavailable upstream, so not surfaced.
+  anthropic_chat_completions: { model: 'claude-haiku-4-5', messages: [{ role: 'user', content: 'Write a haiku about autonomous AI agents.' }], max_tokens: 256 },
+
   // ── Codex (GraphQL) ─────────────────────────────────────────────────────────
   codex_graphql: { query: '{ getNetworks { name networkId } }' },
 
@@ -579,6 +584,9 @@ export const PROVIDER_EXAMPLES: Record<string, Record<string, unknown>> = {
 
   // ── OpenRouter ───────────────────────────────────────────────────────────────
   openrouter: { model: 'google/gemma-3-4b-it:free', messages: [{ role: 'user', content: 'Reply with the single word: ok' }] },
+
+  // ── Anthropic (OpenAI-compatible chat completions) ────────────────────────────
+  anthropic: { model: 'claude-haiku-4-5', messages: [{ role: 'user', content: 'Write a haiku about autonomous AI agents.' }], max_tokens: 256 },
 
   // ── Parallel ─────────────────────────────────────────────────────────────────
   parallel: { query: 'stellar blockchain usdc payments for AI agents' },

@@ -707,11 +707,16 @@ async function executeMarketplaceCallInternal(
         transactionId: finalTxId,
         upstream_body: mppResult.body,
       })
+      // Channel errors are pre-settlement: MPP can't route to the merchant, so no
+      // USDC is charged. Only promise a refund if something was actually committed.
+      const channelMsg = paymentCommitted
+        ? 'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid and USDC was charged — contact support@argens.xyz with the transaction_id for a full refund.'
+        : 'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid and no payment was taken. Try again later or contact support@argens.xyz.'
       throw new AppError(
-        'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid — contact support@argens.xyz with the transaction_id for a full refund.',
+        channelMsg,
         'MARKETPLACE_SERVICE_UNAVAILABLE',
         503,
-        { transaction_id: finalTxId, service_id: service.id },
+        { transaction_id: finalTxId, service_id: service.id, payment_committed: paymentCommitted },
       )
     }
 
