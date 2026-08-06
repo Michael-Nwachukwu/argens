@@ -116,7 +116,7 @@
 ### High priority
 
 - [x] **API deploy** — live on a VPS via Dokploy (Railway plan dropped)
-- [ ] **Example payloads** — `example_payload` is always `null`; marketplace call form has no prefills; need a generation pipeline (curated + OpenAPI extraction + LLM-generated fallback)
+- [x] **Example payloads** — `services/marketplace-examples.ts` provides curated per-endpoint/provider `example_payload` + `example_query` (surfaced in catalog, embedded in per-provider skill md, prefilled in the dashboard call form). Endpoint→provider→null resolution order.
 - [x] **Documentation page** (`/docs`) — quickstart, API reference, policies, marketplace, CCTP, agent onboarding
 
 ### Medium priority
@@ -129,7 +129,8 @@
 
 - [x] Per-service skill files (`/SKILL/<provider>.md`) — generated from the MPP catalog and upstream docs links
 - [x] `llms.txt` at argens.xyz/llms.txt — links SKILL.md + docs pages
-- [ ] XLM balance alerting on ops wallet
+- [ ] Async-only marketplace endpoints (firecrawl_crawl/extract, stablestudio_generate_*) — x402 session scheme unsupported upstream. Guard prototyped then reverted 2026-08-06; deferred to GitHub issue #29. See decisions.md 2026-07-31.
+- [~] XLM/credit-pool balance alerting — `services/alerting.ts` implemented (ops XLM + credit-pool USDC, 6h interval, 24h rate limit). NOT yet E2E-verified against a real low balance.
 - [ ] Wallet-funded SSE watcher E2E test
 - [ ] Low balance email E2E verification
 
