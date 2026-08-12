@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#F2D9A6; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+
+  /* ── warm afternoon sky ── */
+  #sky { position:absolute; inset:0;
+    background:
+      radial-gradient(circle 460px at 78% 16%, rgba(255,244,208,0.95) 0%, rgba(255,238,190,0) 62%),
+      linear-gradient(178deg, #FAE6BE 0%, #F6D9A8 34%, #F0C68C 64%, #E7AE71 88%, #DE9A61 100%); }
+  #haze { position:absolute; left:0; right:0; bottom:300px; height:340px;
+    background: linear-gradient(180deg, rgba(255,240,206,0) 0%, rgba(255,238,198,0.5) 100%); }
+
+  /* ── copy ── */
+  #kick { position:absolute; left:88px; top:128px; font-family:"JetBrains Mono",monospace;
+    font-size:20px; letter-spacing:0.24em; text-transform:uppercase; color:#9A7433; }
+  #h1 { position:absolute; left:88px; top:180px; width:750px;
+    font-size:86px; font-weight:700; letter-spacing:-0.035em; line-height:1.06; color:#3A2E15; }
+  #h1 .r { color:#B0623A; }
+  #sub { position:absolute; left:90px; top:472px; width:668px;
+    font-size:31px; font-weight:500; line-height:1.5; color:#7A5F26; letter-spacing:-0.004em; }
+
+  #wm { position:absolute; left:88px; bottom:78px; display:flex; align-items:center; gap:14px; z-index:6; }
+  #wm .nm { font-size:36px; font-weight:700; letter-spacing:-0.03em; color:#F7EFDC; }
+  #wm .nm .dot { color:#E8CC85; }
+
+  #art { position:absolute; inset:0; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="sky"></div>
+
+  <svg id="art" width="1080" height="1350" viewBox="0 0 1080 1350">
+    <defs>
+      <radialGradient id="sunG" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0"    stop-color="#FFFAE8"/>
+        <stop offset="0.62" stop-color="#FFF0C2"/>
+        <stop offset="1"    stop-color="#FCE3A0"/>
+      </radialGradient>
+      <radialGradient id="sunHalo" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#FFF3CC" stop-opacity="0.85"/>
+        <stop offset="1" stop-color="#FFF3CC" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="postG" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0"   stop-color="#8A6C2E"/>
+        <stop offset="0.4" stop-color="#6B5324"/>
+        <stop offset="1"   stop-color="#4A3917"/>
+      </linearGradient>
+      <linearGradient id="clothG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FDF7E6"/>
+        <stop offset="1" stop-color="#EFE0BC"/>
+      </linearGradient>
+      <radialGradient id="coinW" cx="0.36" cy="0.3" r="0.8">
+        <stop offset="0" stop-color="#FFF9E4"/>
+        <stop offset="0.55" stop-color="#F4E1AE"/>
+        <stop offset="1" stop-color="#C9A957"/>
+      </radialGradient>
+      <clipPath id="hamClip">
+        <path d="M 210 792 Q 540 930 870 792 Q 540 1130 210 792 Z"/>
+      </clipPath>
+      <!-- concave shading: lit far rim, shadowed trough, bounce at the near rim -->
+      <linearGradient id="troughG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"    stop-color="#FFFAE8" stop-opacity="0.34"/>
+        <stop offset="0.20" stop-color="#FFFAE8" stop-opacity="0"/>
+        <stop offset="0.60" stop-color="#543A14" stop-opacity="0.26"/>
+        <stop offset="0.86" stop-color="#543A14" stop-opacity="0.16"/>
+        <stop offset="1"    stop-color="#B0803A" stop-opacity="0.10"/>
+      </linearGradient>
+      <linearGradient id="glassG" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0"    stop-color="#FFF6DE" stop-opacity="0.85"/>
+        <stop offset="0.45" stop-color="#FFF6DE" stop-opacity="0.35"/>
+        <stop offset="1"    stop-color="#E0C98E" stop-opacity="0.6"/>
+      </linearGradient>
+    </defs>
+
+    <!-- ══ sun ══ -->
+    <circle cx="838" cy="212" r="250" fill="url(#sunHalo)"/>
+    <circle cx="838" cy="212" r="116" fill="url(#sunG)"/>
+    <circle cx="838" cy="212" r="116" fill="none" stroke="#FFF6D6" stroke-width="5" opacity="0.7"/>
+
+    <!-- ══ clouds ══ -->
+    <g fill="#FFF6DF">
+      <g opacity="0.78">
+        <ellipse cx="252" cy="718" rx="96" ry="27"/>
+        <ellipse cx="316" cy="704" rx="62" ry="22"/>
+        <ellipse cx="196" cy="708" rx="52" ry="19"/>
+      </g>
+      <g opacity="0.55">
+        <ellipse cx="884" cy="468" rx="82" ry="23"/>
+        <ellipse cx="938" cy="456" rx="52" ry="18"/>
+      </g>
+      <g opacity="0.42">
+        <ellipse cx="782" cy="692" rx="70" ry="19"/>
+        <ellipse cx="832" cy="684" rx="44" ry="15"/>
+      </g>
+    </g>
+
+    <!-- ══ dunes ══ -->
+    <path d="M -60 1046 Q 300 946 700 1030 Q 900 1072 1140 1016 L 1140 1350 L -60 1350 Z" fill="#D4AF63"/>
+    <path d="M -60 1122 Q 260 1046 620 1116 Q 900 1170 1140 1104 L 1140 1350 L -60 1350 Z" fill="#A8853F"/>
+    <path d="M -60 1216 Q 340 1146 720 1214 Q 940 1252 1140 1206 L 1140 1350 L -60 1350 Z" fill="#6E5824"/>
+    <!-- sand speckle -->
+    <g fill="#FFF0C8" opacity="0.20">
+      <circle cx="150" cy="1090" r="3"/><circle cx="330" cy="1058" r="2.6"/>
+      <circle cx="520" cy="1084" r="3"/><circle cx="880" cy="1074" r="2.6"/>
+      <circle cx="240" cy="1170" r="2.8"/><circle cx="700" cy="1168" r="3"/>
+      <circle cx="960" cy="1148" r="2.6"/><circle cx="420" cy="1256" r="2.8"/>
+    </g>
+
+    <!-- ══ hammock posts ══ -->
+    <g>
+      <rect x="152" y="612" width="36" height="452" rx="16" fill="url(#postG)"/>
+      <ellipse cx="170" cy="614" rx="24" ry="12" fill="#E8CC85"/>
+      <ellipse cx="170" cy="610" rx="24" ry="12" fill="#C5A253"/>
+      <rect x="892" y="596" width="36" height="470" rx="16" fill="url(#postG)"/>
+      <ellipse cx="910" cy="598" rx="24" ry="12" fill="#E8CC85"/>
+      <ellipse cx="910" cy="594" rx="24" ry="12" fill="#C5A253"/>
+    </g>
+
+    <!-- ══ hammock ropes ══ -->
+    <g stroke="#8A6C2E" stroke-width="3.4" fill="none" stroke-linecap="round">
+      <path d="M 170 646 L 212 790"/>
+      <path d="M 170 646 L 205 796"/>
+      <path d="M 170 646 L 219 799"/>
+      <path d="M 910 630 L 868 790"/>
+      <path d="M 910 630 L 875 796"/>
+      <path d="M 910 630 L 861 799"/>
+    </g>
+
+    <!-- ══ hammock cloth — a real sling: far rim, 100px trough, near rim ══ -->
+    <!-- cast shadow on the sand -->
+    <ellipse cx="548" cy="1016" rx="286" ry="24" fill="#6E5824" opacity="0.20"/>
+    <!-- soft shadow hugging the underside of the near rim -->
+    <path d="M 210 792 Q 540 1146 870 792" fill="none" stroke="#8A6C2E" stroke-width="10"
+          stroke-linecap="round" opacity="0.28"/>
+    <!-- base cloth -->
+    <path d="M 210 792 Q 540 930 870 792 Q 540 1130 210 792 Z" fill="url(#clothG)"/>
+    <!-- woven bands, each following the sag from far rim to near rim -->
+    <g clip-path="url(#hamClip)">
+      <path fill="#E2C27E" d="M 246.3 806.3 L 251.8 808.4 L 257.3 810.4 L 262.9 812.3 L 268.4 814.3 L 273.9 816.1 L 279.4 818.0 L 279.4 855.6 L 273.9 851.1 L 268.4 846.5 L 262.9 841.8 L 257.3 837.0 L 251.8 832.1 L 246.3 827.1 Z"/>
+      <path fill="#B0623A" opacity="0.42" d="M 299.7 824.4 L 305.2 826.1 L 310.7 827.7 L 316.3 829.3 L 321.8 830.8 L 327.3 832.3 L 332.8 833.8 L 332.8 894.4 L 327.3 890.8 L 321.8 887.1 L 316.3 883.3 L 310.7 879.4 L 305.2 875.5 L 299.7 871.4 Z"/>
+      <path fill="#E2C27E" d="M 353.1 838.9 L 358.6 840.2 L 364.1 841.4 L 369.7 842.6 L 375.2 843.8 L 380.7 844.9 L 386.2 846.0 L 386.2 924.3 L 380.7 921.6 L 375.2 918.8 L 369.7 916.0 L 364.1 913.0 L 358.6 909.9 L 353.1 906.8 Z"/>
+      <path fill="#EDD8A4" d="M 406.5 849.7 L 412.0 850.6 L 417.5 851.5 L 423.1 852.3 L 428.6 853.1 L 434.1 853.9 L 439.6 854.6 L 439.6 945.4 L 434.1 943.6 L 428.6 941.7 L 423.1 939.8 L 417.5 937.7 L 412.0 935.6 L 406.5 933.3 Z"/>
+      <path fill="#E2C27E" d="M 459.9 856.9 L 465.4 857.5 L 470.9 858.0 L 476.5 858.4 L 482.0 858.9 L 487.5 859.3 L 493.0 859.6 L 493.0 957.6 L 487.5 956.7 L 482.0 955.8 L 476.5 954.7 L 470.9 953.6 L 465.4 952.4 L 459.9 951.0 Z"/>
+      <path fill="#B0623A" opacity="0.42" d="M 513.3 860.5 L 518.8 860.7 L 524.3 860.8 L 529.9 860.9 L 535.4 861.0 L 540.9 861.0 L 546.4 861.0 L 546.4 960.9 L 540.9 961.0 L 535.4 961.0 L 529.9 960.8 L 524.3 960.6 L 518.8 960.3 L 513.3 959.9 Z"/>
+      <path fill="#E2C27E" d="M 566.7 860.5 L 572.2 860.3 L 577.7 860.1 L 583.3 859.8 L 588.8 859.5 L 594.3 859.1 L 599.8 858.7 L 599.8 955.4 L 594.3 956.4 L 588.8 957.3 L 583.3 958.1 L 577.7 958.8 L 572.2 959.4 L 566.7 959.9 Z"/>
+      <path fill="#EDD8A4" d="M 620.1 856.9 L 625.6 856.4 L 631.1 855.7 L 636.7 855.1 L 642.2 854.4 L 647.7 853.7 L 653.2 852.9 L 653.2 941.1 L 647.7 943.0 L 642.2 944.8 L 636.7 946.5 L 631.1 948.1 L 625.6 949.6 L 620.1 951.0 Z"/>
+      <path fill="#E2C27E" d="M 673.5 849.7 L 679.0 848.8 L 684.5 847.8 L 690.1 846.7 L 695.6 845.7 L 701.1 844.6 L 706.6 843.4 L 706.6 917.9 L 701.1 920.7 L 695.6 923.4 L 690.1 926.1 L 684.5 928.6 L 679.0 931.0 L 673.5 933.3 Z"/>
+      <path fill="#B0623A" opacity="0.42" d="M 726.9 838.9 L 732.4 837.5 L 737.9 836.2 L 743.5 834.8 L 749.0 833.3 L 754.5 831.9 L 760.0 830.3 L 760.0 885.9 L 754.5 889.6 L 749.0 893.2 L 743.5 896.8 L 737.9 900.2 L 732.4 903.5 L 726.9 906.8 Z"/>
+      <path fill="#E2C27E" d="M 780.3 824.4 L 785.8 822.7 L 791.3 821.0 L 796.9 819.2 L 802.4 817.4 L 807.9 815.5 L 813.4 813.6 L 813.4 845.0 L 807.9 849.6 L 802.4 854.2 L 796.9 858.6 L 791.3 863.0 L 785.8 867.2 L 780.3 871.4 Z"/>
+      <!-- concave depth: the trough falls into shadow -->
+      <rect x="200" y="790" width="680" height="345" fill="url(#troughG)"/>
+    </g>
+    <!-- gathered fabric at each rope end -->
+    <g stroke="#C9A85E" stroke-width="2.6" fill="none" opacity="0.8" stroke-linecap="round">
+      <path d="M 214 794 Q 250 812 268 838"/>
+      <path d="M 214 794 Q 244 826 254 862"/>
+      <path d="M 866 794 Q 830 812 812 838"/>
+      <path d="M 866 794 Q 836 826 826 862"/>
+    </g>
+    <!-- far rim catches the sun; near rim is the front edge -->
+    <path d="M 210 792 Q 540 930 870 792" fill="none" stroke="#FFF6DE" stroke-width="5.5" stroke-linecap="round" opacity="0.9"/>
+    <path d="M 210 792 Q 540 1130 870 792" fill="none" stroke="#C9A85E" stroke-width="5.5" stroke-linecap="round"/>
+
+    <!-- ══ side crate: where your things actually got put down ══ -->
+    <ellipse cx="314" cy="1098" rx="110" ry="16" fill="#6E5824" opacity="0.28"/>
+    <path d="M 232 986 L 412 986 L 396 1006 L 216 1006 Z" fill="#B8934A"/>
+    <path d="M 216 1006 L 396 1006 L 396 1096 L 216 1096 Z" fill="#7A6230"/>
+    <path d="M 396 1006 L 412 986 L 412 1076 L 396 1096 Z" fill="#5C4A22"/>
+    <g stroke="#5C4A22" stroke-width="2.4" opacity="0.55">
+      <line x1="216" y1="1036" x2="396" y2="1036"/>
+      <line x1="216" y1="1066" x2="396" y2="1066"/>
+    </g>
+
+    <!-- phone, face-down, lying flat on the crate -->
+    <g>
+      <ellipse cx="260" cy="1001" rx="34" ry="6" fill="#5C4A22" opacity="0.35"/>
+      <path d="M 228 999 L 280 999 L 292 985 L 240 985 Z" fill="#2A2219"/>
+      <path d="M 233 997 L 277 997 L 287 987 L 243 987 Z" fill="#3A3027"/>
+      <circle cx="252" cy="991" r="4.4" fill="#211A13"/>
+      <circle cx="252" cy="991" r="1.9" fill="#4A3F31"/>
+    </g>
+
+    <!-- a cold one, sweating in the sun -->
+    <g>
+      <ellipse cx="316" cy="1000" rx="22" ry="6" fill="#5C4A22" opacity="0.3"/>
+      <path d="M 296 930 L 336 930 L 331 998 L 301 998 Z" fill="#E8A05E" opacity="0.3"/>
+      <path d="M 299 952 L 333 952 L 329 995 L 303 995 Z" fill="#D98A46"/>
+      <path d="M 296 930 L 336 930 L 331 998 L 301 998 Z" fill="url(#glassG)"/>
+      <ellipse cx="316" cy="930" rx="20" ry="5.5" fill="#FFF6DE" opacity="0.9"/>
+      <g fill="#FFF6DE" opacity="0.7">
+        <rect x="304" y="958" width="13" height="13" rx="3" transform="rotate(-14 310 964)"/>
+        <rect x="316" y="970" width="11" height="11" rx="3" transform="rotate(20 321 975)"/>
+      </g>
+      <path d="M 324 928 L 338 902" stroke="#B0623A" stroke-width="6" stroke-linecap="round"/>
+      <path d="M 338 902 L 350 906" stroke="#B0623A" stroke-width="6" stroke-linecap="round"/>
+      <path d="M 303 940 L 306 990" stroke="#FFFDF4" stroke-width="4" opacity="0.6" stroke-linecap="round"/>
+    </g>
+
+    <!-- sunglasses, folded, resting flat on the crate -->
+    <g transform="rotate(-7 370 996)">
+      <ellipse cx="370" cy="1004" rx="32" ry="6" fill="#5C4A22" opacity="0.35"/>
+      <rect x="342" y="988" width="27" height="14" rx="6.5" fill="#3A3027"/>
+      <rect x="371" y="988" width="27" height="14" rx="6.5" fill="#3A3027"/>
+      <path d="M 368 991 q 2.5 -3.5 5 0" fill="none" stroke="#3A3027" stroke-width="4" stroke-linecap="round"/>
+      <rect x="346" y="990" width="12" height="5" rx="2.5" fill="#8A7A5E" opacity="0.6"/>
+      <rect x="375" y="990" width="12" height="5" rx="2.5" fill="#8A7A5E" opacity="0.6"/>
+    </g>
+
+    <!-- ══ the agent, still on the clock ══ -->
+    <!-- little crate desk with a glowing screen -->
+    <g>
+      <rect x="672" y="1122" width="132" height="86" rx="10" fill="#6E5824"/>
+      <rect x="672" y="1122" width="132" height="14" rx="7" fill="#8A6C2E"/>
+      <rect x="694" y="1076" width="94" height="60" rx="9" fill="#2A2219"/>
+      <rect x="700" y="1082" width="82" height="42" rx="5" fill="#12100C"/>
+      <g font-family="JetBrains Mono" font-size="11" fill="#E8CC85">
+        <text x="707" y="1096">$ pay</text>
+        <text x="707" y="1110" fill="#7FD49B">ok ✓</text>
+      </g>
+      <rect x="694" y="1136" width="94" height="7" rx="3.5" fill="#3A3027"/>
+      <!-- screen spill -->
+      <path d="M 694 1076 L 788 1076 L 812 1030 L 670 1030 Z" fill="#FFF0C2" opacity="0.28"/>
+    </g>
+
+    <!-- coins ticking out of the work -->
+    <g>
+      <circle cx="764" cy="1018" r="17" fill="url(#coinW)" stroke="#B59243" stroke-width="3.4"/>
+      <text x="764" y="1025" text-anchor="middle" font-family="JetBrains Mono" font-weight="700"
+            font-size="17" fill="#8F7437">$</text>
+    </g>
+    <g opacity="0.9">
+      <circle cx="800" cy="962" r="12" fill="url(#coinW)" stroke="#B59243" stroke-width="2.8"/>
+    </g>
+    <g opacity="0.72">
+      <circle cx="826" cy="916" r="8" fill="url(#coinW)" stroke="#B59243" stroke-width="2.2"/>
+    </g>
+
+    <!-- mascot at the desk -->
+    <g transform="translate(556,1052) scale(1.12)">
+      <g transform="translate(21,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+      <g transform="translate(49,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+      <rect x="35" y="0" width="14" height="7" fill="#3E4346"/>
+      <rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+      <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/>
+      <rect x="7"  y="21" width="7" height="14" fill="#B0623A"/>
+      <rect x="77" y="21" width="7" height="14" fill="#B0623A"/>
+      <rect x="21" y="21" width="14" height="14" fill="#3E4346"/>
+      <rect x="49" y="21" width="14" height="14" fill="#3E4346"/>
+      <rect x="35" y="21" width="7" height="7" fill="#FFFFFF"/>
+      <rect x="63" y="21" width="7" height="7" fill="#FFFFFF"/>
+      <rect x="14" y="28" width="7" height="7" fill="#E0A096"/>
+      <rect x="70" y="28" width="7" height="7" fill="#E0A096"/>
+      <rect x="35" y="36" width="14" height="6" fill="#3E4346"/>
+      <rect x="28" y="42" width="35" height="7" fill="#3E4346"/>
+      <rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+      <rect x="63" y="56" width="7" height="7" fill="#3E4346"/>
+      <!-- left arm down, right arm reaching to the keys -->
+      <g transform="translate(0,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+      <g transform="translate(86,54) rotate(-52)"><rect width="7" height="16" fill="#3E4346"/><rect y="16" width="7" height="7" fill="#B0623A"/></g>
+      <!-- tiny sun visor, because it is technically the weekend -->
+      <rect x="10" y="8" width="71" height="6" rx="3" fill="#4D9B6A"/>
+      <rect x="-2" y="8" width="26" height="6" rx="3" fill="#4D9B6A" transform="rotate(-6 11 11)"/>
+    </g>
+
+    <!-- ledger chip, floated up into clear sky -->
+    <g>
+      <rect x="88" y="598" width="528" height="62" rx="31" fill="#FBF2DC" opacity="0.92"/>
+      <rect x="88" y="598" width="528" height="62" rx="31" fill="none" stroke="#C9A85E" stroke-width="2.5"/>
+      <circle cx="130" cy="629" r="9" fill="#4D9B6A"/>
+      <text x="156" y="637" font-family="JetBrains Mono" font-size="21" fill="#6E5824">
+        still working · 12 payments · <tspan fill="#8F5A2E" font-weight="600">$0.43</tspan>
+      </text>
+    </g>
+  </svg>
+
+  <div id="kick">// go on, log off</div>
+  <div id="h1">Take the<br/>weekend off.<br/><span class="r">Your agent won't.</span></div>
+  <div id="sub">It keeps working and paying while you're gone — inside the limits you already set.</div>
+
+  <div id="wm">
+    <svg width="32" height="34" viewBox="0 0 52 55"><g fill="#E8CC85">
+      <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+      <circle cx="41" cy="41.5" r="8.8"/>
+    </g></svg>
+    <div class="nm">argens<span class="dot">.</span></div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="23"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.045"/>
+  </svg>
+</body>
+</html>

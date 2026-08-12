@@ -8,7 +8,7 @@ This file is the **single source of truth** for the Claude Code agent building A
 
 ---
 
-## Status — 2026-06-19
+## Status — 2026-08-12
 
 - **Network: Stellar MAINNET.** Live on mainnet. Testnet code paths exist for local-dev parity only.
 - **Web app: live on Vercel** at `argens.xyz`. Landing page + full dashboard deployed. `SKILL.md` accessible at `argens.xyz/SKILL.md`. Vercel root directory set to `apps/web` for GitHub-triggered deployments.
@@ -23,8 +23,10 @@ This file is the **single source of truth** for the Claude Code agent building A
 - **Admin ops console: implemented.** Stats, wallet balances (ops/fee/Base relayer/credit-pool), users, access codes, credit grants, failed transactions (+ refund-needed), and the marketplace pause tab.
 - **SKILL.md: v7.** Per-service skill discovery is a mandatory pre-call step (`GET /SKILL/{provider}.md`); documents example payloads, `MARKETPLACE_SERVICE_PAUSED`, CCTP response shapes/fee, Base recipient rules, `/docs`, and `/llms.txt`.
 - **Approval flow:** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
-- **Schema beyond the schema block below:** `MarketplaceServiceSetting`, `GlobalServiceSetting`, `AccessCode`, `CreditGrant`; `User.accessCodeId`, `User.passwordResetToken`, `User.passwordResetExpiry`.
-- **What is NOT done yet:** approval-token CCTP live verification, demo Loom, ops/XLM/credit-pool alerting, wallet-funded SSE E2E, low-balance email E2E. (16 marketplace providers fail at the MPP payment layer — flagged for global pause + MPP Router escalation.)
+- **Balance alerting: IMPLEMENTED.** `services/alerting.ts` is started from `index.ts` and warns on the ops wallet (XLM, default floor 50) and the credit pool (USDC, default floor 10) to `ADMIN_ALERT_EMAIL`.
+- **Configuration:** `.env.example` is the authoritative env list; `apps/api/prisma/schema.prisma` is the authoritative schema. Neither is reproduced in this file — both copies had drifted.
+- **What is NOT done yet:** approval-token CCTP live verification, demo Loom, wallet-funded SSE end-to-end, low-balance email end-to-end. (16 marketplace providers fail at the MPP payment layer — flagged for global pause + MPP Router escalation.)
+- **Known upstream issue (2026-08-12):** MPP Router's merchant-payout leg can fail with `502 Merchant payment failed` when its Tempo RPC (`rpc.tempo.xyz`) rate-limits their server IP. The Stellar credential is signed but never settled, so `receipt` is null and **no USDC is charged**. Not an Argens fault and not a provider outage — diagnose from `metadata.mpp_router.upstream_body` before pausing anything.
 
 ---
 
@@ -44,7 +46,7 @@ This file is the **single source of truth** for the Claude Code agent building A
 12. [Notifications](#notifications)
 13. [Stellar Integration](#stellar-integration)
 14. [CCTP V2 — Cross-Chain Payments](#cctp-v2--cross-chain-payments)
-15. [Soroban Contract](#soroban-contract-policy-engine)
+15. [Soroban Contract — not built](#soroban-contract-policy-engine--v2-design-sketch-not-built)
 16. [Environment Variables](#environment-variables)
 17. [Build Order](#build-order)
 18. [Code Standards](#code-standards)
@@ -314,9 +316,11 @@ tasks/
 |---|---|---|
 | Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS | Use server components where possible |
 | Backend | Node.js, Express, TypeScript | Separate service from frontend |
-| Database | PostgreSQL via Prisma ORM | See schema below |
-| Smart Contracts | Soroban (Rust) | Policy enforcement on-chain |
+| Database | PostgreSQL via Prisma ORM | `apps/api/prisma/schema.prisma` is authoritative |
 | Blockchain | Stellar **mainnet** (live) | USDC only in V1; `STELLAR_NETWORK=mainnet` |
+| Cross-chain | Circle CCTP V2 → Base | Burn-and-mint; `viem` for the Base leg |
+| Marketplace payments | x402 v2 (`@x402/core`, `@x402/stellar`) | MPP Router migrated off the legacy scheme in 2026-06 |
+| Smart contracts | **None.** Soroban dropped for V1 | Policy enforcement is TypeScript in `services/policy.ts` |
 | Auth | Custom JWT + bcrypt | No third-party auth in V1 |
 | Email | Resend | Transactional emails only |
 | Hosting | Vercel (frontend), VPS via Dokploy (backend) | |
@@ -326,7 +330,7 @@ tasks/
 
 ## Wallet & Policy Architecture — At a Glance
 
-A compressed mental model of how wallets and policies actually work in Argens V1. Read before touching any code in `services/wallet.ts`, `services/stellar.ts`, `services/policy.ts`, or `services/soroban.ts`.
+A compressed mental model of how wallets and policies actually work in Argens V1. Read before touching any code in `services/wallet.ts`, `services/stellar.ts`, or `services/policy.ts`.
 
 ### Wallets — plain Stellar keypairs, Argens-custodied
 
@@ -334,260 +338,165 @@ A compressed mental model of how wallets and policies actually work in Argens V1
 - The public key (`G...`, 56 chars) is the wallet address. Stored in the clear in Postgres.
 - The secret key (`S...`, 56 chars) is encrypted with AES-256-GCM using `ENCRYPTION_KEY` env var, then stored in `Wallet.stellarSecretKeyEnc`. Decrypted only in memory, only for signing, then wiped.
 - This is the **agent-custodial** model: Argens signs on behalf of the user so the agent can transact autonomously.
-- The system uses **two** wallet roles. All are just keypairs — the distinction is operational:
+- The system uses **five** wallet roles. All are just keypairs — the distinction is operational:
 
-| Role | Generated | Holds | Used for |
-|---|---|---|---|
-| User wallet | By API server on signup | USDC | Signs outgoing payments (agent-driven and dashboard transfers) |
-| Ops wallet (`ARGENS_OPS_WALLET`) | Manually, once per env | XLM | Funds 1.5 XLM account reserve + trustline reserve for each new user wallet |
+| Role | Env var | Generated | Holds | Used for |
+|---|---|---|---|---|
+| User wallet | — | By API server on signup | USDC | Signs outgoing payments (agent-driven and dashboard transfers) |
+| Ops wallet | `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | Manually, once per env | XLM | Funds the 1.5 XLM account + trustline reserve for each new user wallet |
+| Fee wallet | `ARGENS_FEE_WALLET` | Manually, once per env | USDC | Receives the 20% marketplace markup and the CCTP fee. Needs a USDC trustline |
+| Credit pool | `ARGENS_CREDIT_POOL_SECRET` / `_PUBLIC` | Manually, once per env | USDC | Funds marketplace calls made against admin-granted credits |
+| Base relayer | `ARGENS_BASE_RELAYER_SECRET` | Manually, once per env | ETH on Base | Pays gas to relay CCTP mints on Base |
 
-> There is no fee wallet — direct USDC transfers carry $0 Argens fee. Revenue comes from marketplace markup only.
+> **Direct USDC transfers carry $0 Argens fee** and never touch the fee wallet — they are a
+> single-operation Stellar transaction. The fee wallet exists for marketplace markup and CCTP fees
+> only. `GET /v1/admin/wallets` reports all four platform balances; each fails silently when empty.
 
-### Policies — stored on-chain, enforced in two places, executed off-chain
+### Policies — stored, enforced, and executed entirely off-chain
 
 Policies go through three separate concerns. Do not conflate them.
 
-**1. Storage — Soroban contract is the source of truth.**
-   - When the user saves a policy in the dashboard, the backend calls `PolicyContract.set_policies(...)` on Stellar, then mirrors the values to Postgres's `Policy` table for fast reads.
-   - If Postgres and the contract ever disagree, the contract wins. Postgres is a cache.
-   - One contract instance per user, deployed lazily on first policy save. Contract ID stored in `Policy.sorobanContractId`.
+**1. Storage — Postgres is the source of truth.**
+   - When the user saves a policy in the dashboard, `POST /policies` writes the `Policy` row and an `AuditLog` entry. That is the whole operation. There is no on-chain write.
+   - `Policy.sorobanContractId` exists in the schema but is null for every user and is never read. It is reserved for a possible V2.
 
-**2. Enforcement — TypeScript policy engine is permanent in V1. Soroban was dropped.**
+**2. Enforcement — the TypeScript policy engine is permanent in V1.**
 
-   The TypeScript function `checkPolicy(amount, userId)` in `services/policy.ts` reads Postgres and returns `APPROVED / BLOCKED / PENDING_APPROVAL`. This is the final implementation — there is no Phase 4 Soroban swap-out. See Key Decisions.
+   `checkPolicy(userId, amount)` and `checkPolicyAndReserve(...)` in `services/policy.ts` read Postgres and return `APPROVED / BLOCKED / PENDING_APPROVAL`. This is the final implementation, not a stand-in — Soroban was dropped. See [Key Decisions](#key-decisions-already-made).
 
-**3. Execution — always the backend, never the contract (in V1).**
+**3. Execution — always the backend.**
 
-   Even after the Soroban contract is live, the Node backend is what builds and signs the actual Stellar payment (two-op atomic tx: recipient + fee wallet — see [Fee Mechanics](#fee-mechanics)). The contract is consulted but does not move funds.
+   The Node backend builds and signs the Stellar payment. Direct payments are a **single-operation** transaction (one payment op to the recipient, no fee op — see [Payment Submission](#payment-submission-fee-free-single-operation)). Marketplace markup and CCTP fees are separate transfers, not extra operations on the user's payment.
 
-   Implication: V1's trust model is "Argens backend consults an on-chain policy before signing." A compromised backend could bypass the consult. This is honest, and it's why the custody model is **agent-custodial**, not trustless. V2's goal is to move to contract-held funds and contract-executed payments — at that point the consult and the execution merge into a single atomic contract call.
+   Implication: V1's trust model is "Argens enforces policy in its own backend before signing." A compromised backend could bypass the check. That is honest, and it is why the custody model is **agent-custodial**, not trustless. V2's goal is contract-held funds and contract-executed payments — at that point the check and the execution merge into a single atomic contract call.
 
 ### The Approval Threshold path is different
 
 Max Transaction and Allowance are straightforward validate-and-block rules. Approval Threshold produces a `PendingApproval` result, which triggers a flow that lives entirely off-chain:
 
-1. Contract/TS check returns `PendingApproval`.
+1. The policy check returns `PENDING_APPROVAL`.
 2. Backend writes an `ApprovalQueue` row with a 24h single-use token.
 3. Backend sends the user an email with a link to the dashboard confirmation page.
 4. User clicks → lands on `/approve/confirm?token=...` → clicks approve or reject → dashboard sends `POST /approve/:token` or `POST /reject/:token`.
 5. On approve: backend re-runs policy check, then signs and submits the payment. On reject: tx marked `REJECTED`, no payment.
 
-The Soroban contract participates only in step 1. Everything else is backend + frontend.
+Every step is backend + frontend. Nothing on-chain participates in the decision.
 
 ### What this means for new code
 
-- Signing the payment is always a backend responsibility. Never try to make the contract move USDC in V1.
-- Policy reads for display/analytics: use Postgres. Policy reads for enforcement decisions: use the contract (Phase 4+) or the TS stand-in (Phase 2–3).
-- Policy writes: always write to the contract first, then mirror to Postgres. If the contract call fails, the Postgres write must not happen.
-- When in doubt about which enforcement model is active, check `STELLAR_NETWORK` and `Policy.sorobanContractId`. If the contract ID is null, the TS stand-in is authoritative; otherwise the contract is.
+- Signing the payment is always a backend responsibility. There is no contract to move USDC.
+- Policy reads — for display, analytics, or enforcement — all come from Postgres. There is no second source to reconcile against.
+- Policy writes go to Postgres and write an `AuditLog` entry. Do not add an on-chain write.
+- Enforcement decisions must go through `checkPolicyAndReserve` in `services/policy.ts`, never a hand-rolled comparison. It is the only thing that increments `totalSpent` atomically, and duplicating the logic reintroduces the concurrent-overspend race it exists to close.
 
 ---
 
 ## Project Structure
 
-```
+Generated from the working tree — keep it that way. If you add a route or service, add it here.
+
+```text
 argens/
 ├── apps/
-│   ├── web/                        # Next.js frontend (dashboard)
+│   ├── web/                          # Next.js 14 (App Router) dashboard
 │   │   ├── app/
-│   │   │   ├── (auth)/
-│   │   │   │   ├── login/
-│   │   │   │   └── signup/
-│   │   │   ├── (dashboard)/
-│   │   │   │   ├── layout.tsx
-│   │   │   │   ├── page.tsx        # Overview
-│   │   │   │   ├── wallet/
-│   │   │   │   ├── policies/
-│   │   │   │   ├── transactions/
-│   │   │   │   ├── analytics/
-│   │   │   │   ├── api-keys/
-│   │   │   │   └── settings/
-│   │   │   └── layout.tsx
-│   │   ├── components/
-│   │   │   ├── ui/                 # Base UI components
-│   │   │   ├── dashboard/          # Dashboard-specific components
-│   │   │   └── shared/
-│   │   └── lib/
-│   │       ├── api.ts
-│   │       └── utils.ts
+│   │   │   ├── (auth)/               # login, signup
+│   │   │   ├── dashboard/            # overview, wallet, policies, transactions,
+│   │   │   │                         #   analytics, api-keys, marketplace, settings
+│   │   │   ├── auth/                 # verify, forgot-password, reset-password
+│   │   │   ├── approve/confirm/      # approval landing page (POST-only state change)
+│   │   │   ├── docs/ services/ showcase/
+│   │   │   ├── x/<obscured>/         # admin ops console
+│   │   │   └── page.tsx              # landing page
+│   │   ├── components/{ui,dashboard,shared}/
+│   │   ├── lib/api.ts                # typed API client
+│   │   └── public/SKILL.md           # agent onboarding file, served at /SKILL.md
 │   │
-│   └── api/                        # Express backend
-│       ├── src/
-│       │   ├── routes/
-│       │   │   ├── auth.ts
-│       │   │   ├── wallet.ts
-│       │   │   ├── transactions.ts
-│       │   │   ├── policies.ts
-│       │   │   ├── apikeys.ts
-│       │   │   └── analytics.ts
-│       │   ├── middleware/
-│       │   │   ├── auth.ts         # JWT middleware
-│       │   │   ├── apikey.ts       # API key auth middleware
-│       │   │   └── ratelimit.ts
-│       │   ├── services/
-│       │   │   ├── stellar.ts      # Stellar SDK wrapper
-│       │   │   ├── policy.ts       # Policy engine
-│       │   │   ├── wallet.ts       # Wallet operations
-│       │   │   ├── email.ts        # Resend email service
-│       │   │   └── soroban.ts      # Soroban contract calls
-│       │   ├── lib/
-│       │   │   ├── prisma.ts
-│       │   │   └── crypto.ts       # AES-256 encryption for private keys
-│       │   └── index.ts
-│       └── prisma/
-│           └── schema.prisma
+│   └── api/                          # Express + TypeScript backend
+│       ├── prisma/schema.prisma      # AUTHORITATIVE schema
+│       ├── scripts/
+│       │   └── marketplace-catalog-test.ts   # catalog health harness (spends real USDC)
+│       ├── Dockerfile                # CMD runs `prisma migrate deploy` on start
+│       └── src/
+│           ├── routes/
+│           │   ├── auth.ts           # signup, verify, login, password reset, api-keys, transfer-pin
+│           │   ├── wallet.ts         # balance, send, export-key, bootstrap-retry
+│           │   ├── transactions.ts   # pay, quote, refund, list, detail, dismiss
+│           │   ├── policies.ts       # get + save policy
+│           │   ├── approve.ts        # approve/reject by token
+│           │   ├── marketplace.ts    # catalog, call, per-provider enable/disable, skill.md
+│           │   ├── x402.ts           # pay an x402-gated resource
+│           │   ├── agent.ts          # agent status, spend summary
+│           │   └── admin.ts          # ops console API (x-admin-secret)
+│           ├── services/
+│           │   ├── stellar.ts        # Stellar SDK wrapper, network resolution
+│           │   ├── payment.ts        # build + sign + submit, retry once
+│           │   ├── policy.ts         # THE policy engine (checkPolicyAndReserve)
+│           │   ├── wallet.ts         # keypair generation, bootstrap, trustline
+│           │   ├── apikey.ts         # key generation + verification
+│           │   ├── cctp.ts           # CCTP V2 burn, fee maths, preflight
+│           │   ├── cctp-relay.ts     # attestation poll + Base mint; owns totalSpent on that path
+│           │   ├── marketplace.ts    # MPP call orchestration, markup, refund flagging
+│           │   ├── mpp-client.ts     # x402 v2 client (challenge → sign → retry → receipt)
+│           │   ├── mpp-router.ts     # MPP catalog client, provider grouping
+│           │   ├── marketplace-examples.ts   # per-endpoint example payloads
+│           │   ├── credits.ts        # grant, consume, refund credits
+│           │   ├── email.ts          # Resend / ethereal templates
+│           │   ├── email-validation.ts       # disposable-domain + MX checks
+│           │   ├── watcher.ts        # Horizon payments SSE + 60s poll fallback
+│           │   ├── alerting.ts       # low-balance alerts for ops + credit pool
+│           │   └── admin-balances.ts # all four platform wallet balances
+│           ├── middleware/
+│           │   ├── auth.ts           # requireJwt / requireApiKey / requireJwtOrApiKey
+│           │   ├── ratelimit.ts      # 100 req/min per API key; auth + email limiters
+│           │   └── validate.ts       # Zod body validation
+│           ├── lib/
+│           │   ├── prisma.ts
+│           │   ├── crypto.ts         # AES-256-GCM for secret keys; secure tokens
+│           │   ├── errors.ts         # AppError and friends
+│           │   ├── response.ts       # sendSuccess / sendError / sendPaginated
+│           │   └── logger.ts         # structured logging
+│           └── index.ts
 │
-├── contracts/                      # Soroban smart contracts (Rust)
-│   └── policy/
-│       ├── src/
-│       │   └── lib.rs
-│       └── Cargo.toml
-│
-└── tasks/                          # Task management — create on Day 1
-    ├── todo.md
-    ├── lessons.md
-    └── decisions.md
+├── tasks/                            # todo.md, lessons.md, decisions.md, catalog reports
+├── .env.example                      # AUTHORITATIVE env var list
+├── README.md
+└── CLAUDE.md / AGENTS.md             # this file
 ```
+
+There is no `contracts/` directory and no `services/soroban.ts`.
 
 ---
 
 ## Database Schema
 
-```prisma
-// prisma/schema.prisma — authoritative as of 2026-05-07
+**`apps/api/prisma/schema.prisma` is the single source of truth.** It is not reproduced here — the
+copy that used to live in this file drifted four models and six columns behind reality. Read the
+real file before writing a query or a migration.
 
-generator client {
-  provider = "prisma-client-js"
-}
+### Model index
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+| Model | Holds |
+|---|---|
+| `User` | Account, `emailVerified`, verification + password-reset tokens, `transferPinHash`, redeemed `accessCodeId` |
+| `Wallet` | `stellarPublicKey`, AES-256-GCM `stellarSecretKeyEnc`, `status` (`INITIALISING` / `TRUSTLINE_PENDING` / `READY`), cached balance |
+| `ApiKey` | bcrypt `keyHash`, `keyPrefix` for display, `isActive`, `lastUsedAt` |
+| `Policy` | The three V1 limits + `totalSpent`. One row per user. `sorobanContractId` is vestigial and always null |
+| `Transaction` | Every payment attempt: direct, marketplace (`type`, `serviceId`, `costPaid`), and cross-chain (`destinationChain`, `destinationTxHash`, `crossChain`). `metadata` carries the MPP diagnostic payload |
+| `ApprovalQueue` | 24h single-use approval `token`, status, `actedAt` |
+| `AuditLog` | `eventType` + `eventData` — policy changes, key regeneration, refund-required flags |
+| `MarketplaceServiceSetting` | Per-user provider enablement. Unique on `(userId, serviceId)` |
+| `GlobalServiceSetting` | Platform-wide kill-switch keyed by provider. **Absence of a row means enabled** — a row is written only to pause. Overrides any per-user setting |
+| `AccessCode` | Single-use beta codes; `redeemedBy` links to the user |
+| `CreditGrant` | Prepaid marketplace budget. Per-grant `amountRemaining`, optional `expiresAt`. Consumed FIFO by soonest expiry |
 
-model User {
-  id                      String        @id @default(cuid())
-  email                   String        @unique
-  passwordHash            String
-  emailVerified           Boolean       @default(false)
-  emailVerificationToken  String?       @unique
-  emailVerificationExpiry DateTime?
-  transferPinHash         String?       // bcrypt hash of 4-digit PIN; null = no PIN
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
-  wallet                  Wallet?
-  apiKeys                 ApiKey[]
-  policies                Policy?
-  transactions            Transaction[]
-  auditLogs               AuditLog[]
-}
+### Invariants that are not visible in the schema file
 
-model Wallet {
-  id                  String        @id @default(cuid())
-  userId              String        @unique
-  user                User          @relation(fields: [userId], references: [id])
-  stellarPublicKey    String        @unique
-  stellarSecretKeyEnc String        // AES-256-GCM encrypted — NEVER expose raw
-  status              WalletStatus  @default(INITIALISING)
-  balanceCache        Decimal       @default(0) @db.Decimal(18, 7)
-  balanceCachedAt     DateTime?
-  createdAt           DateTime      @default(now())
-  transactions        Transaction[]
-}
-
-enum WalletStatus {
-  INITIALISING       // created in DB, awaiting on-chain bootstrap
-  TRUSTLINE_PENDING  // account exists on-chain but USDC trustline failed — retryable
-  READY              // account exists + trustline established — can receive USDC
-}
-
-model ApiKey {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id])
-  keyHash    String    @unique  // bcrypt hash — original never stored after creation
-  keyPrefix  String             // First 8 chars for UI e.g. "argns_ab"
-  isActive   Boolean   @default(true)
-  lastUsedAt DateTime?
-  createdAt  DateTime  @default(now())
-}
-
-model Policy {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id])
-  allowanceLimit      Decimal? @db.Decimal(18, 7)  // null = unlimited
-  maxTransactionLimit Decimal? @db.Decimal(18, 7)  // null = unlimited
-  approvalThreshold   Decimal? @db.Decimal(18, 7)  // null = no threshold
-  totalSpent          Decimal  @default(0) @db.Decimal(18, 7)
-  sorobanContractId   String?  // reserved for future use; null in V1
-  updatedAt           DateTime @updatedAt
-}
-
-model Transaction {
-  id                String            @id @default(cuid())
-  userId            String
-  user              User              @relation(fields: [userId], references: [id])
-  walletId          String
-  wallet            Wallet            @relation(fields: [walletId], references: [id])
-  stellarTxHash     String?           // null if blocked before Stellar submission
-  recipientAddress  String
-  amount            Decimal           @db.Decimal(18, 7)
-  // NOTE: no fee field — direct transfers carry $0 Argens fee
-  currency          String            @default("USDC")
-  status            TransactionStatus
-  type              String            @default("payment")  // "payment" | "marketplace"
-  serviceId         String?           // marketplace only
-  serviceEndpoint   String?           // marketplace only
-  costPaid          Decimal?          @db.Decimal(18, 7)   // marketplace: marked-up amount charged to user
-  memo              String?
-  metadata          Json?
-  policyResult      Json?
-  blockedReason     String?
-  destinationChain  String?           // V2 cross-chain: 'stellar' | 'base' etc.
-  destinationTxHash String?           // V2 cross-chain: mint tx hash on destination
-  crossChain        Boolean           @default(false)
-  createdAt         DateTime          @default(now())
-  approvalQueue     ApprovalQueue?
-}
-
-enum TransactionStatus {
-  SUCCESS
-  BLOCKED
-  PENDING_APPROVAL
-  APPROVED
-  REJECTED
-  FAILED
-}
-
-model ApprovalQueue {
-  id            String         @id @default(cuid())
-  transactionId String         @unique
-  transaction   Transaction    @relation(fields: [transactionId], references: [id])
-  userId        String
-  status        ApprovalStatus @default(PENDING)
-  token         String         @unique  // crypto.randomBytes(32) — expires 24h
-  expiresAt     DateTime
-  actedAt       DateTime?
-  createdAt     DateTime       @default(now())
-}
-
-enum ApprovalStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  EXPIRED
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  eventType String   // POLICY_UPDATED | API_KEY_REGENERATED | WALLET_FUNDED | etc.
-  eventData Json
-  createdAt DateTime @default(now())
-}
-```
+- **Money is `Decimal(18, 7)` everywhere**, and crosses the API boundary as a 7-decimal **string**. Never a float, never a JS number.
+- **`Policy.totalSpent` is incremented at policy-check time**, not at submission time — see [Policy Engine Logic](#policy-engine-logic). `checkPolicyAndReserve` does both in one `Serializable` transaction; `releaseSpend` compensates on failure.
+- **`Transaction.stellarTxHash` is null on marketplace rows** even when payment settled. The x402 settlement hash lives in `metadata.mpp_router.receipt.reference`. A null `stellarTxHash` on a marketplace row does **not** mean no money moved — check the receipt.
+- **`Wallet.stellarSecretKeyEnc` is never returned by any endpoint** except the explicit, password-gated `POST /wallet/export-key`.
+- **Migrations apply automatically on deploy** — the API `Dockerfile` runs `prisma migrate deploy` in its `CMD`. A redeploy is a migration.
 
 ---
 
@@ -622,6 +531,48 @@ Every response — success or error — must use this exact shape. No exceptions
 // Error
 { "error": string, "code": string, "details"?: unknown }
 ```
+
+---
+
+### Complete endpoint index
+
+The detailed request/response shapes below cover the agent-facing core. This index is the full
+surface — if an endpoint is not here, it does not exist.
+
+| Auth | Endpoint | Purpose |
+|---|---|---|
+| API key | `POST /pay` | Execute a payment (Stellar or CCTP → Base) |
+| API key | `POST /quote` | Dry run — no Stellar tx, no DB write |
+| API key | `POST /refund` | New outgoing payment; not a reversal |
+| API key | `POST /pay/x402` | Pay an x402-gated resource |
+| Either | `GET /agent/status` | Key status, balance, policies, today's spend |
+| Either | `GET /spend/summary` | `?period=daily\|weekly\|monthly` |
+| Either | `GET /transactions`, `GET /transactions/:id` | List (filterable) and detail |
+| Either | `GET /wallet/balance` | Cached USDC balance |
+| Either | `GET /marketplace/services`, `GET /marketplace/services/:providerId` | Catalog, searchable |
+| Either | `POST /marketplace/call` | Call + pay a marketplace service in one step |
+| Public | `GET /marketplace/services/:providerId/skill.md` | Per-provider agent instructions |
+| JWT | `POST /auth/signup`, `GET /auth/verify/:token`, `POST /auth/resend-verification` | Signup + email verification (access code required in beta) |
+| JWT | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | Session |
+| JWT | `POST /auth/forgot-password`, `POST /auth/reset-password` | Single-use 1h reset token |
+| JWT | `POST /auth/api-keys` | Generate a key (requires `emailVerified`) |
+| JWT | `POST /auth/transfer-pin`, `DELETE /auth/transfer-pin` | Optional 4-digit PIN, password-gated |
+| JWT | `POST /wallet/send` | Manual dashboard transfer |
+| JWT | `POST /wallet/export-key` | Export the Stellar secret; password-gated |
+| JWT | `POST /wallet/bootstrap-retry` | Retry a failed trustline bootstrap |
+| JWT | `GET /policies`, `POST /policies` | Read and save policy |
+| JWT | `POST /transactions/:id/dismiss` | Reject a pending approval, even after token expiry |
+| JWT | `POST /marketplace/services/:serviceId/enable\|disable` | Per-user provider enablement |
+| Token | `GET /approve/:token` | Read-only transaction detail for the confirm page (public) |
+| Token | `POST /approve/:token`, `POST /reject/:token` | Act on a pending approval |
+| Admin | `GET /admin/stats`, `/wallets`, `/users`, `/users/:id`, `/credit-grants` | Ops console reads |
+| Admin | `GET /admin/transactions/failed` | Manual reconciliation queue (includes `metadata`) |
+| Admin | `POST /admin/access-codes`, `GET /admin/access-codes` | Beta code issuance |
+| Admin | `POST /admin/users/:userId/credits`, `POST /admin/credits/grant-by-email` | Credit grants |
+| Admin | `GET /admin/marketplace/services`, `POST /admin/marketplace/services/:providerId` | Global kill-switch |
+
+"Either" = `requireJwtOrApiKey`. Admin routes are gated by `ADMIN_SECRET` in the `x-admin-secret`
+header and return `503 ADMIN_DISABLED` when it is unset.
 
 ---
 
@@ -1062,7 +1013,7 @@ A new Stellar account cannot hold USDC until two conditions are met: (1) the acc
 **Failure handling:**
 - If step 3 fails (ops wallet out of XLM, Horizon down), roll back: delete the Wallet row, return 503 with a clear error. Never leave a Wallet row in `initialising` state permanently. Alert ops.
 - If step 4 fails but step 3 succeeded, retry step 4 once. If still failing, mark the Wallet row `trustline_pending` and expose a dashboard action for the user to retry manually. The account is recoverable — the XLM is not lost.
-- Both ops wallets (`ARGENS_OPS_WALLET` for XLM, `ARGENS_FEE_WALLET` for USDC) must exist and be funded before the API is deployed. Document their public keys in the deployment runbook.
+- All four platform wallets (`ARGENS_OPS_WALLET_SECRET` for XLM, `ARGENS_FEE_WALLET` for USDC revenue, `ARGENS_CREDIT_POOL_SECRET` for credit-funded calls, `ARGENS_BASE_RELAYER_SECRET` for Base gas) must exist and be funded before the API is deployed. Document their public keys in the deployment runbook.
 
 **Cost per signup (mainnet):** 1.5 XLM in reserves per wallet, plus tiny tx fees (~0.00002 XLM). At current XLM prices, sub-$0.20 per user. Deliberately absorbed by Argens as a CAC cost — developers see "instant wallet ready to receive USDC" without paying anything first.
 
@@ -1070,13 +1021,20 @@ A new Stellar account cannot hold USDC until two conditions are met: (1) the acc
 
 ### Argens-Operated Wallets
 
-Argens runs one platform-level Stellar wallet — NOT a user wallet:
+Argens runs four platform-level wallets — none of them user wallets:
 
-| Wallet | Purpose | Holds | Must Have Trustline? |
-|---|---|---|---|
-| **Ops Wallet** (`ARGENS_OPS_WALLET`) | Funds new user account reserves + trustline reserves on signup | XLM | No |
+| Wallet | Env var | Purpose | Holds | Trustline? |
+|---|---|---|---|---|
+| **Ops** | `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | Funds new user account + trustline reserves on signup | XLM | No |
+| **Fee** | `ARGENS_FEE_WALLET` | Marketplace markup + CCTP fee revenue | USDC | **Yes** |
+| **Credit pool** | `ARGENS_CREDIT_POOL_SECRET` / `_PUBLIC` | Funds marketplace calls made against granted credits | USDC | **Yes** |
+| **Base relayer** | `ARGENS_BASE_RELAYER_SECRET` | Pays gas to relay CCTP mints on Base | ETH on Base | n/a |
 
-Monitor and alarm on XLM balance. A depleted ops wallet silently breaks new signups.
+Monitor and alarm on all four. Each one fails silently: an empty ops wallet breaks new signups, an
+empty credit pool breaks credit-funded marketplace calls, and an empty Base relayer leaves CCTP
+burns stranded with no mint on the destination chain. `services/alerting.ts` handles the ops and
+credit-pool thresholds (`XLM_ALERT_THRESHOLD_OPS`, `USDC_ALERT_THRESHOLD_POOL`);
+`GET /v1/admin/wallets` reports live balances for all four.
 
 ### Private Key Encryption
 
@@ -1109,7 +1067,7 @@ export function decryptSecretKey(enc: string): string {
 
 ## CCTP V2 — Cross-Chain Payments
 
-> **STATUS — 2026-05-26: implemented locally, direct path verified.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. Direct-approved Stellar → Base CCTP completed on mainnet with burn + Iris attestation + Base relay. Approval-token CCTP path is implemented and builds, but still needs live approval-path verification before calling it fully done.
+> **STATUS — LIVE on mainnet.** `POST /pay` accepts Stellar `G...` and Base `0x...` recipients. The direct path completed a real mainnet Stellar → Base transfer (burn + Iris attestation + Base relay + transaction-history update) on 2026-05-27. The approval-token CCTP path is implemented and type-checks, but **has not been verified against a live approval** — that is the one remaining gap in this feature.
 
 CCTP V2 allows USDC to move natively between Stellar and 15+ chains via Circle's burn-and-mint mechanism. No bridges. No wrapped tokens. No wrapped USDC.
 
@@ -1210,17 +1168,27 @@ The V1 schema already includes nullable `destinationChain`, `destinationTxHash`,
 
 ---
 
-## Soroban Contract (Policy Engine)
+## Soroban Contract (Policy Engine) — V2 DESIGN SKETCH, NOT BUILT
 
-The Soroban contract stores policies on-chain and **validates** payment attempts. **It does not hold funds and does not execute the Stellar payment** in V1. The API server, after receiving an `Approved` result from the contract, builds and submits the native Stellar payment (see [Payment Submission](#payment-submission-with-fee)).
+> **Nothing in this section exists.** There is no `contracts/` directory, no Rust crate, no deployed
+> contract, and no `services/soroban.ts`. Soroban was dropped for V1 (see [Key Decisions](#key-decisions-already-made)):
+> the TypeScript engine in `services/policy.ts` is the permanent V1 policy engine, and
+> `Policy.sorobanContractId` is null for every user.
+>
+> The sketch below is retained as V2 design intent only. Do not implement against it, do not treat
+> it as a source of truth for how policy works today, and do not "reconcile" running code with it.
 
-This split is deliberate:
+The intended V2 shape: the contract stores policies on-chain and **validates** payment attempts. It
+would not hold funds or execute the Stellar payment — the API server, after receiving an `Approved`
+result, still builds and submits the native payment.
+
+The split is deliberate:
 - The contract is the **source of truth** for policy — visible on-chain, auditable, tamper-evident.
-- The API server is the **executor** — it holds the signing key (agent-custodial model) and composes the two-op atomic payment (recipient + fee).
-- A V2 migration to contract-held funds (true user-custodial) replaces the executor step with a contract call, without changing the validation contract. Keep the validation surface narrow so V2 doesn't break V1 data.
+- The API server is the **executor** — it holds the signing key (agent-custodial model).
+- A later migration to contract-held funds (true user-custodial) replaces the executor step with a contract call, without changing the validation contract. Keep the validation surface narrow so that migration doesn't break existing data.
 
 ```rust
-// contracts/policy/src/lib.rs
+// V2 sketch — no such file exists in this repository.
 
 pub trait PolicyContract {
     fn initialize(env: Env, owner: Address) -> Result<(), Error>;
@@ -1253,127 +1221,129 @@ pub enum BlockReason {
 }
 ```
 
-**Deployment notes:**
-- The TypeScript policy engine (Phase 2) is a stand-in only — replace with Soroban calls in Phase 4
+**If this is ever built (V2):**
 - Deploy to testnet first, verify all paths before mainnet
-- Store deployed contract ID in `policies.sorobanContractId`
-- The contract never receives or sends USDC in V1 — don't add payment logic to it. Payment execution stays in the Node API server.
+- Store the deployed contract ID in `Policy.sorobanContractId` — the column already exists and is unused
+- The contract must never receive or send USDC while the executor lives in Node — don't add payment logic to it
+
+**What is true today:** `services/policy.ts` is authoritative. `checkPolicyAndReserve` runs the three
+V1 rules in a `Serializable` transaction and is the only thing standing between an agent and a
+signature. There is no on-chain consult and no Phase 4 swap-out.
 
 ---
 
 ## Environment Variables
 
-```env
-# apps/api/.env
+**`.env.example` at the repo root is the single source of truth.** Every variable the API reads is
+listed there with its default, whether it is required, and what breaks when it is missing. It is
+kept in exact parity with `process.env` usage in `apps/api/src` — do not duplicate the list here, and
+when you add a variable, add it there in the same commit.
 
-DATABASE_URL="postgresql://user:pass@localhost:5432/argens"
-
-JWT_SECRET="minimum-32-character-random-string"
-JWT_EXPIRES_IN="1h"   # 1 hour — client-side tab-idle logout (5 min) is primary defense
-
-# Live on mainnet. (Testnet values kept here as a comment for local-dev parity:
-#   STELLAR_NETWORK="testnet" / HORIZON_URL="https://horizon-testnet.stellar.org")
-STELLAR_NETWORK="mainnet"
-HORIZON_URL="https://horizon.stellar.org"
-SOROBAN_RPC_URL="https://soroban-testnet.stellar.org"   # unused in V1 — Soroban dropped
-
-ENCRYPTION_KEY="generate-with: openssl rand -hex 32"
-
-RESEND_API_KEY="re_..."
-RESEND_FROM_EMAIL="noreply@argens.xyz"
-
-API_PORT=3001
-FRONTEND_URL="http://localhost:3000"
-
-# --- Argens-operated Stellar wallets ---
-# Ops wallet — funds XLM reserves for new user wallets on signup.
-# On testnet, leave empty and bootstrap uses friendbot instead.
-# On mainnet, MUST be set and funded before deployment.
-ARGENS_OPS_WALLET_SECRET="S..."     # 56-char Stellar secret key
-ARGENS_OPS_WALLET_PUBLIC="G..."     # 56-char Stellar public key (for monitoring)
-
-# NOTE: No fee wallet. Direct USDC transfers carry $0 Argens fee.
-# Revenue comes from marketplace markup only (handled in marketplace service, not payment.ts).
+```bash
+cp .env.example apps/api/.env
 ```
+
+Four points that are easy to get wrong and are not obvious from the variable names:
+
+- **`STELLAR_NETWORK` is the only network toggle.** There is no `HORIZON_URL` variable — the Horizon
+  endpoint is derived from `STELLAR_NETWORK` in `services/stellar.ts`. Setting `HORIZON_URL` in the
+  environment does nothing.
+- **`SOROBAN_RPC_URL` is REQUIRED, and must match the network.** Soroban was dropped as a policy
+  engine, but the x402 marketplace client (`services/mpp-client.ts`) uses this RPC to simulate and
+  build the SEP-41 USDC transfer for every marketplace payment. Pointing it at testnet while
+  `STELLAR_NETWORK=mainnet` breaks every marketplace call.
+- **`ARGENS_FEE_WALLET` is required despite direct payments being free.** Direct Stellar transfers
+  carry $0 and never touch it, but it receives the 20% marketplace markup and the CCTP fee.
+  `POST /marketplace/call` returns `500 FEE_WALLET_NOT_CONFIGURED` without it.
+- **`ENCRYPTION_KEY` must be 64 hex characters (32 bytes), and is not rotatable in place.** Changing
+  it without re-encrypting every `Wallet.stellarSecretKeyEnc` row makes every existing wallet
+  permanently unsignable. Use a distinct key per environment.
+
+There are four Argens-operated wallets (ops/XLM, fee/USDC, credit pool/USDC, Base relayer/ETH). Each
+one fails silently when it empties — see `.env.example` for what each failure looks like, and
+`GET /v1/admin/wallets` for live balances.
 
 ---
 
 ## Build Order
 
-Build in this exact order. Do not skip phases.
+**Phases 1–4 are complete and live on mainnet.** This section is retained as the historical record
+of what was built in what order, and for the phase-gate discipline at the end — not as a to-do list.
+Items below are ticked to reflect shipped reality; the few that are genuinely outstanding are left
+unticked and are also listed under [Status](#status--2026-08-12).
 
 ### Phase 1 — Foundation (Days 1–3)
-- [ ] Create `tasks/todo.md`, `tasks/lessons.md`, `tasks/decisions.md`
-- [ ] Monorepo setup (npm workspaces)
-- [ ] PostgreSQL + Prisma schema + initial migration
-- [ ] Express server scaffolding with TypeScript
-- [ ] `POST /auth/signup` — create user (emailVerified=false), send verification email with token. No wallet created yet.
-- [ ] `GET /auth/verify/:token` — verify email → trigger wallet bootstrap (account creation + trustline) → return wallet public key
-- [ ] `POST /auth/resend-verification` — generate a new token, invalidate old one, email it
-- [ ] `POST /auth/login` — return JWT. Unverified users can log in but cannot generate API keys or access agent endpoints.
-- [ ] `POST /auth/logout`
-- [ ] Stellar ops-wallet setup (fund on testnet via friendbot; mainnet funded manually)
-- [ ] Stellar wallet creation + bootstrap flow (see [Wallet Bootstrap Flow](#wallet-bootstrap-flow))
-- [ ] USDC trustline creation as part of bootstrap
-- [ ] API key generation service (`argns_live_` prefix + bcrypt hash) — gated behind emailVerified=true
+- [x] Create `tasks/todo.md`, `tasks/lessons.md`, `tasks/decisions.md`
+- [x] Monorepo setup (npm workspaces)
+- [x] PostgreSQL + Prisma schema + initial migration
+- [x] Express server scaffolding with TypeScript
+- [x] `POST /auth/signup` — create user (emailVerified=false), send verification email with token. No wallet created yet.
+- [x] `GET /auth/verify/:token` — verify email → trigger wallet bootstrap (account creation + trustline) → return wallet public key
+- [x] `POST /auth/resend-verification` — generate a new token, invalidate old one, email it
+- [x] `POST /auth/login` — return JWT. Unverified users can log in but cannot generate API keys or access agent endpoints.
+- [x] `POST /auth/logout`
+- [x] Stellar ops-wallet setup (fund on testnet via friendbot; mainnet funded manually)
+- [x] Stellar wallet creation + bootstrap flow (see [Wallet Bootstrap Flow](#wallet-bootstrap-flow))
+- [x] USDC trustline creation as part of bootstrap
+- [x] API key generation service (`argns_live_` prefix + bcrypt hash) — gated behind emailVerified=true
 
 ### Phase 2 — Core API (Days 4–8)
-- [ ] Policy engine service in TypeScript (Soroban stand-in for now)
-- [ ] `POST /pay` — full flow: auth → chain detection → policy check → Stellar tx (or CCTP V2 burn for Base recipients) → log → notify
-- [ ] `POST /quote` — dry run, no DB write, no Stellar tx. Returns `destination_chain` and `cross_chain` fields when recipient is a Base address.
-- [ ] `GET /wallet/balance` — Horizon query with 30s cache
-- [ ] `GET /agent/status`
-- [ ] `GET /transactions` + `GET /transactions/:id`
-- [ ] `GET /policies`
-- [ ] `GET /spend/summary`
-- [ ] `POST /refund`
-- [ ] Email service via Resend (blocked tx, pending approval, approval confirmation, low balance, wallet funded, API key regenerated, policy changed templates)
-- [ ] Wallet-funded detection: Horizon payment stream watcher (SSE) per wallet, 60s polling fallback. On incoming USDC payment: invalidate `balanceCache`, send "wallet funded" email (rate-limited to one per 5 minutes to batch rapid deposits)
-- [ ] Low-balance warning: triggered on any transaction that leaves `balanceCache` below `max(10 USDC, 10% of remaining allowance)`. Rate-limited to one email per user per 24h.
-- [ ] Approval queue — `POST /approve/:token` + `POST /reject/:token` (POST only — see [Security Rules](#security-rules--non-negotiable)) + `GET /approve/confirm?token=...` landing page on the dashboard
-- [ ] Rate limiting — 100 req/min per API key
-- [ ] Zod input validation on all endpoints
-- [ ] `SKILL.md` authored and served at `/SKILL.md` from the Next.js web app (see [Agent Onboarding](#agent-onboarding)). Test by fetching in a fresh chat and walking through onboarding with a real API key.
-- [ ] All 10 test scenarios passing (see Testing section)
+- [x] Policy engine service in TypeScript (permanent — Soroban was dropped)
+- [x] `POST /pay` — full flow: auth → chain detection → policy check → Stellar tx (or CCTP V2 burn for Base recipients) → log → notify
+- [x] `POST /quote` — dry run, no DB write, no Stellar tx. Returns `destination_chain` and `cross_chain` fields when recipient is a Base address.
+- [x] `GET /wallet/balance` — Horizon query with 30s cache
+- [x] `GET /agent/status`
+- [x] `GET /transactions` + `GET /transactions/:id`
+- [x] `GET /policies`
+- [x] `GET /spend/summary`
+- [x] `POST /refund`
+- [x] Email service via Resend (blocked tx, pending approval, approval confirmation, low balance, wallet funded, API key regenerated, policy changed templates)
+- [x] Wallet-funded detection: Horizon payment stream watcher (SSE) per wallet, 60s polling fallback. On incoming USDC payment: invalidate `balanceCache`, send "wallet funded" email (rate-limited to one per 5 minutes to batch rapid deposits)
+- [x] Low-balance warning: triggered on any transaction that leaves `balanceCache` below `max(10 USDC, 10% of remaining allowance)`. Rate-limited to one email per user per 24h.
+- [x] Approval queue — `POST /approve/:token` + `POST /reject/:token` (POST only — see [Security Rules](#security-rules--non-negotiable)) + `GET /approve/confirm?token=...` landing page on the dashboard
+- [x] Rate limiting — 100 req/min per API key
+- [x] Zod input validation on all endpoints
+- [x] `SKILL.md` authored and served at `/SKILL.md` from the Next.js web app (see [Agent Onboarding](#agent-onboarding)). Test by fetching in a fresh chat and walking through onboarding with a real API key.
+- [x] All 10 test scenarios passing (see Testing section)
 
 ### Phase 3 — Dashboard (Days 9–16)
-- [ ] Next.js 14 + Tailwind CSS setup
-- [ ] Auth pages: login, signup
-- [ ] Protected layout + sidebar navigation
-- [ ] Overview page
-- [ ] Wallet page — balance, deposit address, QR code, private key download (one-time)
-- [ ] Policies page — edit inline, save, pending approval queue
-- [ ] Transactions page — table, filters, pagination, CSV export
-- [ ] Analytics page — Recharts spend chart, blocked tx breakdown
-- [ ] API Keys page — masked key, copy, regenerate
-- [ ] Settings page — notifications, password, danger zone
+- [x] Next.js 14 + Tailwind CSS setup
+- [x] Auth pages: login, signup
+- [x] Protected layout + sidebar navigation
+- [x] Overview page
+- [x] Wallet page — balance, deposit address, QR code, private key download (one-time)
+- [x] Policies page — edit inline, save, pending approval queue
+- [x] Transactions page — table, filters, pagination, CSV export
+- [x] Analytics page — Recharts spend chart, blocked tx breakdown
+- [x] API Keys page — masked key, copy, regenerate
+- [x] Settings page — notifications, password, danger zone
 
 ### Phase 4 — MPP Marketplace (Tranche 1)
-- [ ] Read MPP docs: `mpp.dev/overview`, `mpp.dev/payment-methods/stellar/charge`, `mpp.dev/api/services` before writing any code
-- [ ] `POST /marketplace/call` — agent calls a service by ID, Argens proxies + adds markup, policy check runs, payment logs as type=marketplace
-- [ ] Marketplace service registry (curated list of services with base cost + marked-up price)
-- [ ] `GET /marketplace/services` — list available services
-- [ ] Dashboard marketplace page
-- [ ] End-to-end test: agent calls service → policy check → payment logged → balance updated
+- [x] Read MPP docs: `mpp.dev/overview`, `mpp.dev/payment-methods/stellar/charge`, `mpp.dev/api/services` before writing any code
+- [x] `POST /marketplace/call` — agent calls a service by ID, Argens proxies + adds markup, policy check runs, payment logs as type=marketplace
+- [x] Marketplace service registry (curated list of services with base cost + marked-up price)
+- [x] `GET /marketplace/services` — list available services
+- [x] Dashboard marketplace page
+- [x] End-to-end test: agent calls service → policy check → payment logged → balance updated
 
 ### Phase 5 — Polish & Demo
-- [ ] Error handling audit — every endpoint handles error cases
-- [ ] Consistent error response format across all endpoints verified
+- [x] Error handling audit — every endpoint handles error cases
+- [x] Consistent error response format across all endpoints verified
 - [ ] Demo script: signup → fund → set policies → agent pays → agent blocked → developer approves → analytics
 - [ ] Record Loom demo video for SCF submission
 
 ### Phase 6 — Mainnet Cut-Over (Days 23–25)
-- [ ] Verify mainnet USDC issuer `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` against Circle's published list
-- [ ] Provision mainnet ops wallet, fund with XLM (estimate: 1.5 XLM × expected signups + buffer)
-- [ ] Provision mainnet fee wallet, create USDC trustline manually, verify on Stellar Expert
-- [ ] Deploy Soroban contract to mainnet, verify the ABI matches the TS client, pin contract ID in env
-- [ ] Rotate `ENCRYPTION_KEY` to a fresh mainnet key — never reuse the testnet key
-- [ ] Switch `STELLAR_NETWORK=mainnet` in prod env, redeploy
-- [ ] Smoke test: signup → verify email → wallet bootstrap → fund with a small amount of real USDC → send $1 payment → confirm on mainnet explorer → policy violation path → refund path
-- [ ] Run full 10 test scenarios against mainnet — no mocks
-- [ ] Enable balance alerting on ops wallet (XLM) and fee wallet (USDC)
-- [ ] Announce mainnet availability, onboard first external user
-- [ ] Post-launch: monitor Stellar submission failure rate for 72 hours before calling it done
+- [x] Verify mainnet USDC issuer `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` against Circle's published list
+- [x] Provision mainnet ops wallet, fund with XLM (estimate: 1.5 XLM × expected signups + buffer)
+- [x] Provision mainnet fee wallet, create USDC trustline manually, verify on Stellar Expert
+- ~~Deploy Soroban contract to mainnet~~ — **dropped.** Soroban is not part of V1; `services/policy.ts` is the policy engine
+- [x] Rotate `ENCRYPTION_KEY` to a fresh mainnet key — never reuse the testnet key
+- [x] Switch `STELLAR_NETWORK=mainnet` in prod env, redeploy
+- [x] Smoke test: signup → verify email → wallet bootstrap → fund with a small amount of real USDC → send $1 payment → confirm on mainnet explorer → policy violation path → refund path
+- [x] Run full 10 test scenarios against mainnet — no mocks
+- [x] Enable balance alerting — `services/alerting.ts` covers the ops wallet (XLM) and credit pool (USDC). **The fee wallet has no alert threshold yet**
+- [x] Announce mainnet availability, onboard first external user
+- [x] Post-launch: monitor Stellar submission failure rate for 72 hours before calling it done
 
 ### Phase Transition Gates
 
