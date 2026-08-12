@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1600px; height:900px; overflow:hidden; background:#0C0B0A; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+
+  /* ── sky ── */
+  #sky { position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 900px 620px at 72% 26%, rgba(197,162,83,0.20) 0%, rgba(197,162,83,0) 62%),
+      radial-gradient(ellipse 1300px 560px at 62% 104%, rgba(197,162,83,0.16) 0%, rgba(197,162,83,0) 60%),
+      linear-gradient(178deg, #080806 0%, #100D0A 46%, #191309 82%, #241A0C 100%); }
+  #dots { position:absolute; inset:0;
+    background-image: radial-gradient(rgba(88,82,74,0.35) 1.1px, transparent 1.1px);
+    background-size: 46px 46px; }
+  .star { position:absolute; border-radius:50%; background:#EDE9E3; }
+
+  /* ── copy ── */
+  #kick { position:absolute; left:92px; top:150px; font-family:"JetBrains Mono",monospace;
+    font-size:19px; letter-spacing:0.26em; text-transform:uppercase; color:#8F7437; }
+  #h1 { position:absolute; left:92px; top:206px; width:700px;
+    font-size:98px; font-weight:700; letter-spacing:-0.035em; line-height:1.03; color:#EDE9E3; }
+  #h1 .g { color:#C5A253; }
+  #sub { position:absolute; left:92px; top:452px; width:620px;
+    font-size:29px; font-weight:400; line-height:1.55; color:#A79F94; letter-spacing:-0.004em; }
+  #rule { position:absolute; left:94px; top:576px; width:76px; height:3px; background:#8F7437; }
+  #wm { position:absolute; left:92px; bottom:96px; display:flex; align-items:center; gap:15px; }
+  #wm .nm { font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#EDE9E3; }
+  #wm .nm .dot { color:#C5A253; }
+
+  /* ── illustration layers ── */
+  #art { position:absolute; inset:0; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="sky"></div>
+  <div id="dots"></div>
+
+  <div class="star" style="left:1010px; top:118px; width:4px; height:4px; opacity:0.75"></div>
+  <div class="star" style="left:1364px; top:186px; width:3px; height:3px; opacity:0.5"></div>
+  <div class="star" style="left:900px;  top:262px; width:3px; height:3px; opacity:0.45"></div>
+  <div class="star" style="left:1487px; top:96px;  width:4px; height:4px; opacity:0.6"></div>
+  <div class="star" style="left:1198px; top:74px;  width:3px; height:3px; opacity:0.5"></div>
+  <div class="star" style="left:832px;  top:150px; width:3px; height:3px; opacity:0.4"></div>
+  <div class="star" style="left:1436px; top:330px; width:3px; height:3px; opacity:0.42"></div>
+
+  <svg id="art" width="1600" height="900" viewBox="0 0 1600 900">
+    <defs>
+      <linearGradient id="kiteA" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#F4E1AE"/><stop offset="1" stop-color="#D8BC77"/>
+      </linearGradient>
+      <linearGradient id="kiteB" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#D9BD78"/><stop offset="1" stop-color="#B0913F"/>
+      </linearGradient>
+      <linearGradient id="kiteC" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#C5A253"/><stop offset="1" stop-color="#8F7437"/>
+      </linearGradient>
+      <linearGradient id="kiteD" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#A8853F"/><stop offset="1" stop-color="#6E5824"/>
+      </linearGradient>
+      <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#E8CC85"/><stop offset="0.5" stop-color="#B59243"/>
+        <stop offset="1" stop-color="#7A6230"/>
+      </linearGradient>
+      <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#221C15"/><stop offset="1" stop-color="#0F0C09"/>
+      </linearGradient>
+      <radialGradient id="coinG" cx="0.36" cy="0.3" r="0.8">
+        <stop offset="0" stop-color="#FFF6DC"/><stop offset="0.55" stop-color="#F0E0AC"/>
+        <stop offset="1" stop-color="#C9A957"/>
+      </radialGradient>
+      <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#C5A253" stop-opacity="0.42"/>
+        <stop offset="1" stop-color="#C5A253" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="10"/>
+      </filter>
+      <filter id="softer" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="3.2"/>
+      </filter>
+    </defs>
+
+    <!-- glow behind the kite -->
+    <ellipse cx="1168" cy="250" rx="330" ry="300" fill="url(#halo)"/>
+
+    <!-- ══ distant service nodes — the economy the agent operates in ══ -->
+    <g font-family="JetBrains Mono" font-weight="600" text-anchor="middle">
+      <g opacity="0.30">
+        <circle cx="862"  cy="196" r="27" fill="#131210" stroke="#2E2A25" stroke-width="2"/>
+        <text x="862" y="205" font-size="20" fill="#8A837A">A</text>
+      </g>
+      <g opacity="0.24">
+        <circle cx="1444" cy="252" r="23" fill="#131210" stroke="#2E2A25" stroke-width="2"/>
+        <text x="1444" y="260" font-size="17" fill="#8A837A">E</text>
+      </g>
+      <g opacity="0.34">
+        <circle cx="1330" cy="122" r="30" fill="#131210" stroke="#332E28" stroke-width="2"/>
+        <text x="1330" y="132" font-size="22" fill="#8A837A">G</text>
+      </g>
+      <g opacity="0.22">
+        <circle cx="1052" cy="88"  r="21" fill="#131210" stroke="#2E2A25" stroke-width="2"/>
+        <text x="1052" y="96" font-size="16" fill="#8A837A">R</text>
+      </g>
+      <g opacity="0.26">
+        <circle cx="1512" cy="424" r="25" fill="#131210" stroke="#2E2A25" stroke-width="2"/>
+        <text x="1512" y="433" font-size="18" fill="#8A837A">D</text>
+      </g>
+      <g opacity="0.20">
+        <circle cx="922"  cy="392" r="20" fill="#131210" stroke="#2E2A25" stroke-width="2"/>
+        <text x="922" y="400" font-size="15" fill="#8A837A">S</text>
+      </g>
+    </g>
+
+    <!-- ══ the line — taut, luminous, unbroken from hand to kite ══ -->
+    <path d="M 1096 742 C 1146 596, 1178 470, 1180 372"
+          fill="none" stroke="#C5A253" stroke-width="9" opacity="0.16" filter="url(#soft)"/>
+    <path d="M 1096 742 C 1146 596, 1178 470, 1180 372"
+          fill="none" stroke="#D8BC77" stroke-width="2.6" stroke-linecap="round"/>
+
+    <!-- coins riding the line up to the agent -->
+    <g>
+      <circle cx="1113" cy="690" r="15" fill="url(#coinG)" stroke="#B59243" stroke-width="3"/>
+      <text x="1113" y="697" text-anchor="middle" font-family="JetBrains Mono" font-weight="700"
+            font-size="15" fill="#8F7437">$</text>
+    </g>
+    <g opacity="0.94">
+      <circle cx="1150" cy="558" r="12" fill="url(#coinG)" stroke="#B59243" stroke-width="2.6"/>
+      <text x="1150" y="564" text-anchor="middle" font-family="JetBrains Mono" font-weight="700"
+            font-size="12" fill="#8F7437">$</text>
+    </g>
+
+    <!-- ══ the kite — the agent, aloft ══ -->
+    <g transform="translate(1180,222)">
+      <!-- tail streaming clear to the right, away from the flight line -->
+      <path d="M 0 116 C 62 150, 96 138, 150 176 C 202 212, 236 196, 288 232"
+            fill="none" stroke="#8F7437" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+      <g fill="#C5A253">
+        <rect x="52"  y="136" width="26" height="9" rx="4.5" transform="rotate(24 65 140)"/>
+        <rect x="126" y="158" width="26" height="9" rx="4.5" transform="rotate(38 139 162)"/>
+        <rect x="198" y="200" width="24" height="8" rx="4"   transform="rotate(20 210 204)"/>
+        <rect x="262" y="218" width="22" height="8" rx="4"   transform="rotate(36 273 222)"/>
+      </g>
+
+      <!-- sail panels -->
+      <path d="M 0 -104 L -84 6 L 0 6 Z" fill="url(#kiteA)"/>
+      <path d="M 0 -104 L 84 6 L 0 6 Z"  fill="url(#kiteB)"/>
+      <path d="M -84 6 L 0 118 L 0 6 Z"  fill="url(#kiteC)"/>
+      <path d="M 84 6 L 0 118 L 0 6 Z"   fill="url(#kiteD)"/>
+      <!-- spars + outline -->
+      <path d="M 0 -104 L -84 6 L 0 118 L 84 6 Z" fill="none" stroke="#5C4A22" stroke-width="3.5" stroke-linejoin="round"/>
+      <line x1="0" y1="-104" x2="0" y2="118" stroke="#5C4A22" stroke-width="2.4" opacity="0.75"/>
+      <line x1="-84" y1="6" x2="84" y2="6" stroke="#5C4A22" stroke-width="2.4" opacity="0.75"/>
+      <!-- argens mark on the sail -->
+      <g transform="translate(-19,-42) scale(0.72)" fill="#3A2E15">
+        <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+        <circle cx="41" cy="41.5" r="8.8"/>
+      </g>
+      <!-- sheen -->
+      <path d="M 0 -104 L -84 6 L -46 6 Z" fill="rgba(255,250,232,0.22)"/>
+    </g>
+
+    <!-- ══ the mascot, riding just below the kite ══ -->
+    <g transform="translate(1128,352) scale(1.02)">
+      <!-- bridle lines running from each raised hand up to the kite -->
+      <line x1="-8" y1="36" x2="51" y2="-12" stroke="#5C4A22" stroke-width="2.4"/>
+      <line x1="92" y1="36" x2="51" y2="-12" stroke="#5C4A22" stroke-width="2.4"/>
+      <!-- arms raised, gripping the bridle -->
+      <g transform="translate(0,56) rotate(150)"><rect width="7" height="15" fill="#3E4346"/><rect y="15" width="7" height="8" fill="#B0623A"/></g>
+      <g transform="translate(84,56) rotate(-150)"><rect width="7" height="15" fill="#3E4346"/><rect y="15" width="7" height="8" fill="#B0623A"/></g>
+      <!-- legs, dangling -->
+      <g transform="translate(21,77) rotate(-9)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+      <g transform="translate(49,77) rotate(11)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+      <!-- body -->
+      <rect x="35" y="0" width="14" height="7" fill="#3E4346"/>
+      <rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+      <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/>
+      <rect x="7"  y="21" width="7" height="14" fill="#B0623A"/>
+      <rect x="77" y="21" width="7" height="14" fill="#B0623A"/>
+      <rect x="21" y="21" width="14" height="14" fill="#3E4346"/>
+      <rect x="49" y="21" width="14" height="14" fill="#3E4346"/>
+      <rect x="28" y="21" width="7" height="7" fill="#FFFFFF"/>
+      <rect x="56" y="21" width="7" height="7" fill="#FFFFFF"/>
+      <rect x="14" y="28" width="7" height="7" fill="#E0A096"/>
+      <rect x="70" y="28" width="7" height="7" fill="#E0A096"/>
+      <rect x="35" y="36" width="14" height="6" fill="#3E4346"/>
+      <rect x="28" y="42" width="35" height="7" fill="#3E4346"/>
+      <rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+      <rect x="63" y="56" width="7"  height="7" fill="#3E4346"/>
+    </g>
+
+    <!-- ══ the hand — you, holding the line ══ -->
+    <g transform="translate(1097,782) scale(1.08) translate(-1097,-782)">
+      <!-- forearm -->
+      <path d="M 1046 814 L 1148 814 L 1164 906 L 1030 906 Z" fill="url(#skin)"/>
+      <!-- spool, gripped across the fist -->
+      <rect x="1036" y="744" width="122" height="40" rx="8" fill="url(#shaft)"/>
+      <ellipse cx="1036" cy="764" rx="14" ry="33" fill="#E8CC85" stroke="#8F7437" stroke-width="3"/>
+      <ellipse cx="1158" cy="764" rx="14" ry="33" fill="#C5A253" stroke="#8F7437" stroke-width="3"/>
+      <ellipse cx="1036" cy="764" rx="5"  ry="11" fill="#8F7437" opacity="0.55"/>
+      <!-- palm mass behind the fingers -->
+      <rect x="1046" y="740" width="104" height="84" rx="26" fill="#0B0907"/>
+      <!-- fingers curled over the spool -->
+      <g fill="#241D16" stroke="#4A3F31" stroke-width="2.4">
+        <rect x="1052" y="731" width="21" height="68" rx="10.5"/>
+        <rect x="1076" y="727" width="21" height="72" rx="10.5"/>
+        <rect x="1100" y="729" width="21" height="70" rx="10.5"/>
+        <rect x="1124" y="735" width="20" height="63" rx="10"/>
+      </g>
+      <!-- gold rim light on the knuckles, lit from the glow above -->
+      <g fill="none" stroke="#C5A253" stroke-width="2.6" stroke-linecap="round" opacity="0.65">
+        <path d="M 1054 739 q 8.5 -10 17 0"/>
+        <path d="M 1078 735 q 8.5 -10 17 0"/>
+        <path d="M 1102 737 q 8.5 -10 17 0"/>
+        <path d="M 1126 743 q 8 -9 16 0"/>
+      </g>
+      <!-- thumb wrapping across the front -->
+      <g transform="rotate(-12 1074 792)">
+        <rect x="1042" y="778" width="66" height="27" rx="13.5" fill="#2A2219" stroke="#4A3F31" stroke-width="2.4"/>
+        <path d="M 1050 782 q 14 -7 28 0" fill="none" stroke="#C5A253" stroke-width="2.2"
+              stroke-linecap="round" opacity="0.42"/>
+      </g>
+      <!-- warm bounce light on the wrist -->
+      <path d="M 1048 814 L 1146 814 L 1149 828 L 1045 828 Z" fill="#C5A253" opacity="0.12"/>
+    </g>
+
+    <!-- policy readout, tucked by the hand -->
+    <g font-family="JetBrains Mono" font-size="17" letter-spacing="1.5">
+      <line x1="1196" y1="762" x2="1244" y2="762" stroke="#3A342C" stroke-width="2"/>
+      <text x="1258" y="754" fill="#8A837A">allowance</text>
+      <text x="1258" y="782" fill="#C5A253">$500 / mo</text>
+      <line x1="1258" y1="796" x2="1392" y2="796" stroke="#2A251F" stroke-width="2"/>
+      <text x="1258" y="826" fill="#8A837A">approve over</text>
+      <text x="1258" y="854" fill="#C5A253">$100</text>
+    </g>
+
+    <!-- faint horizon so the hand is grounded -->
+    <path d="M 0 884 C 340 862, 700 894, 1600 872 L 1600 900 L 0 900 Z" fill="#0A0806" opacity="0.85"/>
+  </svg>
+
+  <div id="kick">// autonomy, on a line you hold</div>
+  <div id="h1">Let it fly.<br/><span class="g">Keep the line.</span></div>
+  <div id="sub">Your agent pays for what it needs, on its own — inside the limits you set. Never a blank cheque.</div>
+  <div id="rule"></div>
+
+  <div id="wm">
+    <svg width="34" height="36" viewBox="0 0 52 55"><g fill="#C5A253">
+      <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+      <circle cx="41" cy="41.5" r="8.8"/>
+    </g></svg>
+    <div class="nm">argens<span class="dot">.</span></div>
+  </div>
+
+  <svg id="grain" width="1600" height="900">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="91"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1600" height="900" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>
