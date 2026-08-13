@@ -26,11 +26,34 @@ import {
 import { sendBlockedEmail, sendPendingApprovalEmail, sendMarketplaceRefundAlertEmail } from './email.js'
 import { consumeCredits, getActiveCreditsBalance, refundCredits } from './credits.js'
 import { examplePayloadFor, exampleQueryFor } from './marketplace-examples.js'
+import { ASYNC_SYNC_ALTERNATIVES, isAsyncOnlyEndpoint } from './marketplace-async.js'
 
 const MARKUP_RATE = new Decimal('0.20')
 const MPP_USDC_BASE_UNITS = new Decimal('10000000')
 const NETWORK = process.env['STELLAR_NETWORK'] === 'mainnet' ? 'mainnet' : 'testnet'
 const ROUTER_NETWORK = 'stellar:pubnet'
+
+export { isAsyncOnlyEndpoint } from './marketplace-async.js'
+
+function assertNotAsyncOnlyEndpoint(serviceId: string): void {
+  if (!isAsyncOnlyEndpoint(serviceId)) return
+
+  const alternative = ASYNC_SYNC_ALTERNATIVES[serviceId] ?? null
+  const altHint = alternative
+    ? ` Use the synchronous alternative "${alternative}" instead.`
+    : ''
+
+  throw new AppError(
+    `This marketplace endpoint returns a background job id and requires an x402 session credential to bind ownership. Argens supports only one-shot charge payments, so this endpoint cannot be called yet.${altHint}`,
+    'MARKETPLACE_ENDPOINT_REQUIRES_SESSION',
+    400,
+    {
+      service_id: serviceId,
+      alternative,
+      reason: 'x402_session_unsupported',
+    },
+  )
+}
 
 export class MarketplaceBlockedError extends AppError {
   constructor(public readonly transactionId: string, public readonly policyResult: PolicyResult) {
@@ -232,6 +255,7 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     '- `202 PENDING_APPROVAL` — human approval required. Poll `data.poll_url` until the transaction resolves.',
     '- `402 POLICY_BLOCKED` — spend blocked by the developer\'s policy. Do not retry automatically; report to the user.',
     '- `403 SERVICE_DISABLED` — the user must enable this provider from the Argens dashboard.',
+    '- `400 MARKETPLACE_ENDPOINT_REQUIRES_SESSION` — this endpoint is async-only (job id + poll) and needs an x402 session credential Argens does not support yet. **No USDC was charged.** Use a synchronous alternative if listed in `details.alternative` (e.g. `firecrawl_scrape`); do not retry the same endpoint.',
     '- `503 MARKETPLACE_SERVICE_PAUSED` — Argens paused this provider platform-wide (broken upstream). Do not retry; tell the user it is temporarily unavailable.',
     '- `MARKETPLACE_NOT_MPP` — upstream rejected the request **before** payment was processed. **No USDC was charged.** Fix the request payload or query and retry.',
     '- `MARKETPLACE_UPSTREAM_FAILED` — the upstream provider errored. Check the response `payment_committed` field: if `true`, USDC was charged and a refund will be issued; if `false`, no USDC was taken (safe to retry). Check `GET /v1/transactions/{id}` for `upstream_body` detail.',
@@ -372,6 +396,11 @@ async function executeMarketplaceCallInternal(
 
   const service = await findMppRouterService(input.serviceId)
   if (!service) throw new AppError('Marketplace service not found', 'SERVICE_NOT_FOUND', 404)
+
+  // Async-only (x402 session) endpoints: fail closed before any wallet decrypt, credit
+  // consume, or policy check. Even without this guard, charge is gated behind
+  // `onChallenge` in mpp-client.ts so no USDC can move — but the upstream 401 is opaque.
+  assertNotAsyncOnlyEndpoint(service.id)
 
   // Global kill-switch wins over per-user enablement. A paused provider is fully
   // off for everyone — reject before any wallet/credit/policy work happens.

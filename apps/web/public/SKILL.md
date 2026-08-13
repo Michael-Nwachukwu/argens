@@ -1,4 +1,4 @@
-# Argens Skill — v7 — updated 2026-06-17
+# Argens Skill — v8 — updated 2026-08-13
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -402,6 +402,7 @@ POST /marketplace/call
 |---|---|---|
 | `SERVICE_NOT_FOUND` | No | `service_id` doesn't match any endpoint in the catalog |
 | `SERVICE_DISABLED` | No | Provider not enabled by the developer — user must enable from dashboard |
+| `MARKETPLACE_ENDPOINT_REQUIRES_SESSION` | **No** | Async-only endpoint (job id + poll); needs x402 session Argens does not support yet — use `details.alternative` if present (e.g. `firecrawl_scrape`); do not retry the same endpoint |
 | `MARKETPLACE_SERVICE_PAUSED` | No | Provider paused platform-wide by Argens — do not retry; temporarily unavailable |
 | `MARKETPLACE_NOT_MPP` | **No** | Upstream rejected before payment — fix the request payload or query and retry |
 | `MARKETPLACE_UPSTREAM_FAILED` | **Yes** | Payment sent; upstream service errored — do not retry immediately; developer auto-notified; check `upstream_body` in error details |
@@ -429,6 +430,7 @@ POST /marketplace/call
    402 → blocked by policy, report to user, do not retry
    202 → pending approval, poll /v1/transactions/{id}
    MARKETPLACE_NOT_MPP → payload was wrong, no USDC charged — fix payload and retry
+   MARKETPLACE_ENDPOINT_REQUIRES_SESSION → async-only endpoint; no USDC charged — use details.alternative if any; do not retry same id
    MARKETPLACE_UPSTREAM_FAILED → USDC was charged, upstream errored — do not retry; developer auto-notified
    503 MARKETPLACE_SERVICE_PAUSED → provider temporarily unavailable, do not retry
 ```
