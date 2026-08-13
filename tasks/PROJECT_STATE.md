@@ -19,7 +19,7 @@
 | Phase 4 — Marketplace | ✅ Complete | 86 providers / 493 endpoints, E2E verified on mainnet. Hardened with global kill-switch + paid-but-failed refund flagging (see below). |
 | Phase 5 — Polish & Demo | 🔄 In progress | Partially done; see below |
 | CCTP Stellar → Base | ✅ Live & available | Direct path verified twice on mainnet (latest 0.0100000 USDC burn + Base relay, 2026-05-27). Argens fee `clamp(amount × 0.5%, $0.01, $2.00)`; both direct and approval paths fail closed before the fee when live `amount + fee` balance cannot be verified. Approval-token path still needs live verification. |
-| Phase 6 — Mainnet infra | ⚠️ Partial | API deployed (VPS/Dokploy); credit-pool funded; alerting pending |
+| Phase 6 — Mainnet infra | ⚠️ Partial | API deployed (VPS/Dokploy); credit-pool funded; balance alerting covers all four platform wallets |
 
 ---
 
@@ -82,7 +82,7 @@
 - [x] POST /pay + POST /approve/:token CCTP preflight — shared helper verifies live USDC balance >= amount + fee before fee transfer
 - [ ] POST /approve/:token — Base/CCTP approval path compiles but still needs live approval-path verification
 - [ ] Wallet-funded SSE watcher — code exists, never E2E tested
-- [ ] XLM balance alerting on ops wallet — not implemented
+- [x] Balance alerting — all four platform wallets (ops XLM, credit-pool USDC, fee USDC, Base-relayer ETH)
 
 ---
 
@@ -148,7 +148,7 @@
 - [x] Credit pool wallet — bootstrapped and funded on mainnet; working well
 - [x] argens.xyz live (Vercel)
 - [x] **API deployment** — live on a VPS via Dokploy (Railway plan dropped)
-- [ ] XLM balance alerting on ops wallet
+- [x] Balance alerting — all four platform wallets (ops XLM, credit-pool USDC, fee USDC, Base-relayer ETH)
 - [ ] Wallet-funded SSE watcher E2E test
 - [ ] Low balance email E2E verification
 - [ ] Post-launch: monitor Stellar submission failure rate for 72h

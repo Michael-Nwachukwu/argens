@@ -23,7 +23,7 @@ This file is the **single source of truth** for the Claude Code agent building A
 - **Admin ops console: implemented.** Stats, wallet balances (ops/fee/Base relayer/credit-pool), users, access codes, credit grants, failed transactions (+ refund-needed), and the marketplace pause tab.
 - **SKILL.md: v7.** Per-service skill discovery is a mandatory pre-call step (`GET /SKILL/{provider}.md`); documents example payloads, `MARKETPLACE_SERVICE_PAUSED`, CCTP response shapes/fee, Base recipient rules, `/docs`, and `/llms.txt`.
 - **Approval flow:** `GET /approve/:token` is public (no JWT). Approval email contains magic link → dashboard confirm page → `POST /approve/:token` or `POST /reject/:token`. Token is the bearer credential.
-- **Balance alerting: IMPLEMENTED.** `services/alerting.ts` is started from `index.ts` and warns on the ops wallet (XLM, default floor 50) and the credit pool (USDC, default floor 10) to `ADMIN_ALERT_EMAIL`.
+- **Balance alerting: IMPLEMENTED.** `services/alerting.ts` is started from `index.ts` and warns on all four platform wallets — ops (XLM, default floor 50), credit pool (USDC, default floor 10), fee (USDC, default floor 0), Base relayer (ETH, default floor 0.001) — to `ADMIN_ALERT_EMAIL`.
 - **Configuration:** `.env.example` is the authoritative env list; `apps/api/prisma/schema.prisma` is the authoritative schema. Neither is reproduced in this file — both copies had drifted.
 - **What is NOT done yet:** approval-token CCTP live verification, demo Loom, wallet-funded SSE end-to-end, low-balance email end-to-end. (16 marketplace providers fail at the MPP payment layer — flagged for global pause + MPP Router escalation.)
 - **Known upstream issue (2026-08-12):** MPP Router's merchant-payout leg can fail with `502 Merchant payment failed` when its Tempo RPC (`rpc.tempo.xyz`) rate-limits their server IP. The Stellar credential is signed but never settled, so `receipt` is null and **no USDC is charged**. Not an Argens fault and not a provider outage — diagnose from `metadata.mpp_router.upstream_body` before pausing anything.
@@ -1031,10 +1031,11 @@ Argens runs four platform-level wallets — none of them user wallets:
 | **Base relayer** | `ARGENS_BASE_RELAYER_SECRET` | Pays gas to relay CCTP mints on Base | ETH on Base | n/a |
 
 Monitor and alarm on all four. Each one fails silently: an empty ops wallet breaks new signups, an
-empty credit pool breaks credit-funded marketplace calls, and an empty Base relayer leaves CCTP
-burns stranded with no mint on the destination chain. `services/alerting.ts` handles the ops and
-credit-pool thresholds (`XLM_ALERT_THRESHOLD_OPS`, `USDC_ALERT_THRESHOLD_POOL`);
-`GET /v1/admin/wallets` reports live balances for all four.
+empty credit pool breaks credit-funded marketplace calls, an empty fee wallet means markup/CCTP-fee
+transfers are failing or the trustline is missing, and an empty Base relayer leaves CCTP burns
+stranded with no mint on the destination chain. `services/alerting.ts` checks all four on a 6h
+interval (`XLM_ALERT_THRESHOLD_OPS`, `USDC_ALERT_THRESHOLD_POOL`, `USDC_ALERT_THRESHOLD_FEE`,
+`ETH_ALERT_THRESHOLD_RELAYER`); `GET /v1/admin/wallets` reports live balances on demand.
 
 ### Private Key Encryption
 
@@ -1341,7 +1342,7 @@ unticked and are also listed under [Status](#status--2026-08-12).
 - [x] Switch `STELLAR_NETWORK=mainnet` in prod env, redeploy
 - [x] Smoke test: signup → verify email → wallet bootstrap → fund with a small amount of real USDC → send $1 payment → confirm on mainnet explorer → policy violation path → refund path
 - [x] Run full 10 test scenarios against mainnet — no mocks
-- [x] Enable balance alerting — `services/alerting.ts` covers the ops wallet (XLM) and credit pool (USDC). **The fee wallet has no alert threshold yet**
+- [x] Enable balance alerting — `services/alerting.ts` covers all four platform wallets: ops (XLM), credit pool (USDC), fee (USDC, floor 0), Base relayer (ETH)
 - [x] Announce mainnet availability, onboard first external user
 - [x] Post-launch: monitor Stellar submission failure rate for 72 hours before calling it done
 
