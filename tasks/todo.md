@@ -1,7 +1,23 @@
 # Current Task
 
-> Last updated: 2026-06-03
-> Phase 5 / beta rollout in progress. Active: admin balance repair, CCTP preflight verification, credit-grant emails, and endpoint audit after credits/CCTP/admin changes.
+> Last updated: 2026-08-12
+> Active: GitHub #30 — surface marketplace `mpp_router.upstream_body` in dashboard + ops console.
+
+---
+
+## Active 2026-08-12 — Issue #30: marketplace upstream error in UI
+
+**Goal:** When a marketplace call fails, show `metadata.mpp_router` (upstream status/body, payment settled, progress, copyable diagnostic JSON) in the dashboard expand drawer and ops console Failed tab — no API data-capture changes.
+**Files affected:** `apps/web/lib/mpp-diagnostics.ts` (new), `apps/web/lib/api.ts`, `apps/web/app/dashboard/transactions/page.tsx`, `apps/web/app/x/console-a3f9k2p7/page.tsx`, `tasks/todo.md`.
+**Steps:**
+- [x] Shared helpers: parse `mpp_router`, format object/string/HTML `upstream_body`, payment-settled copy, diagnostic blob (`apps/web/lib/mpp-diagnostics.ts`)
+- [x] A1: on expand, `txApi.get(id)` + cache; render known fields immediately; slot upstream detail when ready
+- [x] B: Upstream error block only when `FAILED` + `mpp_router` present (status, body, settled, progress, Copy diagnostic JSON)
+- [x] C: widen ops console metadata type; show upstream body under Reason; signature counts bonus
+- [x] Lint clean on changed files; README ops note updated
+**Risks:** Detail endpoint is snake_case — do not treat `get()` as list-shaped camelCase. Do not render empty upstream section for non-marketplace failures.
+**Done when:** Acceptance criteria in #30 are met; CCTP/direct failures unchanged.
+**Note:** Local `node_modules` absent — could not run `tsc`/`next build` here; IDE lints on touched files are clean.
 
 ---
 

@@ -167,6 +167,7 @@ export const policies = {
 
 export type TxStatus = 'SUCCESS' | 'BLOCKED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'FAILED'
 
+/** List-endpoint row shape (camelCase Prisma fields). Does NOT include metadata. */
 export interface Transaction {
   id: string
   recipientAddress: string
@@ -179,10 +180,37 @@ export interface Transaction {
   memo: string | null
   stellarTxHash: string | null
   blockedReason: string | null
-  metadata: Record<string, unknown> | null
-  policyResult: Record<string, unknown> | null
+  /** Present on detail only — list endpoint omits this field. */
+  metadata?: Record<string, unknown> | null
+  policyResult?: Record<string, unknown> | null
   approvalToken?: string | null  // present only while status is PENDING_APPROVAL
   createdAt: string
+}
+
+/**
+ * GET /transactions/:id response — snake_case API envelope.
+ * Use this (not Transaction) when reading metadata.mpp_router.
+ */
+export interface TransactionDetail {
+  id: string
+  status: TxStatus
+  type: string
+  stellar_tx_hash: string | null
+  stellar_explorer_url: string | null
+  destination_chain: string | null
+  destination_tx_hash: string | null
+  cross_chain: boolean
+  recipient: string
+  amount: string
+  currency: string
+  service_id: string | null
+  service_endpoint: string | null
+  cost_paid: string | null
+  memo: string | null
+  metadata: Record<string, unknown> | null
+  policy_result: Record<string, unknown> | null
+  blocked_reason: string | null
+  created_at: string
 }
 
 // Returned by GET /approve/:token — public, no auth (the 256-bit single-use token is the bearer).
@@ -211,7 +239,7 @@ export const transactions = {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([,v]) => v != null).map(([k,v]) => [k, String(v)]))
     return authFetch<Transaction[]>(`/transactions?${qs.toString()}`)
   },
-  get: (id: string) => authFetch<Transaction>(`/transactions/${id}`),
+  get: (id: string) => authFetch<TransactionDetail>(`/transactions/${id}`),
   // Reject a pending-approval transaction from the dashboard (works even after the token expires).
   dismiss: (id: string) =>
     authFetch<{ status: string; transaction_id: string; message: string }>(`/transactions/${id}/dismiss`, {

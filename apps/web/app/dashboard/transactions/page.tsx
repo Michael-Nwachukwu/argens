@@ -1,15 +1,246 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, type CSSProperties, type ReactNode } from 'react'
 import { TopBar } from '@/components/dashboard/TopBar'
 import { Icon, Icons } from '@/components/dashboard/Icon'
 import { StatusBadge } from '@/components/ui/Badge'
 import { transactions as txApi, isError } from '@/lib/api'
-import type { Transaction, TxStatus } from '@/lib/api'
+import type { Transaction, TransactionDetail, TxStatus } from '@/lib/api'
+import {
+  asMppRouter,
+  buildDiagnosticBlob,
+  formatUpstreamBody,
+  paymentSettledLabel,
+  progressStepLabel,
+  type MppRouterMeta,
+} from '@/lib/mpp-diagnostics'
 
 const STATUS_OPTS: Array<'All' | TxStatus> = ['All', 'SUCCESS', 'BLOCKED', 'PENDING_APPROVAL', 'FAILED', 'REJECTED']
 
-function TxRow({ tx, expanded, onToggle }: { tx: Transaction; expanded: boolean; onToggle: () => void }) {
+const labelStyle: CSSProperties = {
+  fontSize: 11,
+  color: 'var(--faint)',
+  fontFamily: 'var(--font-mono)',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  marginBottom: 4,
+}
+
+const valueStyle: CSSProperties = {
+  fontSize: 12,
+  color: 'var(--text2)',
+  fontFamily: 'var(--font-mono)',
+  wordBreak: 'break-all',
+  maxWidth: 300,
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div style={labelStyle}>{label}</div>
+      <div style={valueStyle}>{children}</div>
+    </div>
+  )
+}
+
+function UpstreamErrorBlock({
+  tx,
+  detail,
+  loading,
+  error,
+}: {
+  tx: Transaction
+  detail: TransactionDetail | undefined
+  loading: boolean
+  error: string | null
+}) {
+  const [copied, setCopied] = useState(false)
+
+  if (tx.status !== 'FAILED') return null
+
+  // Only marketplace failures carry mpp_router — skip loading chrome for CCTP/direct.
+  const maybeMarketplace = tx.type === 'marketplace' || Boolean(tx.serviceId)
+
+  if (maybeMarketplace && loading && !detail) {
+    return (
+      <div style={{ width: '100%', marginTop: 4 }}>
+        <div style={labelStyle}>Upstream error</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+          Loading diagnostics…
+        </div>
+      </div>
+    )
+  }
+
+  if (maybeMarketplace && error && !detail) {
+    return (
+      <div style={{ width: '100%', marginTop: 4 }}>
+        <div style={labelStyle}>Upstream error</div>
+        <div style={{ fontSize: 12, color: 'var(--error, #A04848)', fontFamily: 'var(--font-mono)' }}>
+          Could not load diagnostics: {error}
+        </div>
+      </div>
+    )
+  }
+
+  // List payload has no metadata — wait for detail before rendering (or deciding absence).
+  if (!detail) return null
+
+  const mpp = asMppRouter(detail.metadata)
+  if (!mpp) return null
+
+  const body = formatUpstreamBody(mpp.upstream_body)
+  const settled = paymentSettledLabel(mpp.receipt)
+  const serviceId = detail?.service_id ?? tx.serviceId ?? null
+  const createdAt = detail?.created_at ?? tx.createdAt
+
+  const onCopy = async () => {
+    const blob = buildDiagnosticBlob({
+      transaction_id: tx.id,
+      service_id: serviceId,
+      created_at: createdAt,
+      mpp_router: mpp,
+    })
+    try {
+      await navigator.clipboard.writeText(blob)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback for older browsers / denied clipboard
+      window.prompt('Copy diagnostic JSON:', blob)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        marginTop: 8,
+        paddingTop: 14,
+        borderTop: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ ...labelStyle, marginBottom: 0 }}>Upstream error</div>
+        <button
+          type="button"
+          onClick={onCopy}
+          style={{
+            padding: '5px 10px',
+            background: 'transparent',
+            border: '1px solid var(--border2)',
+            borderRadius: 5,
+            color: copied ? 'var(--accent)' : 'var(--muted)',
+            fontSize: 11,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-mono)',
+          }}
+        >
+          {copied ? 'Copied' : 'Copy diagnostic JSON'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+        <Field label="Upstream status">
+          {mpp.upstream_status != null ? String(mpp.upstream_status) : '—'}
+        </Field>
+        <Field label="Payment settled">
+          <span style={{ color: settled.charged ? 'var(--warning, #B8832A)' : 'var(--accent)' }}>
+            {settled.label}
+          </span>
+          {settled.reference && (
+            <div style={{ marginTop: 4 }}>
+              <a
+                href={`https://stellar.expert/explorer/public/tx/${settled.reference}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}
+              >
+                stellar.expert ↗
+              </a>
+            </div>
+          )}
+        </Field>
+      </div>
+
+      {mpp.progress.length > 0 && <ProgressStepper progress={mpp.progress} />}
+
+      <div>
+        <div style={labelStyle}>
+          Upstream body{body.kind === 'html' ? ' (HTML)' : body.kind === 'json' ? ' (JSON)' : ''}
+        </div>
+        <pre
+          style={{
+            margin: 0,
+            padding: '10px 12px',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            color: 'var(--text2)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            maxHeight: 240,
+            overflow: 'auto',
+            lineHeight: 1.45,
+          }}
+        >
+          {body.text}
+        </pre>
+      </div>
+    </div>
+  )
+}
+
+function ProgressStepper({ progress }: { progress: MppRouterMeta['progress'] }) {
+  const steps = progress.map(progressStepLabel)
+  return (
+    <div>
+      <div style={labelStyle}>Progress</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+        {steps.map((step, i) => (
+          <span key={`${step}-${i}`} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <span
+              style={{
+                padding: '3px 8px',
+                borderRadius: 4,
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--text2)',
+              }}
+            >
+              {step}
+            </span>
+            {i < steps.length - 1 && (
+              <span style={{ color: 'var(--faint)', padding: '0 6px' }}>→</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TxRow({
+  tx,
+  expanded,
+  onToggle,
+  detail,
+  detailLoading,
+  detailError,
+}: {
+  tx: Transaction
+  expanded: boolean
+  onToggle: () => void
+  detail: TransactionDetail | undefined
+  detailLoading: boolean
+  detailError: string | null
+}) {
   const d = new Date(tx.createdAt)
   const timeStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   const short = tx.recipientAddress.slice(0, 8) + '…' + tx.recipientAddress.slice(-6)
@@ -51,19 +282,25 @@ function TxRow({ tx, expanded, onToggle }: { tx: Transaction; expanded: boolean;
             const [k, v] = pair as [string, string]
             return (
               <div key={k}>
-                <div style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>{k}</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', maxWidth: 300 }}>{v}</div>
+                <div style={labelStyle}>{k}</div>
+                <div style={valueStyle}>{v}</div>
               </div>
             )
           })}
           {tx.stellarTxHash && (
             <div>
-              <div style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Explorer</div>
+              <div style={labelStyle}>Explorer</div>
               <a href={`https://stellar.expert/explorer/public/tx/${tx.stellarTxHash}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}>
                 stellar.expert ↗
               </a>
             </div>
           )}
+          <UpstreamErrorBlock
+            tx={tx}
+            detail={detail}
+            loading={detailLoading}
+            error={detailError}
+          />
         </div>
       )}
     </>
@@ -78,6 +315,13 @@ export default function TransactionsPage() {
   const [loading, setLoading]   = useState(true)
   const [page, setPage]         = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [details, setDetails] = useState<Record<string, TransactionDetail>>({})
+  const [detailLoading, setDetailLoading] = useState<Record<string, boolean>>({})
+  const [detailErrors, setDetailErrors] = useState<Record<string, string>>({})
+  const detailsRef = useRef(details)
+  const detailLoadingRef = useRef(detailLoading)
+  detailsRef.current = details
+  detailLoadingRef.current = detailLoading
 
   const load = useCallback(async (p: number, status: string) => {
     setLoading(true)
@@ -90,6 +334,31 @@ export default function TransactionsPage() {
   }, [])
 
   useEffect(() => { load(page, filter).catch(() => setLoading(false)) }, [load, page, filter])
+
+  const fetchDetail = useCallback(async (id: string) => {
+    if (detailsRef.current[id] || detailLoadingRef.current[id]) return
+    setDetailLoading(prev => ({ ...prev, [id]: true }))
+    setDetailErrors(prev => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    const r = await txApi.get(id)
+    if (isError(r)) {
+      setDetailErrors(prev => ({ ...prev, [id]: r.error }))
+    } else {
+      setDetails(prev => ({ ...prev, [id]: r.data }))
+    }
+    setDetailLoading(prev => ({ ...prev, [id]: false }))
+  }, [])
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpanded(prev => {
+      const next = prev === id ? null : id
+      if (next) void fetchDetail(next)
+      return next
+    })
+  }, [fetchDetail])
 
   const filtered = txs.filter(tx =>
     (tx.memo ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -182,7 +451,10 @@ export default function TransactionsPage() {
                 key={tx.id}
                 tx={tx}
                 expanded={expanded === tx.id}
-                onToggle={() => setExpanded(p => p === tx.id ? null : tx.id)}
+                onToggle={() => toggleExpand(tx.id)}
+                detail={details[tx.id]}
+                detailLoading={Boolean(detailLoading[tx.id])}
+                detailError={detailErrors[tx.id] ?? null}
               />
             ))
           )}
