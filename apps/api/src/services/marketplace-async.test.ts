@@ -5,6 +5,7 @@ import { ASYNC_SYNC_ALTERNATIVES, isAsyncOnlyEndpoint } from './marketplace-asyn
 const ASYNC_IDS = [
   'firecrawl_crawl',
   'firecrawl_extract',
+  'browserbase_fetch',
   'stablestudio_generate_flux-2-pro_generate',
   'stablestudio_generate_flux-2-pro_edit',
   'stablestudio_generate_gpt-image-1_generate',
@@ -33,6 +34,9 @@ const SYNC_SIBLINGS = [
   'firecrawl_map',
   'firecrawl_search',
   'stablestudio_upload',
+  // browserbase_fetch is async-only, but its siblings answer inline (both probed SUCCESS).
+  'browserbase_search',
+  'browserbase_browser_session_create',
 ] as const
 
 describe('isAsyncOnlyEndpoint', () => {
@@ -61,5 +65,11 @@ describe('isAsyncOnlyEndpoint', () => {
     expect(ASYNC_SYNC_ALTERNATIVES['firecrawl_crawl']).toBe('firecrawl_scrape')
     expect(ASYNC_SYNC_ALTERNATIVES['firecrawl_extract']).toBe('firecrawl_scrape')
     expect(ASYNC_SYNC_ALTERNATIVES['stablestudio_generate_flux-2-pro_generate']).toBeUndefined()
+  })
+
+  it('offers no alternative for browserbase_fetch', () => {
+    // Deliberate: browserbase has no synchronous URL-fetch sibling, and pointing at
+    // another provider (firecrawl_scrape) would 403 unless the user enabled it too.
+    expect(ASYNC_SYNC_ALTERNATIVES['browserbase_fetch']).toBeUndefined()
   })
 })
