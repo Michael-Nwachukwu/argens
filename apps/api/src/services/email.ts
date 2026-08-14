@@ -463,7 +463,7 @@ export async function sendCreditsGrantedEmail(
  */
 export async function sendOpsAlertEmail(alerts: Array<{
   wallet: string
-  asset: 'XLM' | 'USDC'
+  asset: 'XLM' | 'USDC' | 'ETH'
   balance: string
   threshold: string
   note?: string
@@ -483,7 +483,7 @@ export async function sendOpsAlertEmail(alerts: Array<{
     ${bodyText("One or more Argens-operated wallets is running low. Fund them before they cause user-facing failures.")}
     ${dataTable(rows)}
     ${divider()}
-    ${mutedText("A depleted ops wallet silently breaks new user signups. A depleted credit pool blocks credit-funded marketplace calls. This alert fires once per 24 hours until the balance is restored.")}
+    ${mutedText("A depleted ops wallet silently breaks new user signups. A depleted credit pool blocks credit-funded marketplace calls. A depleted Base relayer strands CCTP burns mid-flight with no mint on destination. An empty fee wallet means markup/CCTP-fee transfers are failing or the trustline is missing. This alert fires once per 24 hours until the balance is restored.")}
   `)
 
   const text = `Argens ops alert: wallet balance below threshold.\n\n${alerts.map(a => `${a.wallet} (${a.asset}): ${a.balance} (threshold ${a.threshold})`).join('\n')}`
