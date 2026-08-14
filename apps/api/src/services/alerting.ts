@@ -8,12 +8,16 @@
  * one alert email per wallet per 24h — avoids spam while remaining actionable.
  *
  * Wallets monitored:
- *   - Ops wallet (ARGENS_OPS_WALLET_PUBLIC)   — XLM balance
- *   - Credit pool (ARGENS_CREDIT_POOL_PUBLIC) — USDC balance
+ *   - Ops wallet (ARGENS_OPS_WALLET_PUBLIC)     — XLM balance
+ *   - Credit pool (ARGENS_CREDIT_POOL_PUBLIC)   — USDC balance
+ *   - Fee wallet (ARGENS_FEE_WALLET)            — USDC balance
+ *   - Base relayer (ARGENS_BASE_RELAYER_SECRET) — ETH on Base
  *
  * Thresholds (configurable via env, sensible defaults):
- *   - XLM_ALERT_THRESHOLD_OPS   default "50"   (50 XLM  ≈ 33 new signups at 1.5 XLM each)
- *   - USDC_ALERT_THRESHOLD_POOL default "10"   (10 USDC)
+ *   - XLM_ALERT_THRESHOLD_OPS      default "50"    (50 XLM  ≈ 33 new signups at 1.5 XLM each)
+ *   - USDC_ALERT_THRESHOLD_POOL    default "10"    (10 USDC)
+ *   - USDC_ALERT_THRESHOLD_FEE     default "0"     (alert only when empty / no trustline)
+ *   - ETH_ALERT_THRESHOLD_RELAYER  default "0.001" (see comment on the constant)
  *
  * Required env:
  *   ADMIN_ALERT_EMAIL  — recipient of alert emails (typically the operator)
@@ -23,6 +27,7 @@
 
 import { Decimal } from '@prisma/client/runtime/library'
 import { getXlmBalance, getUsdcBalance } from './stellar.js'
+import { readBaseRelayer } from './admin-balances.js'
 import { sendOpsAlertEmail } from './email.js'
 import { logger } from '../lib/logger.js'
 
@@ -31,8 +36,14 @@ import { logger } from '../lib/logger.js'
 const ALERT_INTERVAL_MS  = 6 * 60 * 60 * 1000   // 6 hours
 const RATE_LIMIT_MS      = 24 * 60 * 60 * 1000  // 24 hours between alerts per wallet
 
-const XLM_THRESHOLD_OPS   = process.env['XLM_ALERT_THRESHOLD_OPS']   ?? '50'
-const USDC_THRESHOLD_POOL  = process.env['USDC_ALERT_THRESHOLD_POOL']  ?? '10'
+const XLM_THRESHOLD_OPS        = process.env['XLM_ALERT_THRESHOLD_OPS']      ?? '50'
+const USDC_THRESHOLD_POOL      = process.env['USDC_ALERT_THRESHOLD_POOL']    ?? '10'
+const USDC_THRESHOLD_FEE       = process.env['USDC_ALERT_THRESHOLD_FEE']     ?? '0'
+// Observed mainnet CCTP mint 0xb086f56e… used 154,553 gas ≈ 0.00000093 ETH.
+// 0.001 ETH covers ~1,000 mints at that rate, or a handful if L1 data fees spike.
+const ETH_THRESHOLD_RELAYER    = process.env['ETH_ALERT_THRESHOLD_RELAYER']  ?? '0.001'
+
+type AlertAsset = 'XLM' | 'USDC' | 'ETH'
 
 // ─── Per-wallet alert rate limiting ──────────────────────────────────────────
 
@@ -52,7 +63,7 @@ function markAlerted(key: string): void {
 async function checkBalances(): Promise<void> {
   const alerts: Array<{
     wallet: string
-    asset: 'XLM' | 'USDC'
+    asset: AlertAsset
     balance: string
     threshold: string
     note?: string
@@ -107,6 +118,59 @@ async function checkBalances(): Promise<void> {
     }
   }
 
+  // ── Fee wallet — USDC ──
+  // Inclusive comparison: default floor "0" must fire on a genuinely empty
+  // wallet (or a missing USDC trustline, which getUsdcBalance reports as 0).
+  const feePublic = process.env['ARGENS_FEE_WALLET']
+  if (feePublic) {
+    try {
+      const usdc = await getUsdcBalance(feePublic)
+      if (usdc !== null) {
+        const bal = new Decimal(usdc)
+        const thr = new Decimal(USDC_THRESHOLD_FEE)
+        if (bal.lessThanOrEqualTo(thr) && shouldAlert('ARGENS_FEE_WALLET')) {
+          alerts.push({
+            wallet: 'Fee wallet',
+            asset: 'USDC',
+            balance: bal.toFixed(7),
+            threshold: thr.toFixed(7),
+            note: 'Receives marketplace markup and CCTP fees. A zero balance means the wallet is empty or the USDC trustline is missing — revenue transfers will fail.',
+          })
+          markAlerted('ARGENS_FEE_WALLET')
+        }
+      }
+    } catch (e) {
+      logger.warn('alerting: failed to read fee wallet USDC balance', { error: (e as Error).message })
+    }
+  }
+
+  // ── Base relayer — ETH ──
+  // Reuses readBaseRelayer() so the admin dashboard and alerting cannot drift.
+  // Unconfigured (no ARGENS_BASE_RELAYER_SECRET) is skipped silently.
+  try {
+    const relayer = await readBaseRelayer()
+    if (relayer.configured) {
+      if (relayer.eth === null) {
+        logger.warn('alerting: failed to read Base relayer ETH balance', { error: relayer.error })
+      } else {
+        const bal = new Decimal(relayer.eth)
+        const thr = new Decimal(ETH_THRESHOLD_RELAYER)
+        if (bal.lessThan(thr) && shouldAlert('ARGENS_BASE_RELAYER_SECRET')) {
+          alerts.push({
+            wallet: 'Base relayer',
+            asset: 'ETH',
+            balance: bal.toFixed(7),
+            threshold: thr.toFixed(7),
+            note: 'Pays gas to mint USDC on Base after a CCTP burn. Running low strands burned USDC mid-flight until the relayer is refunded.',
+          })
+          markAlerted('ARGENS_BASE_RELAYER_SECRET')
+        }
+      }
+    }
+  } catch (e) {
+    logger.warn('alerting: failed to read Base relayer ETH balance', { error: (e as Error).message })
+  }
+
   if (alerts.length === 0) return
 
   logger.warn('alerting: wallet balance alert firing', {
@@ -123,7 +187,7 @@ async function checkBalances(): Promise<void> {
 
 export function startBalanceAlerting(): void {
   if (!process.env['ADMIN_ALERT_EMAIL']) {
-    logger.warn('ADMIN_ALERT_EMAIL not set — ops wallet alerting disabled')
+    logger.warn('ADMIN_ALERT_EMAIL not set — platform wallet alerting disabled')
     return
   }
   // Run once immediately on boot, then on interval
@@ -133,5 +197,7 @@ export function startBalanceAlerting(): void {
     intervalHours: ALERT_INTERVAL_MS / 3600000,
     xlmThreshold: XLM_THRESHOLD_OPS,
     usdcPoolThreshold: USDC_THRESHOLD_POOL,
+    usdcFeeThreshold: USDC_THRESHOLD_FEE,
+    ethRelayerThreshold: ETH_THRESHOLD_RELAYER,
   })
 }

@@ -178,7 +178,7 @@ All are read by the API from `apps/api/.env`.
 | `ADMIN_ALERT_EMAIL` | Destination for ops alerts (refund-needed, low balances) |
 | `MPP_ROUTER_BASE_URL` | `https://apiserver.mpprouter.dev` |
 | `BASE_RPC_URL` / `BASE_TESTNET_RPC_URL` | CCTP destination-chain RPC |
-| `XLM_ALERT_THRESHOLD_OPS`, `USDC_ALERT_THRESHOLD_POOL` | Balance alert floors |
+| `XLM_ALERT_THRESHOLD_OPS`, `USDC_ALERT_THRESHOLD_POOL`, `USDC_ALERT_THRESHOLD_FEE`, `ETH_ALERT_THRESHOLD_RELAYER` | Balance alert floors (ops XLM, credit-pool USDC, fee USDC, Base-relayer ETH) |
 | `JWT_EXPIRES_IN` | `1h` — deliberate, paired with the dashboard's 5-minute tab-idle logout. Don't lengthen it without revisiting that pairing |
 | `API_PORT`, `NODE_ENV`, `ARGENS_WEB_URL` | `ARGENS_WEB_URL` builds links in emails and skill files; `WEB_URL` is a legacy fallback |
 
