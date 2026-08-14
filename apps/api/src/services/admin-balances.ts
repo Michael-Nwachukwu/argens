@@ -6,6 +6,9 @@
  * Base relayer's ETH balance for CCTP relay gas. All reads are best-effort;
  * any individual wallet that errors returns null so the dashboard can still
  * render the others.
+ *
+ * `readBaseRelayer` is also the ETH reader used by services/alerting.ts —
+ * do not add a second implementation there.
  */
 
 import { createPublicClient, formatEther, http } from 'viem'
@@ -97,7 +100,7 @@ async function readStellarWallet(
   }
 }
 
-async function readBaseRelayer(): Promise<BaseRelayerStatus> {
+export async function readBaseRelayer(): Promise<BaseRelayerStatus> {
   const relayerSecret = process.env['ARGENS_BASE_RELAYER_SECRET']
   const chain = NETWORK === 'mainnet' ? base : baseSepolia
   const chainLabel: 'base' | 'base-sepolia' = NETWORK === 'mainnet' ? 'base' : 'base-sepolia'

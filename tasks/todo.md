@@ -1,15 +1,12 @@
-## Task: Async-only marketplace endpoint guard (Track A / #29)
-**Goal:** Reject async-only marketplace endpoints with a clear pre-payment `400 MARKETPLACE_ENDPOINT_REQUIRES_SESSION` before any wallet/credit/policy work, so agents never hit the opaque post-challenge upstream 401.
-**Files affected:** `apps/api/src/services/marketplace-async.ts`, `apps/api/src/services/marketplace-async.test.ts`, `apps/api/src/services/marketplace.ts`, `apps/web/public/SKILL.md`, `tasks/decisions.md`.
-**Guard shape (decided):** Hardcoded id set (`firecrawl_crawl`, `firecrawl_extract`) + `stablestudio_generate_` prefix. Not catalog-driven. See `tasks/decisions.md` 2026-07-31.
+## Task: Platform-wallet alerting coverage (fee + Base relayer)
+**Goal:** Check all four Argens-operated wallets on the existing 6h interval and 24h per-wallet rate limit, so a dry Base relayer or empty fee wallet pages ops instead of failing silently.
+**Files affected:** `apps/api/src/services/alerting.ts`, `apps/api/src/services/admin-balances.ts`, `apps/api/src/services/email.ts`, `.env.example`, `CLAUDE.md`, `AGENTS.md`, `README.md`, `tasks/PROJECT_STATE.md`
 **Steps:**
-- [x] Export pure `isAsyncOnlyEndpoint(serviceId)` + sync alternatives map (`marketplace-async.ts`)
-- [x] Call guard in `executeMarketplaceCallInternal` immediately after service lookup, before wallet/credit/policy
-- [x] Error: `400 MARKETPLACE_ENDPOINT_REQUIRES_SESSION` with `alternative` when one exists (`firecrawl_scrape`)
-- [x] Confirm charge stays gated behind `onChallenge` in `mpp-client.ts` (no funds at risk even without guard)
-- [x] Unit test: blocks async ids; passes every sync sibling (54/54 suite green)
-- [x] Document error code in provider skill markdown + SKILL.md v8
-- [x] Mark decisions.md UPDATE note that Track A is shipped
-**Risks:** Over-blocking a future sync endpoint that starts with `stablestudio_generate_` — accept per decision. Under-blocking if MPP adds new async ids outside the set/prefix — escalate with #23.
-**Done when:** Unit tests pass; calling an async id throws before wallet decrypt; sync siblings are not gated.
-**Status:** DONE 2026-08-13. Track B remains blocked on #23.
+- [x] Export `readBaseRelayer()` from `admin-balances.ts` so alerting reuses the existing ETH read
+- [x] Add fee wallet (USDC, `USDC_ALERT_THRESHOLD_FEE` default `"0"`, inclusive) and Base relayer (ETH, `ETH_ALERT_THRESHOLD_RELAYER` default `"0.001"`) to `checkBalances()`
+- [x] Widen `sendOpsAlertEmail` asset type to include `'ETH'`
+- [x] Add the two env vars to `.env.example`; report all four thresholds in the startup log
+- [x] Update CLAUDE.md / AGENTS.md / README.md / PROJECT_STATE.md so they no longer claim fee/relayer are unmonitored
+- [x] Typecheck `@argens/api`
+**Risks:** Default fee floor of `0` never fires with exclusive `lessThan` — must use inclusive comparison for that wallet. Duplicate ETH readers would drift; reuse `readBaseRelayer` only.
+**Done when:** All four wallets are checked independently (a failed read of one does not skip the others); unconfigured wallets are skipped; startup log lists four thresholds; env list and docs match.
