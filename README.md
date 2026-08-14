@@ -399,9 +399,8 @@ MARKETPLACE_SERVICE_PAUSED`. Toggle it from the ops console or
 16 providers are known-broken at MPP's payment layer.
 
 **Diagnosing a failed marketplace call.** `blockedReason` is generic ("MPP Router returned HTTP
-502"). The real cause is in `metadata.mpp_router.upstream_body`, returned by
-`GET /v1/transactions/:id` and `GET /v1/admin/transactions/failed` but
-[not yet surfaced in the UI](https://github.com/Michael-Nwachukwu/argens/issues/30). Check
+502"). The real cause is in `metadata.mpp_router.upstream_body` — shown in the dashboard
+transaction drawer (expand a FAILED marketplace row) and the Ops Console Failed tab. Check
 `receipt` in the same object: `null` means MPP aborted before settling and **no USDC was charged**.
 
 **Refunds are manual.** A paid-but-undelivered call sets `metadata.refund.required = true`, writes

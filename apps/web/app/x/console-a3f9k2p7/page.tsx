@@ -8,6 +8,12 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Logo } from '@/components/ui/Logo'
+import {
+  asMppRouter,
+  formatUpstreamBody,
+  paymentSettledLabel,
+  upstreamSignature,
+} from '@/lib/mpp-diagnostics'
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/v1').replace(/\/$/, '')
 const SECRET_KEY = 'argens_admin_secret'
@@ -93,7 +99,15 @@ interface FailedTxRow {
   user: { email: string }
   type?: string
   serviceId?: string | null
-  metadata?: { refund?: { required?: boolean; amount?: string | null } } | null
+  metadata?: {
+    refund?: { required?: boolean; amount?: string | null }
+    mpp_router?: {
+      receipt?: { method?: string; reference?: string; status?: string; timestamp?: string } | null
+      progress?: Array<Record<string, unknown>>
+      upstream_status?: number | null
+      upstream_body?: unknown
+    }
+  } | null
 }
 
 interface AdminServiceRow {
@@ -649,6 +663,7 @@ function CreditsPanel({ onChanged }: { onChanged: () => void }) {
 function FailedPanel() {
   const [rows, setRows] = useState<FailedTxRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [expandedUpstream, setExpandedUpstream] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     setLoading(true)
@@ -658,8 +673,36 @@ function FailedPanel() {
     })
   }, [])
 
+  const signatureCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of rows) {
+      const mpp = asMppRouter(r.metadata)
+      if (!mpp) continue
+      const sig = upstreamSignature(mpp)
+      counts.set(sig, (counts.get(sig) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+  }, [rows])
+
   return (
     <Section title={`Failed transactions (${rows.length})`}>
+      {signatureCounts.length > 0 && (
+        <div style={{ marginBottom: 14, padding: '10px 12px', background: t.bg3, border: `1px solid ${t.border}`, borderRadius: 6 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: t.faint, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Upstream signatures (marketplace)
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {signatureCounts.map(([sig, count]) => (
+              <div key={sig} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+                <span style={{ color: t.accent, flexShrink: 0, minWidth: 28 }}>{count}×</span>
+                <span style={{ color: t.text2, wordBreak: 'break-word' }}>{sig}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
@@ -675,8 +718,12 @@ function FailedPanel() {
             {rows.map(r => {
               const refundNeeded = Boolean(r.metadata?.refund?.required)
               const refundAmount = r.metadata?.refund?.amount
+              const mpp = asMppRouter(r.metadata)
+              const body = mpp ? formatUpstreamBody(mpp.upstream_body) : null
+              const settled = mpp ? paymentSettledLabel(mpp.receipt) : null
+              const open = Boolean(expandedUpstream[r.id])
               return (
-              <tr key={r.id} style={{ borderBottom: `1px solid ${t.border}`, background: refundNeeded ? t.errorLow : 'transparent' }}>
+              <tr key={r.id} style={{ borderBottom: `1px solid ${t.border}`, background: refundNeeded ? t.errorLow : 'transparent', verticalAlign: 'top' }}>
                 <td style={{ padding: '10px 14px', color: t.text }}>{r.user.email}</td>
                 <td style={{ padding: '10px 14px', color: r.crossChain ? '#5B8EFF' : r.type === 'marketplace' ? t.accent : t.text2, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{r.crossChain ? 'cctp' : r.type === 'marketplace' ? 'mkt' : 'direct'}</td>
                 <td style={{ padding: '10px 14px', color: t.text2, fontFamily: 'JetBrains Mono, monospace' }}>${parseFloat(r.amount).toFixed(2)}</td>
@@ -686,7 +733,56 @@ function FailedPanel() {
                     ? <span style={{ color: t.error, border: '1px solid rgba(160,72,72,0.4)', background: t.errorLow, borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>● REFUND NEEDED{refundAmount ? ` $${parseFloat(refundAmount).toFixed(4)}` : ''}</span>
                     : <span style={{ color: t.faint }}>—</span>}
                 </td>
-                <td style={{ padding: '10px 14px', color: t.error, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 320, wordBreak: 'break-word' }}>{r.blockedReason ?? '—'}</td>
+                <td style={{ padding: '10px 14px', color: t.error, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 380, wordBreak: 'break-word' }}>
+                  <div>{r.blockedReason ?? '—'}</div>
+                  {mpp && body && (
+                    <div style={{ marginTop: 8, color: t.text2 }}>
+                      <div style={{ color: t.muted, marginBottom: 6 }}>
+                        upstream {mpp.upstream_status ?? '—'}
+                        {settled ? ` · ${settled.charged ? 'charged' : 'not charged'}` : ''}
+                      </div>
+                      <pre
+                        style={{
+                          margin: 0,
+                          padding: '8px 10px',
+                          background: t.bg,
+                          border: `1px solid ${t.border}`,
+                          borderRadius: 5,
+                          fontSize: 10,
+                          color: t.text2,
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          maxHeight: open ? 220 : 72,
+                          overflow: 'auto',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {open || body.text.length <= 220
+                          ? body.text
+                          : `${body.text.slice(0, 220)}…`}
+                      </pre>
+                      {body.text.length > 220 && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedUpstream(prev => ({ ...prev, [r.id]: !prev[r.id] }))}
+                          style={{
+                            marginTop: 6,
+                            padding: '2px 8px',
+                            background: 'transparent',
+                            border: `1px solid ${t.border2}`,
+                            borderRadius: 4,
+                            color: t.muted,
+                            fontSize: 10,
+                            cursor: 'pointer',
+                            fontFamily: 'JetBrains Mono, monospace',
+                          }}
+                        >
+                          {open ? 'Collapse' : 'Expand full body'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
                 <td style={{ padding: '10px 14px', color: t.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{new Date(r.createdAt).toLocaleString()}</td>
               </tr>
               )
