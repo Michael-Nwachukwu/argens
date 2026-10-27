@@ -153,13 +153,14 @@ export default function WalletPage() {
     setKeyLoading(false)
     if (isError(res)) { setKeyError(res.error); return }
 
-    const { secret_key, public_key, network } = res.data
+    const { secret_key, public_key, network, fees_note } = res.data
     const content = [
       'ARGENS WALLET — PRIVATE KEY BACKUP',
       '====================================',
       '',
       'Keep this file secret. Anyone with the secret key can spend all funds.',
       '',
+      ...(fees_note ? [fees_note, ''] : []),
       `Network:    ${network}`,
       `Public key: ${public_key}`,
       `Secret key: ${secret_key}`,
@@ -228,7 +229,7 @@ export default function WalletPage() {
         <div style={{ margin: '20px 32px 0', padding: '20px 24px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10 }}>
           <div style={{ fontFamily: 'var(--font-head)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Wallet setup incomplete</div>
           <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 16 }}>
-            Your wallet was created but the on-chain setup didn't finish. This can happen when the platform is briefly out of XLM reserves. Click below to retry — it usually takes a few seconds.
+            Your wallet was created but the on-chain setup didn't finish. This can happen when the platform wallet that sponsors account reserves is briefly low. Click below to retry — it usually takes a few seconds.
           </div>
           {retryError && (
             <div style={{ fontSize: 12, color: 'var(--error)', fontFamily: 'var(--font-mono)', marginBottom: 12, padding: '8px 12px', background: 'var(--error-low)', borderRadius: 6, border: '1px solid rgba(160,72,72,0.25)' }}>
@@ -259,12 +260,13 @@ export default function WalletPage() {
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>{loading ? 'Loading…' : `${balance} USDC`}</div>
             </div>
             <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '20px 22px' }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>XLM (fees)</div>
+              {/* Reserves are sponsored and every fee is paid by Argens, so 0 XLM is normal. */}
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Network fees</div>
               <div style={{ fontFamily: 'var(--font-head)', fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1 }}>
-                {loading ? '—' : parseFloat(walletData?.xlm_balance ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                Paid by Argens
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>
-                {loading ? 'Loading…' : `${walletData?.xlm_balance ?? '0.0000000'} XLM`}
+                {loading ? 'Loading…' : `Reserves sponsored · ${walletData?.xlm_balance ?? '0.0000000'} XLM held`}
               </div>
             </div>
           </div>
@@ -314,7 +316,7 @@ export default function WalletPage() {
             <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>Network details</div>
             {([
               ['Network', 'Stellar mainnet'],
-              ['Assets', 'USDC (Circle) + XLM (fees)'],
+              ['Assets', 'USDC (Circle) — XLM reserves and fees covered by Argens'],
               ['Custody model', 'Agent-custodial'],
               ['Balance cached', walletData?.cached_at ? new Date(walletData.cached_at).toLocaleString() : '—'],
             ] as const).map(([k, v]) => (
@@ -371,6 +373,9 @@ export default function WalletPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ padding: '10px 14px', background: 'rgba(160,72,72,0.10)', border: '1px solid rgba(160,72,72,0.3)', borderRadius: 6, fontSize: 13, color: 'var(--error)' }}>
                   Anyone with this key can spend all funds. Never share it.
+                </div>
+                <div style={{ padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+                  Argens pays this wallet's network fees and sponsors its reserves, so it may hold no XLM. To use the key in another wallet app, send it a small amount of XLM first.
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setKeyStep('idle')} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>

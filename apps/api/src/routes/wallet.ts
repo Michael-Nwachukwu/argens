@@ -8,10 +8,17 @@
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
 import { z } from 'zod'
+import { Decimal } from '@prisma/client/runtime/library'
 import { requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { getUsdcBalance, getXlmBalance, getAccountBalances, isStellarAddress, validateMemo, fundNewAccount, createUsdcTrustline } from '../services/stellar.js'
+import { getUsdcBalance, getXlmBalance, getAccountBalances, isStellarAddress, validateMemo } from '../services/stellar.js'
+import {
+  activateAccount,
+  getSpendableXlm,
+  inspectAccount,
+  SPONSORED_RESERVE_PER_WALLET_XLM,
+} from '../services/sponsorship.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
 import { getActiveCreditsBalance } from '../services/credits.js'
@@ -148,12 +155,18 @@ walletRouter.post('/wallet/bootstrap-retry', requireJwt, async (req, res, next) 
 
     const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
 
-    if (wallet.status === 'INITIALISING') {
-      // Account was never funded on-chain — check ops wallet first
+    // The chain decides what is left to do, not the DB status: a previous attempt may have
+    // landed after it reported failure. activateAccount() is idempotent on that state.
+    const state = await inspectAccount(wallet.stellarPublicKey)
+
+    if (state !== 'ready') {
+      // Activation locks reserves in the ops wallet; check what it can actually spend.
+      // Total balance overstates it — every sponsored wallet adds to the ops minimum balance.
       const opsPublic = process.env['ARGENS_OPS_WALLET_PUBLIC']
       if (opsPublic) {
-        const xlm = await getXlmBalance(opsPublic).catch(() => null)
-        if (xlm !== null && parseFloat(xlm) < 2.5) {
+        const spendable = await getSpendableXlm(opsPublic).catch(() => null)
+        const needed = new Decimal(SPONSORED_RESERVE_PER_WALLET_XLM).plus('0.01')
+        if (spendable !== null && new Decimal(spendable).lessThan(needed)) {
           sendError(
             res,
             'Platform wallet is being refilled. Please try again in a few minutes.',
@@ -164,12 +177,9 @@ walletRouter.post('/wallet/bootstrap-retry', requireJwt, async (req, res, next) 
         }
       }
 
-      await fundNewAccount(wallet.stellarPublicKey)
-      await prisma.wallet.update({ where: { id: wallet.id }, data: { status: 'TRUSTLINE_PENDING' } })
+      await activateAccount(secretKey)
     }
 
-    // At this point status is TRUSTLINE_PENDING (either was, or just transitioned)
-    await createUsdcTrustline(secretKey)
     await prisma.wallet.update({ where: { id: wallet.id }, data: { status: 'READY' } })
 
     logger.info('Wallet bootstrap retry succeeded', { userId, publicKey: wallet.stellarPublicKey })
@@ -479,6 +489,10 @@ walletRouter.post('/wallet/export-key', requireJwt, authLimiter, validate(Export
       public_key: wallet.stellarPublicKey,
       network: process.env['STELLAR_NETWORK'] ?? 'testnet',
       warning: 'Keep this key secret. Anyone with it can spend all funds in this wallet.',
+      // Reserves are sponsored and fees are paid by Argens, so the account may hold 0 XLM.
+      // Outside Argens it needs its own XLM before it can send anything.
+      fees_note:
+        'Argens pays this wallet\'s network fees and sponsors its reserves. If you use this key in another wallet, send it a small amount of XLM first — it may hold none of its own.',
     })
   } catch (err) {
     next(err)

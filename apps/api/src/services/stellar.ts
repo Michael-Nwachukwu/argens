@@ -2,13 +2,8 @@ import {
   Horizon,
   Networks,
   Keypair,
-  TransactionBuilder,
-  Operation,
   Asset,
-  Memo,
-  BASE_FEE,
 } from '@stellar/stellar-sdk'
-import { logger } from '../lib/logger.js'
 import { StellarError } from '../lib/errors.js'
 
 // ─── Network config ────────────────────────────────────────────────────────────
@@ -40,75 +35,9 @@ export function createStellarWallet(): { publicKey: string; secretKey: string } 
   }
 }
 
-// ─── Account funding ───────────────────────────────────────────────────────────
-/**
- * On testnet: fund via friendbot (free 10,000 XLM).
- * On mainnet: fund from ops wallet (1.5 XLM reserve).
- */
-export async function fundNewAccount(publicKey: string): Promise<void> {
-  if (NETWORK === 'testnet') {
-    const res = await fetch(`https://friendbot.stellar.org?addr=${encodeURIComponent(publicKey)}`)
-    if (!res.ok) {
-      const body = await res.text()
-      throw new StellarError('Friendbot funding failed', { publicKey, body })
-    }
-    logger.info('Friendbot funded new account', { publicKey })
-    return
-  }
-
-  // Mainnet: use ops wallet to send 1.5 XLM via createAccount operation.
-  const opsSecret = process.env['ARGENS_OPS_WALLET_SECRET']
-  if (!opsSecret) throw new StellarError('ARGENS_OPS_WALLET_SECRET not set — cannot fund mainnet accounts')
-
-  const opsKeypair = Keypair.fromSecret(opsSecret)
-  try {
-    const opsAccount = await server.loadAccount(opsKeypair.publicKey())
-    const tx = new TransactionBuilder(opsAccount, {
-      fee: BASE_FEE,
-      networkPassphrase: NETWORK_PASSPHRASE,
-    })
-      .addOperation(
-        Operation.createAccount({
-          destination: publicKey,
-          startingBalance: '2.0000000', // 1 XLM base + 0.5 XLM trustline reserve + 0.5 XLM fee buffer (~50k txs)
-        }),
-      )
-      .setTimeout(30)
-      .build()
-    tx.sign(opsKeypair)
-    await server.submitTransaction(tx)
-    logger.info('Ops wallet funded new account', { publicKey })
-  } catch (e) {
-    throw new StellarError('Ops wallet funding failed', { publicKey, error: (e as Error).message })
-  }
-}
-
-// ─── USDC trustline ────────────────────────────────────────────────────────────
-/**
- * Creates a USDC trustline on the given account.
- * Must be called after the account exists on-chain with sufficient XLM balance.
- */
-export async function createUsdcTrustline(secretKey: string): Promise<void> {
-  const keypair = Keypair.fromSecret(secretKey)
-  try {
-    const account = await server.loadAccount(keypair.publicKey())
-    const tx = new TransactionBuilder(account, {
-      fee: BASE_FEE,
-      networkPassphrase: NETWORK_PASSPHRASE,
-    })
-      .addOperation(Operation.changeTrust({ asset: USDC_ASSET }))
-      .setTimeout(30)
-      .build()
-    tx.sign(keypair)
-    await server.submitTransaction(tx)
-    logger.info('USDC trustline created', { publicKey: keypair.publicKey() })
-  } catch (e) {
-    throw new StellarError('USDC trustline creation failed', {
-      publicKey: keypair.publicKey(),
-      error: (e as Error).message,
-    })
-  }
-}
+// ─── Account activation ────────────────────────────────────────────────────────
+// Funding and trustline creation live in services/sponsorship.ts (activateAccount):
+// the ops wallet sponsors the reserves instead of transferring XLM to the user.
 
 // ─── Balance ───────────────────────────────────────────────────────────────────
 /**

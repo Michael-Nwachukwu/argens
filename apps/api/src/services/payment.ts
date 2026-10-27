@@ -9,6 +9,10 @@
  * Argens charges zero fee on direct payments. Revenue comes exclusively
  * from marketplace API markup. See CLAUDE.md — Key Decisions.
  *
+ * The network fee is paid by the ops wallet: the user signs the payment and it is
+ * submitted inside a fee-bump (services/sponsorship.ts). User wallets created after
+ * reserve sponsorship hold 0 XLM and could not pay it themselves.
+ *
  * Amount handling:
  *   - All amounts are STRING "25.0000000" — never JS numbers
  *   - Stellar SDK accepts and returns string amounts
@@ -16,13 +20,13 @@
 
 import {
   Keypair,
-  Horizon,
   TransactionBuilder,
   Operation,
   BASE_FEE,
   Memo,
 } from '@stellar/stellar-sdk'
-import { HORIZON_URL, NETWORK_PASSPHRASE, USDC_ASSET } from './stellar.js'
+import { NETWORK_PASSPHRASE, USDC_ASSET, server } from './stellar.js'
+import { submitClassic } from './sponsorship.js'
 import { StellarError } from '../lib/errors.js'
 import { logger } from '../lib/logger.js'
 
@@ -41,7 +45,7 @@ export interface SubmitPaymentResult {
 }
 
 /**
- * Build, sign, and submit a single-operation Stellar USDC payment.
+ * Build, sign, and submit a single-operation Stellar USDC payment, fee paid by the ops wallet.
  *
  * Retries ONCE on failure before marking FAILED (per CLAUDE.md rule).
  * Any remaining error is wrapped in StellarError and re-thrown.
@@ -51,8 +55,6 @@ export async function submitPayment(
 ): Promise<SubmitPaymentResult> {
   const attempt = async (): Promise<SubmitPaymentResult> => {
     const keypair = Keypair.fromSecret(params.senderSecretKey)
-    const server = new Horizon.Server(HORIZON_URL)
-
     const account = await server.loadAccount(keypair.publicKey())
 
     const builder = new TransactionBuilder(account, {
@@ -76,7 +78,9 @@ export async function submitPayment(
     const tx = builder.build()
     tx.sign(keypair)
 
-    const result = await server.submitTransaction(tx)
+    // Ops wallet pays the fee via fee-bump; `result.hash` is the fee-bump hash, which
+    // explorers resolve to the enclosed payment.
+    const result = await submitClassic(tx)
 
     return {
       hash: result.hash,

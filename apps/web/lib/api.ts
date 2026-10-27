@@ -128,6 +128,7 @@ export interface ExportKeyResult {
   public_key: string
   network: string
   warning: string
+  fees_note?: string
 }
 
 export const wallet = {

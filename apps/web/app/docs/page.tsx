@@ -396,7 +396,7 @@ function QuickstartSection() {
     {
       num: '01',
       title: 'Create an account',
-      desc: 'Sign up at argens.xyz. You\'ll receive a verification email. Argens automatically creates and funds a Stellar wallet with USDC trustline on signup — 2 XLM absorbed on your behalf, nothing to configure.',
+      desc: 'Sign up at argens.xyz. You\'ll receive a verification email. Argens automatically creates a Stellar wallet with a USDC trustline on signup and sponsors its XLM reserves — you never need to hold XLM, nothing to configure.',
       code: `# After email verification, your wallet is live
 GET /v1/wallet/balance
 → { "balance": "0.0000000", "wallet_address": "GXXX...", "currency": "USDC" }`,
@@ -409,7 +409,7 @@ GET /v1/wallet/balance
 GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 # Minimum deposit: there is no minimum.
-# Argens absorbs XLM fees for all outgoing transactions.`,
+# Argens pays the network fee on every outgoing transaction — no XLM needed.`,
     },
     {
       num: '03',

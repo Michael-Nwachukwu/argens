@@ -15,6 +15,7 @@ import { createPublicClient, formatEther, http } from 'viem'
 import { base, baseSepolia } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 import { USDC_ASSET, server } from './stellar.js'
+import { spendableXlm } from './sponsorship.js'
 import { logger } from '../lib/logger.js'
 import type { AppError } from '../lib/errors.js'
 
@@ -26,6 +27,9 @@ export interface StellarWalletStatus {
   public_key: string | null
   usdc: string | null
   xlm: string | null
+  /** XLM above the account's minimum balance. For the ops wallet, sponsored user reserves
+   *  inflate `xlm` but can never be spent — this is the number that runs out. */
+  xlm_spendable: string | null
   configured: boolean
   error?: string | null
 }
@@ -51,7 +55,7 @@ async function readStellarWallet(
   publicKey: string | undefined,
 ): Promise<StellarWalletStatus> {
   if (!publicKey) {
-    return { label, envKey, public_key: null, usdc: null, xlm: null, configured: false }
+    return { label, envKey, public_key: null, usdc: null, xlm: null, xlm_spendable: null, configured: false }
   }
   try {
     const account = await server.loadAccount(publicKey)
@@ -69,6 +73,7 @@ async function readStellarWallet(
       public_key: publicKey,
       usdc: usdc?.balance ?? '0.0000000',
       xlm: native?.balance ?? '0.0000000',
+      xlm_spendable: spendableXlm(account),
       configured: true,
       error: null,
     }
@@ -81,6 +86,7 @@ async function readStellarWallet(
         public_key: publicKey,
         usdc: null,
         xlm: null,
+        xlm_spendable: null,
         configured: true,
         error: 'Account not found on the active Stellar network.',
       }
@@ -94,6 +100,7 @@ async function readStellarWallet(
       public_key: publicKey,
       usdc: null,
       xlm: null,
+      xlm_spendable: null,
       configured: true,
       error: msg,
     }

@@ -44,7 +44,7 @@ const t = {
 
 interface BalancesReport {
   network: 'mainnet' | 'testnet'
-  stellar: Array<{ label: string; envKey: string; public_key: string | null; usdc: string | null; xlm: string | null; configured: boolean; error?: string | null }>
+  stellar: Array<{ label: string; envKey: string; public_key: string | null; usdc: string | null; xlm: string | null; xlm_spendable?: string | null; configured: boolean; error?: string | null }>
   base_relayer: { label: string; configured: boolean; address: string | null; eth: string | null; chain: string; error?: string | null }
 }
 
@@ -336,6 +336,12 @@ function WalletCard({ w }: { w: BalancesReport['stellar'][number] }) {
           <div style={{ fontSize: 12, color: t.muted, fontFamily: 'JetBrains Mono, monospace' }}>
             XLM: <span style={{ color: t.text2 }}>{w.xlm ? xlmNum.toFixed(4) : '—'}</span>
           </div>
+          {/* Sponsored user reserves sit inside `xlm` but can never be spent — this is what runs out. */}
+          {w.xlm_spendable != null && w.xlm_spendable !== w.xlm && (
+            <div style={{ fontSize: 12, color: t.muted, fontFamily: 'JetBrains Mono, monospace' }}>
+              Spendable: <span style={{ color: t.text2 }}>{parseFloat(w.xlm_spendable).toFixed(4)}</span>
+            </div>
+          )}
           {w.public_key && (
             <div style={{ fontSize: 10, color: t.faint, fontFamily: 'JetBrains Mono, monospace', marginTop: 8, wordBreak: 'break-all', lineHeight: 1.5 }}>
               {w.public_key.slice(0, 8)}…{w.public_key.slice(-6)}

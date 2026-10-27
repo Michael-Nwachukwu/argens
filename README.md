@@ -125,9 +125,10 @@ pnpm dev:web             # → http://localhost:3000
 Set `EMAIL_PROVIDER=ethereal` for local work — it spins up a throwaway inbox and logs a preview URL
 to the console instead of sending real mail.
 
-For local Stellar work, set `STELLAR_NETWORK=testnet`. Wallet bootstrap then uses
-[friendbot](https://friendbot.stellar.org) instead of the ops wallet, so you need no funded
-mainnet account.
+For local Stellar work, set `STELLAR_NETWORK=testnet` and give `ARGENS_OPS_WALLET_SECRET` a
+[friendbot](https://friendbot.stellar.org)-funded testnet key, so local runs exercise the same
+sponsored-reserve and fee-bump path as production. Leave it empty and wallets fall back to
+friendbot funding and pay their own fees — that path never exercises the sponsorship code.
 
 ### Common commands
 
@@ -162,7 +163,7 @@ All are read by the API from `apps/api/.env`.
 
 | Variable | Holds | Purpose |
 | --- | --- | --- |
-| `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | XLM | Funds 1.5 XLM of reserves per new user wallet. **Empty ops wallet = new signups silently break** |
+| `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | XLM | Sponsors every user wallet's reserves and pays every user transaction fee. **Empty ops wallet = signups and all user payments stop** |
 | `ARGENS_FEE_WALLET` | USDC | Receives marketplace markup and CCTP fees. Needs a USDC trustline |
 | `ARGENS_CREDIT_POOL_SECRET` / `_PUBLIC` | USDC | Funds marketplace calls made against granted credits |
 | `ARGENS_BASE_RELAYER_SECRET` | ETH | Relays CCTP mints on Base |
@@ -318,8 +319,13 @@ owns that call, and duplicating it double-counts spend.
 
 - **Never floating point.** Strings for Stellar, `Decimal` for the DB. `amount * 0.005` is a bug.
 - Stellar addresses are 56 chars starting `G`; secrets are 56 chars starting `S`.
-- A wallet needs a USDC trustline before it can receive USDC. Bootstrap: ops wallet sends 1.5 XLM
-  (1 base reserve + 0.5 trustline reserve), then the user's key signs a `changeTrust`.
+- A wallet needs a USDC trustline before it can receive USDC. Bootstrap is **one atomic
+  transaction**: the ops wallet sponsors the account and trustline reserves (CAP-33), so user
+  wallets hold **0 XLM** and the 1.5 XLM stays locked in the ops wallet.
+- **User wallets cannot pay their own fees.** Every user-signed transaction must be submitted
+  through `withFeeSponsor` / `submitClassic` (`services/sponsorship.ts`), which wraps it in an
+  ops-paid fee-bump. A path that submits directly works for pre-sponsorship wallets and fails
+  only for new ones.
 - Submission ≠ confirmation. Verify on Horizon. Retry once, then mark `FAILED`.
 - Memos max 28 bytes.
 - Mainnet USDC issuer: `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`
@@ -385,7 +391,7 @@ rotated to a fresh mainnet key, alerting enabled — is in `CLAUDE.md` § Build 
 
 | Wallet | Runs out ⇒ |
 | --- | --- |
-| Ops (XLM) | New signups break — no account reserve to fund |
+| Ops (XLM, **spendable**) | New signups **and every user payment** break — it sponsors reserves and pays all user fees. Watch `xlm_spendable`, not the raw balance |
 | Fee (USDC) | Revenue collection fails |
 | Credit pool (USDC) | Credit-funded marketplace calls fail |
 | Base relayer (ETH) | CCTP mints stop relaying |

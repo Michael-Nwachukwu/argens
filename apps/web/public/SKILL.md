@@ -1,4 +1,4 @@
-# Argens Skill — v8 — updated 2026-08-13
+# Argens Skill — v8 — updated 2026-10-26
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -213,14 +213,14 @@ Poll until `data.status` is `SUCCESS` and `data.destination_tx_hash` is set — 
   "data": {
     "balance": "492.5000000",
     "currency": "USDC",
-    "xlm_balance": "2.5000000",
+    "xlm_balance": "0.0000000",
     "wallet_address": "GXXX...",
     "cached_at": "2026-05-25T11:55:00Z"
   }
 }
 ```
 
-Balance is cached for 30 seconds. `xlm_balance` is for reserve monitoring only.
+Balance is cached for 30 seconds. `xlm_balance` is informational only and is normally `"0.0000000"`: Argens sponsors the wallet's XLM reserves and pays the network fee on every transaction. A zero XLM balance is **not** a problem — never ask the user to deposit XLM, and never block a payment on it.
 
 ---
 

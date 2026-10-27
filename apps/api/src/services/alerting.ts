@@ -8,13 +8,16 @@
  * one alert email per wallet per 24h — avoids spam while remaining actionable.
  *
  * Wallets monitored:
- *   - Ops wallet (ARGENS_OPS_WALLET_PUBLIC)     — XLM balance
+ *   - Ops wallet (ARGENS_OPS_WALLET_PUBLIC)     — SPENDABLE XLM (balance minus its minimum
+ *     balance). Its raw balance includes the reserves it has sponsored for every user wallet,
+ *     which it can never spend, so judging it on total balance would never fire.
  *   - Credit pool (ARGENS_CREDIT_POOL_PUBLIC)   — USDC balance
  *   - Fee wallet (ARGENS_FEE_WALLET)            — USDC balance
  *   - Base relayer (ARGENS_BASE_RELAYER_SECRET) — ETH on Base
  *
  * Thresholds (configurable via env, sensible defaults):
- *   - XLM_ALERT_THRESHOLD_OPS      default "50"    (50 XLM  ≈ 33 new signups at 1.5 XLM each)
+ *   - XLM_ALERT_THRESHOLD_OPS      default "50"    (spendable; ≈ 33 sponsored signups at 1.5 XLM
+ *                                                  locked each, plus every user tx fee)
  *   - USDC_ALERT_THRESHOLD_POOL    default "10"    (10 USDC)
  *   - USDC_ALERT_THRESHOLD_FEE     default "0"     (alert only when empty / no trustline)
  *   - ETH_ALERT_THRESHOLD_RELAYER  default "0.001" (see comment on the constant)
@@ -26,7 +29,8 @@
  */
 
 import { Decimal } from '@prisma/client/runtime/library'
-import { getXlmBalance, getUsdcBalance } from './stellar.js'
+import { getUsdcBalance } from './stellar.js'
+import { getSpendableXlm } from './sponsorship.js'
 import { readBaseRelayer } from './admin-balances.js'
 import { sendOpsAlertEmail } from './email.js'
 import { logger } from '../lib/logger.js'
@@ -73,23 +77,23 @@ async function checkBalances(): Promise<void> {
   const opsPublic = process.env['ARGENS_OPS_WALLET_PUBLIC']
   if (opsPublic) {
     try {
-      const xlm = await getXlmBalance(opsPublic)
+      const xlm = await getSpendableXlm(opsPublic)
       if (xlm !== null) {
         const bal = new Decimal(xlm)
         const thr = new Decimal(XLM_THRESHOLD_OPS)
         if (bal.lessThan(thr) && shouldAlert('ARGENS_OPS_WALLET_PUBLIC')) {
           alerts.push({
-            wallet: 'Ops wallet',
+            wallet: 'Ops wallet (spendable)',
             asset: 'XLM',
             balance: bal.toFixed(7),
             threshold: thr.toFixed(7),
-            note: 'Funds new user accounts. Running low will break signups.',
+            note: 'Sponsors reserves for new user wallets and pays the network fee on every user transaction. Running low stops signups AND all user payments.',
           })
           markAlerted('ARGENS_OPS_WALLET_PUBLIC')
         }
       }
     } catch (e) {
-      logger.warn('alerting: failed to read ops wallet XLM balance', { error: (e as Error).message })
+      logger.warn('alerting: failed to read ops wallet spendable XLM', { error: (e as Error).message })
     }
   }
 

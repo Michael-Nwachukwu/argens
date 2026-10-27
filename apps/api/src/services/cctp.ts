@@ -19,6 +19,7 @@ import {
   contract as contractSdk,
   rpc as sorobanRpc,
   nativeToScVal,
+  type Transaction,
 } from '@stellar/stellar-sdk'
 import { createWalletClient, http } from 'viem'
 import { base, baseSepolia } from 'viem/chains'
@@ -27,6 +28,7 @@ import { Decimal } from '@prisma/client/runtime/library'
 import { logger } from '../lib/logger.js'
 import { AppError } from '../lib/errors.js'
 import { getUsdcBalance } from './stellar.js'
+import { withFeeSponsor } from './sponsorship.js'
 
 // ─── Network config ────────────────────────────────────────────────────────────
 
@@ -208,6 +210,57 @@ function makeNodeSigner(keypair: Keypair, networkPassphrase: string) {
   }
 }
 
+/**
+ * Submit a signed, user-sourced Soroban transaction inside an ops-paid fee-bump and wait
+ * for it to land. User wallets hold no XLM, so they cannot pay Soroban fees themselves;
+ * the fee-bump carries the inner resource fee (see services/sponsorship.ts).
+ *
+ * Polls until SUCCESS / FAILED or until the transaction's validity window has closed —
+ * after `maxTime` it can no longer be included, so a timeout here means it did not land.
+ * Transient RPC errors while polling are tolerated: once submitted, giving up early would
+ * misreport a transaction that may still succeed (fatal for a burn).
+ */
+async function sendSponsoredSoroban(
+  rpcServer: sorobanRpc.Server,
+  signedInnerTx: Transaction,
+  label: string,
+): Promise<string> {
+  const sent = await rpcServer.sendTransaction(withFeeSponsor(signedInnerTx))
+  if (sent.status !== 'PENDING' && sent.status !== 'DUPLICATE') {
+    throw new CctpError(`${label} submission failed`, {
+      status: sent.status,
+      errorResult: String(sent.errorResult),
+    })
+  }
+
+  logger.info(`${label} submitted`, { hash: sent.hash })
+
+  const maxTime = Number(signedInnerTx.timeBounds?.maxTime ?? 0)
+  const deadline = maxTime > 0 ? (maxTime + 15) * 1000 : Date.now() + 60_000
+  while (Date.now() < deadline) {
+    await sleep(2000)
+    let result: sorobanRpc.Api.GetTransactionResponse
+    try {
+      result = await rpcServer.getTransaction(sent.hash)
+    } catch (pollErr) {
+      logger.warn(`${label} status poll failed — retrying`, {
+        hash: sent.hash,
+        error: pollErr instanceof Error ? pollErr.message : String(pollErr),
+      })
+      continue
+    }
+    if (result.status === sorobanRpc.Api.GetTransactionStatus.SUCCESS) return sent.hash
+    if (result.status === sorobanRpc.Api.GetTransactionStatus.FAILED) {
+      throw new CctpError(`${label} tx failed on-chain`, {
+        hash: sent.hash,
+        resultXdr: String(result.resultXdr),
+      })
+    }
+  }
+
+  throw new CctpError(`${label} tx timed out waiting for confirmation`, { hash: sent.hash })
+}
+
 // ─── Step 0 — Approve TokenMessengerMinter allowance ─────────────────────────
 
 /**
@@ -279,32 +332,8 @@ async function submitApproveOnce(
   const assembled = sorobanRpc.assembleTransaction(tx, simResult).build()
   assembled.sign(keypair)
 
-  const sent = await rpcServer.sendTransaction(assembled)
-  if (sent.status === 'ERROR') {
-    throw new CctpError(`USDC approve submission failed`, { errorResult: String(sent.errorResult) })
-  }
-
-  logger.info('USDC approve submitted', { hash: sent.hash, amount: amountI128, expirationLedger })
-
-  // Poll until confirmed (max ~60s, matching the tx validity window). Soroban
-  // RPC can lag Horizon by several ledgers.
-  for (let i = 0; i < 30; i++) {
-    await sleep(2000)
-    const result = await rpcServer.getTransaction(sent.hash)
-    if (result.status === sorobanRpc.Api.GetTransactionStatus.SUCCESS) {
-      logger.info('USDC allowance approved', { hash: sent.hash, amount: amountI128, expirationLedger })
-      return
-    }
-    if (result.status === sorobanRpc.Api.GetTransactionStatus.FAILED) {
-      throw new CctpError(`USDC approve tx failed on-chain`, {
-        hash: sent.hash,
-        resultXdr: String(result.resultXdr),
-      })
-    }
-    logger.debug('Waiting for USDC approve confirmation', { hash: sent.hash, status: result.status, attempt: i + 1 })
-  }
-
-  throw new CctpError('USDC approve tx timed out waiting for confirmation', { hash: sent.hash })
+  const approveHash = await sendSponsoredSoroban(rpcServer, assembled, 'USDC approve')
+  logger.info('USDC allowance approved', { hash: approveHash, amount: amountI128, expirationLedger })
 }
 
 // ─── Step 1 — Burn USDC on Stellar via Soroban ────────────────────────────────
@@ -381,25 +410,24 @@ export async function burnUsdcOnStellar(
     )
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let sent: any
+  // Sign the simulated transaction, then submit it inside an ops-paid fee-bump rather than
+  // via signAndSend(), which would make the 0-XLM user wallet pay the fee itself.
+  let signedBurn: Transaction
   try {
-    sent = await tx.signAndSend()
-  } catch (sendErr) {
+    await tx.sign()
+    signedBurn = tx.signed
+  } catch (signErr) {
     throw new CctpError(
-      `signAndSend failed: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}`,
-      { raw: String(sendErr) },
+      `deposit_for_burn signing failed: ${signErr instanceof Error ? signErr.message : String(signErr)}`,
+      { raw: String(signErr) },
     )
   }
 
-  const hash: string | undefined =
-    sent?.sendTransactionResponse?.hash ?? sent?.getTransactionResponse?.hash
-
-  if (!hash) {
-    throw new CctpError('CCTP burn completed but no transaction hash returned', {
-      sent: JSON.stringify(sent).slice(0, 500),
-    })
-  }
+  const hash = await sendSponsoredSoroban(
+    new sorobanRpc.Server(SOROBAN_RPC_URL),
+    signedBurn,
+    'CCTP burn',
+  )
 
   logger.info('CCTP burn on Stellar complete', { hash, amount: amountStr, destinationDomain })
   return { stellarTxHash: hash }

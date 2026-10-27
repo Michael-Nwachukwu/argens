@@ -26,6 +26,7 @@ This file is the **single source of truth** for the Claude Code agent building A
 - **Balance alerting: IMPLEMENTED.** `services/alerting.ts` is started from `index.ts` and warns on all four platform wallets — ops (XLM, default floor 50), credit pool (USDC, default floor 10), fee (USDC, default floor 0), Base relayer (ETH, default floor 0.001) — to `ADMIN_ALERT_EMAIL`.
 - **Configuration:** `.env.example` is the authoritative env list; `apps/api/prisma/schema.prisma` is the authoritative schema. Neither is reproduced in this file — both copies had drifted.
 - **What is NOT done yet:** approval-token CCTP live verification, demo Loom, wallet-funded SSE end-to-end, low-balance email end-to-end. (16 marketplace providers fail at the MPP payment layer — flagged for global pause + MPP Router escalation.)
+- **Sponsored reserves + fee-bumps: IMPLEMENTED (2026-10-26).** New user wallets hold **0 XLM**. The ops wallet sponsors each wallet's account + USDC trustline reserves (CAP-33, one atomic activation tx) and pays the network fee on every user-signed transaction via fee-bump (CAP-15). All of it lives in `services/sponsorship.ts`; verified end-to-end on testnet including the CCTP approve + burn. Wallets created before this keep their 2.0 XLM but no longer spend it.
 - **Known upstream issue (2026-08-12):** MPP Router's merchant-payout leg can fail with `502 Merchant payment failed` when its Tempo RPC (`rpc.tempo.xyz`) rate-limits their server IP. The Stellar credential is signed but never settled, so `receipt` is null and **no USDC is charged**. Not an Argens fault and not a provider outage — diagnose from `metadata.mpp_router.upstream_body` before pausing anything.
 
 ---
@@ -343,7 +344,7 @@ A compressed mental model of how wallets and policies actually work in Argens V1
 | Role | Env var | Generated | Holds | Used for |
 |---|---|---|---|---|
 | User wallet | — | By API server on signup | USDC | Signs outgoing payments (agent-driven and dashboard transfers) |
-| Ops wallet | `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | Manually, once per env | XLM | Funds the 1.5 XLM account + trustline reserve for each new user wallet |
+| Ops wallet | `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | Manually, once per env | XLM | **Sponsors** the 1.5 XLM account + trustline reserve of each user wallet (locked in ops, never transferred) and **pays the fee** on every user-signed transaction via fee-bump |
 | Fee wallet | `ARGENS_FEE_WALLET` | Manually, once per env | USDC | Receives the 20% marketplace markup and the CCTP fee. Needs a USDC trustline |
 | Credit pool | `ARGENS_CREDIT_POOL_SECRET` / `_PUBLIC` | Manually, once per env | USDC | Funds marketplace calls made against admin-granted credits |
 | Base relayer | `ARGENS_BASE_RELAYER_SECRET` | Manually, once per env | ETH on Base | Pays gas to relay CCTP mints on Base |
@@ -366,7 +367,7 @@ Policies go through three separate concerns. Do not conflate them.
 
 **3. Execution — always the backend.**
 
-   The Node backend builds and signs the Stellar payment. Direct payments are a **single-operation** transaction (one payment op to the recipient, no fee op — see [Payment Submission](#payment-submission-fee-free-single-operation)). Marketplace markup and CCTP fees are separate transfers, not extra operations on the user's payment.
+   The Node backend builds and signs the Stellar payment, then submits it inside a fee-bump paid by the ops wallet — user wallets hold no XLM (see [Wallet Bootstrap Flow](#wallet-bootstrap-flow)). Direct payments are a **single-operation** transaction (one payment op to the recipient, no fee op — see [Payment Submission](#payment-submission-fee-free-single-operation)). Marketplace markup and CCTP fees are separate transfers, not extra operations on the user's payment.
 
    Implication: V1's trust model is "Argens enforces policy in its own backend before signing." A compromised backend could bypass the check. That is honest, and it is why the custody model is **agent-custodial**, not trustless. V2's goal is contract-held funds and contract-executed payments — at that point the check and the execution merge into a single atomic contract call.
 
@@ -430,7 +431,8 @@ argens/
 │           │   └── admin.ts          # ops console API (x-admin-secret)
 │           ├── services/
 │           │   ├── stellar.ts        # Stellar SDK wrapper, network resolution
-│           │   ├── payment.ts        # build + sign + submit, retry once
+│           │   ├── payment.ts        # build + sign + submit (fee-bumped), retry once
+│           │   ├── sponsorship.ts    # reserve sponsorship, fee-bumps, account activation, spendable XLM
 │           │   ├── policy.ts         # THE policy engine (checkPolicyAndReserve)
 │           │   ├── wallet.ts         # keypair generation, bootstrap, trustline
 │           │   ├── apikey.ts         # key generation + verification
@@ -444,7 +446,7 @@ argens/
 │           │   ├── email.ts          # Resend / ethereal templates
 │           │   ├── email-validation.ts       # disposable-domain + MX checks
 │           │   ├── watcher.ts        # Horizon payments SSE + 60s poll fallback
-│           │   ├── alerting.ts       # low-balance alerts for ops + credit pool
+│           │   ├── alerting.ts       # low-balance alerts for all four platform wallets (ops on spendable XLM)
 │           │   └── admin-balances.ts # all four platform wallet balances
 │           ├── middleware/
 │           │   ├── auth.ts           # requireJwt / requireApiKey / requireJwtOrApiKey
@@ -938,22 +940,9 @@ export function createStellarWallet() {
 
 ### USDC Trustline (required before wallet can receive USDC)
 
-```typescript
-async function createUsdcTrustline(secretKey: string): Promise<void> {
-  const keypair = Keypair.fromSecret(secretKey)
-  const server = new Horizon.Server(HORIZON_URL)
-  const account = await server.loadAccount(keypair.publicKey())
-  const tx = new TransactionBuilder(account, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE
-  })
-    .addOperation(Operation.changeTrust({ asset: USDC_ASSET }))
-    .setTimeout(30)
-    .build()
-  tx.sign(keypair)
-  await server.submitTransaction(tx)
-}
-```
+The trustline is opened in the same atomic transaction that creates the account, with its reserve
+sponsored by the ops wallet — see [Wallet Bootstrap Flow](#wallet-bootstrap-flow). There is no
+standalone trustline step and no `createUsdcTrustline` function.
 
 ### Payment Submission (fee-free, single operation)
 
@@ -985,7 +974,9 @@ async function submitPayment(params: {
 
   const tx = builder.build()
   tx.sign(keypair)
-  const result = await server.submitTransaction(tx)
+  // Never server.submitTransaction(tx) directly: the user wallet holds 0 XLM.
+  // submitClassic wraps it in a fee-bump paid by the ops wallet (services/sponsorship.ts).
+  const result = await submitClassic(tx)
   return { hash: result.hash, ledger: result.ledger ?? 0 }
 }
 ```
@@ -994,30 +985,44 @@ async function submitPayment(params: {
 
 ### Wallet Bootstrap Flow
 
-A new Stellar account cannot hold USDC until two conditions are met: (1) the account exists on-chain with ≥1 XLM base reserve, (2) it has a USDC trustline with 0.5 XLM reserve. Both must be funded by Argens on behalf of the user on signup.
+A new Stellar account cannot hold USDC until two conditions are met: (1) the account exists on-chain with its 1 XLM base reserve covered, (2) it has a USDC trustline with its 0.5 XLM reserve covered. Argens covers both by **sponsoring** the reserves (CAP-33) — the XLM is locked in the ops wallet as its own reserve, never transferred. User wallets therefore hold **0 XLM**, and the ops wallet also pays every user transaction fee via fee-bump (CAP-15). All of it lives in `services/sponsorship.ts`.
 
-**Bootstrap sequence (part of `POST /auth/signup`):**
+**Bootstrap sequence (`bootstrapWallet` in `services/wallet.ts`, called from `GET /auth/verify/:token`):**
 
 ```
 1. Generate keypair in memory:
      const { publicKey, secretKey } = createStellarWallet()
-2. Encrypt secretKey and persist to DB (Wallet row, status = 'initialising')
-3. From ARGENS_OPS_WALLET, send 1.5 XLM (createAccount op) to publicKey
-     → this creates the account on Stellar
-4. Using the user's secretKey, submit a changeTrust op for the USDC asset
-     → trustline established; wallet can now receive USDC
-5. Mark Wallet row status = 'ready'
-6. Return the public key in the signup response
+2. Encrypt secretKey and persist to DB (Wallet row, status = INITIALISING); seed the Policy row
+3. activateAccount(secretKey) — ONE atomic tx, source + fee = ops wallet:
+     beginSponsoringFutureReserves(user)            ← ops
+     createAccount(user, startingBalance "0")       ← ops
+     changeTrust(USDC)                              ← user
+     endSponsoringFutureReserves()                  ← user
+   signed by ops and user. Account and trustline appear together or not at all.
+4. Mark Wallet row status = READY
+5. Return the public key
 ```
 
-**Failure handling:**
-- If step 3 fails (ops wallet out of XLM, Horizon down), roll back: delete the Wallet row, return 503 with a clear error. Never leave a Wallet row in `initialising` state permanently. Alert ops.
-- If step 4 fails but step 3 succeeded, retry step 4 once. If still failing, mark the Wallet row `trustline_pending` and expose a dashboard action for the user to retry manually. The account is recoverable — the XLM is not lost.
+**Failure handling — the chain decides, not the error** (a timed-out submit can still land):
+- Account + trustline exist → READY.
+- Account exists, no trustline → TRUSTLINE_PENDING (only reachable for pre-sponsorship wallets, or a partial legacy bootstrap).
+- Account missing, or chain unreadable → leave the row INITIALISING and return 503. **Never delete the row**: `/auth/verify` has already marked the email verified, so a deleted row strands a user who can neither re-verify nor retry.
+- `POST /wallet/bootstrap-retry` reads the on-chain state and calls the same idempotent `activateAccount` — it creates the account if missing, or opens a sponsored trustline on an existing account (covering legacy 2.0 XLM wallets too). It refuses with `503 OPS_WALLET_LOW` when the ops wallet's **spendable** XLM is below one wallet's reserves.
+
+**Fee-bump coverage — every user-signed submission must go through the sponsor:**
+- Classic: `submitPayment` → `submitClassic` covers `/pay`, `/refund`, `/wallet/send`, approval execution, `/pay/x402`, marketplace markup, and the CCTP fee transfer.
+- Soroban: the CCTP approve and burn go through `sendSponsoredSoroban` in `services/cctp.ts`.
+- Marketplace x402 calls need nothing — the user signs only an auth entry; MPP's facilitator builds and pays.
+- A missed path still works for legacy wallets (they hold 2.0 XLM) and fails **only for new wallets**. Add any new user-signed submission through `withFeeSponsor`, never `server.submitTransaction` / `rpc.sendTransaction` directly.
 - All four platform wallets (`ARGENS_OPS_WALLET_SECRET` for XLM, `ARGENS_FEE_WALLET` for USDC revenue, `ARGENS_CREDIT_POOL_SECRET` for credit-funded calls, `ARGENS_BASE_RELAYER_SECRET` for Base gas) must exist and be funded before the API is deployed. Document their public keys in the deployment runbook.
 
-**Cost per signup (mainnet):** 1.5 XLM in reserves per wallet, plus tiny tx fees (~0.00002 XLM). At current XLM prices, sub-$0.20 per user. Deliberately absorbed by Argens as a CAC cost — developers see "instant wallet ready to receive USDC" without paying anything first.
+**Cost per signup (mainnet):** 1.5 XLM **locked** in the ops wallet's reserve per user wallet (not spent — released if the account or trustline is ever removed), plus the ongoing network fee on each user transaction (~0.00002 XLM classic; more for Soroban). Previously Argens transferred 2.0 XLM per signup that the user could withdraw by exporting their key.
 
-⚠️ **On testnet**, use friendbot (`https://friendbot.stellar.org?addr=<PUBLIC_KEY>`) to fund accounts instead of the ops wallet. Keep the ops-wallet code path for mainnet parity.
+**Existing wallets** created before sponsorship keep their 2.0 XLM and are not migrated. Their transactions are fee-bumped too, so they stop spending it.
+
+**Exporting a key:** a sponsored wallet holds 0 XLM, so outside Argens it cannot send anything until its owner deposits some XLM. `POST /wallet/export-key` returns a `fees_note` saying so, and the dashboard shows it before download.
+
+⚠️ **On testnet**, `activateAccount` uses the sponsored path whenever `ARGENS_OPS_WALLET_SECRET` is set — set it, so testnet exercises the production path. Without it, wallets fall back to friendbot funding and pay their own fees, and the fee-bump code is never exercised. On mainnet the ops secret is mandatory; `withFeeSponsor` throws rather than submit unsponsored.
 
 ### Argens-Operated Wallets
 
@@ -1025,17 +1030,23 @@ Argens runs four platform-level wallets — none of them user wallets:
 
 | Wallet | Env var | Purpose | Holds | Trustline? |
 |---|---|---|---|---|
-| **Ops** | `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | Funds new user account + trustline reserves on signup | XLM | No |
+| **Ops** | `ARGENS_OPS_WALLET_SECRET` / `_PUBLIC` | Sponsors user account + trustline reserves; pays every user transaction fee (fee-bump) | XLM | No |
 | **Fee** | `ARGENS_FEE_WALLET` | Marketplace markup + CCTP fee revenue | USDC | **Yes** |
 | **Credit pool** | `ARGENS_CREDIT_POOL_SECRET` / `_PUBLIC` | Funds marketplace calls made against granted credits | USDC | **Yes** |
 | **Base relayer** | `ARGENS_BASE_RELAYER_SECRET` | Pays gas to relay CCTP mints on Base | ETH on Base | n/a |
 
-Monitor and alarm on all four. Each one fails silently: an empty ops wallet breaks new signups, an
+Monitor and alarm on all four. Each one fails silently: an empty ops wallet breaks new signups
+**and every user payment** (it pays all user fees), an
 empty credit pool breaks credit-funded marketplace calls, an empty fee wallet means markup/CCTP-fee
 transfers are failing or the trustline is missing, and an empty Base relayer leaves CCTP burns
 stranded with no mint on the destination chain. `services/alerting.ts` checks all four on a 6h
 interval (`XLM_ALERT_THRESHOLD_OPS`, `USDC_ALERT_THRESHOLD_POOL`, `USDC_ALERT_THRESHOLD_FEE`,
 `ETH_ALERT_THRESHOLD_RELAYER`); `GET /v1/admin/wallets` reports live balances on demand.
+
+**Judge the ops wallet on spendable XLM, never its raw balance.** Every sponsored user wallet raises
+the ops minimum balance by 1.5 XLM, so the raw balance keeps looking healthy while the spendable
+part runs out. Alerting and `bootstrap-retry` use `getSpendableXlm()`; `GET /admin/wallets` reports
+it as `xlm_spendable`.
 
 ### Private Key Encryption
 
@@ -1411,7 +1422,7 @@ console.log('error', e)
 - **JWT secrets** — minimum 32 chars. Always from environment. Never hardcoded.
 - **CORS** — whitelist `FRONTEND_URL` only. Never `*` in production.
 - **Approval links in email — NEVER `GET` state-change.** Email clients and link-scanners (Gmail, Outlook, antivirus, Slack previews) auto-fetch URLs to generate previews. A `GET /approve/:token` endpoint that actions the approval will be triggered accidentally by scanners. The email link must point to a dashboard landing page (`/approve/confirm?token=...`) that shows the transaction detail and requires the user to click a button that issues a `POST /approve/:token` with a CSRF-safe payload. Same for `/reject`. Tokens remain single-use and 24h-expiring regardless.
-- **Ops wallet secret** — treat like any production credential. Never commit. Rotate if exposed. Access limited to production env. Balance alerting is mandatory — if the ops wallet runs out of XLM, new signups silently break.
+- **Ops wallet secret** — treat like any production credential. Never commit. Rotate if exposed. Access limited to production env. It signs every sponsorship and every user fee-bump. Balance alerting (on spendable XLM) is mandatory — if the ops wallet runs out, new signups and all user payments stop.
 
 ---
 
@@ -1453,7 +1464,8 @@ Do not re-litigate these. They are settled.
 | Fee model | No Argens fee on direct USDC payments — single-op Stellar tx | Removes friction; developers and agents pay nothing to move money |
 | Custody model | **Agent-custodial** — Argens holds encrypted signing key; user can export | True non-custodial impossible for autonomous agents in V1 |
 | Soroban | **Dropped for V1** — TypeScript policy engine in `services/policy.ts` is permanent | Soroban complexity not justified vs. marketplace priority; TS engine covers all V1 needs |
-| Wallet bootstrap | Argens funds 1.5 XLM per new wallet (1 XLM reserve + 0.5 XLM trustline reserve) | Zero-friction onboarding; sub-$0.20 CAC |
+| Wallet bootstrap | Ops wallet **sponsors** each wallet's reserves (CAP-33) in one atomic tx; user wallets hold 0 XLM | Zero-friction onboarding; XLM stays locked in ops (recoverable) instead of gifted and withdrawable |
+| Network fees | Ops wallet pays every user-signed transaction fee via fee-bump (CAP-15) | Wallets need no XLM; fee-bumps use the user's sequence, so no ops-account contention — no relayer service needed |
 | Auth | Custom JWT + required email verification before API access | No external dep; prevents spam-signup XLM burn |
 | Rate limiting | 100 req/min per API key (V1). Per-IP limiting deferred to V2. | Simple, effective for V1 load |
 | Testnet/mainnet toggle | Single env var `STELLAR_NETWORK`. No user-facing dashboard toggle. | Reduces user confusion; deployment-time choice |
