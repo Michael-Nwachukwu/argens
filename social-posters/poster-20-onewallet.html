@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#0C0B0A; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+  #tex { position:absolute; inset:0;
+    background-image: radial-gradient(rgba(64,60,56,0.34) 1.1px, transparent 1.1px);
+    background-size: 46px 46px; }
+  #glow { position:absolute; left:50%; top:82%; transform:translate(-50%,-50%);
+    width:820px; height:480px; border-radius:50%;
+    background: radial-gradient(ellipse, rgba(197,162,83,0.20) 0%, rgba(197,162,83,0) 62%); }
+
+  #kick { position:absolute; left:88px; top:112px; font-family:"JetBrains Mono",monospace;
+    font-size:20px; letter-spacing:0.24em; text-transform:uppercase; color:#706B65;
+    display:flex; align-items:center; gap:0.66em; }
+  #kick > svg { width:0.76em; height:0.82em; flex:none; }
+  #kick > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
+  #h1 { position:absolute; left:88px; top:164px; width:900px;
+    font-size:84px; font-weight:700; letter-spacing:-0.035em; line-height:1.06; color:#EDE9E3; }
+  #h1 .g { color:#C5A253; }
+  #sub { position:absolute; left:88px; top:406px; width:830px;
+    font-size:29px; font-weight:400; line-height:1.55; color:#A79F94; }
+
+  #wm { position:absolute; left:88px; bottom:78px; display:flex; align-items:center; gap:14px; }
+  #wm .nm { font-size:34px; font-weight:700; letter-spacing:-0.03em; color:#EDE9E3; }
+  #wm .nm .dot { color:#C5A253; }
+  #art { position:absolute; inset:0; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="tex"></div>
+  <div id="glow"></div>
+
+  <svg id="art" width="1080" height="1350" viewBox="0 0 1080 1350">
+    <defs>
+      <g id="m">
+        <g transform="translate(21,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+        <g transform="translate(49,77)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+        <rect x="35" y="0" width="14" height="7" fill="#3E4346"/><rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+        <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/><rect x="7" y="21" width="7" height="14" fill="#B0623A"/>
+        <rect x="77" y="21" width="7" height="14" fill="#B0623A"/><rect x="21" y="21" width="14" height="14" fill="#3E4346"/>
+        <rect x="49" y="21" width="14" height="14" fill="#3E4346"/><rect x="28" y="21" width="7" height="7" fill="#FFFFFF"/>
+        <rect x="56" y="21" width="7" height="7" fill="#FFFFFF"/><rect x="14" y="28" width="7" height="7" fill="#E0A096"/>
+        <rect x="70" y="28" width="7" height="7" fill="#E0A096"/><rect x="35" y="36" width="14" height="6" fill="#3E4346"/>
+        <rect x="28" y="42" width="35" height="7" fill="#3E4346"/><rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+        <rect x="63" y="56" width="7" height="7" fill="#3E4346"/>
+        <g transform="translate(0,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+        <g transform="translate(84,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+      </g>
+      <radialGradient id="coinG" cx="0.36" cy="0.3" r="0.78">
+        <stop offset="0" stop-color="#FFF9E4"/><stop offset="0.55" stop-color="#F0E0AC"/>
+        <stop offset="1" stop-color="#C09A45"/>
+      </radialGradient>
+    </defs>
+
+    <!-- five agents -->
+    <g transform="translate(134,640) scale(0.84)"><use href="#m"/></g>
+    <g transform="translate(318,640) scale(0.84)"><use href="#m"/></g>
+    <g transform="translate(502,640) scale(0.84)"><use href="#m"/></g>
+    <g transform="translate(686,640) scale(0.84)"><use href="#m"/></g>
+    <g transform="translate(870,640) scale(0.84)"><use href="#m"/></g>
+
+    <g font-family="JetBrains Mono" font-size="15" letter-spacing="1.6" fill="#6A645C" text-anchor="middle">
+      <text x="172" y="762">research</text>
+      <text x="356" y="762">writer</text>
+      <text x="540" y="762">scraper</text>
+      <text x="724" y="762">support</text>
+      <text x="908" y="762">ops</text>
+    </g>
+
+    <!-- every agent draws from the same balance -->
+    <g fill="none" stroke="#8F7437" stroke-width="2.4" opacity="0.75">
+      <path d="M 172 786 C 172 890, 540 936, 540 1002"/>
+      <path d="M 356 786 C 356 890, 540 946, 540 1002"/>
+      <path d="M 540 786 L 540 1002"/>
+      <path d="M 724 786 C 724 890, 540 946, 540 1002"/>
+      <path d="M 908 786 C 908 890, 540 936, 540 1002"/>
+    </g>
+    <g>
+      <circle cx="243" cy="855" r="11" fill="url(#coinG)" stroke="#B59243" stroke-width="2.6"/>
+      <circle cx="404" cy="866" r="9"  fill="url(#coinG)" stroke="#B59243" stroke-width="2.4"/>
+      <circle cx="540" cy="874" r="10" fill="url(#coinG)" stroke="#B59243" stroke-width="2.5"/>
+      <circle cx="676" cy="866" r="9"  fill="url(#coinG)" stroke="#B59243" stroke-width="2.4"/>
+      <circle cx="837" cy="855" r="11" fill="url(#coinG)" stroke="#B59243" stroke-width="2.6"/>
+    </g>
+
+    <!-- the one balance -->
+    <rect x="322" y="1002" width="436" height="152" rx="22" fill="#131210" stroke="#3A2E15" stroke-width="3"/>
+    <g transform="translate(360,1036) scale(0.62)" fill="#C5A253">
+      <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+      <circle cx="41" cy="41.5" r="8.8"/>
+    </g>
+    <text x="424" y="1055" font-family="JetBrains Mono" font-size="18" letter-spacing="2.6" fill="#706B65">SHARED BALANCE</text>
+    <text x="424" y="1116" font-family="DM Sans" font-weight="700" font-size="52" letter-spacing="-0.03em" fill="#E8CC85">$482.60</text>
+    <text x="722" y="1116" text-anchor="end" font-family="JetBrains Mono" font-size="17" fill="#4D9B6A">usdc ✓</text>
+  </svg>
+
+  <div id="kick"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>one balance, one set of rules</span><i></i></div>
+  <div id="h1">One wallet.<br/><span class="g">Every agent you run.</span></div>
+  <div id="sub">Run five agents or fifty. They all spend from the same balance under the same limits — one place to top up, one place to see where the money went.</div>
+
+  <div id="wm">
+    <svg width="30" height="32" viewBox="0 0 52 55"><g fill="#C5A253">
+      <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+      <circle cx="41" cy="41.5" r="8.8"/>
+    </g></svg>
+    <div class="nm">argens<span class="dot">.</span></div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="53"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

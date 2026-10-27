@@ -26,7 +26,10 @@
     font-family:"DM Sans",sans-serif; font-size:84px; font-weight:700;
     letter-spacing:-0.025em; line-height:1.12; }
   #h1 .a { color:#9FBCF2; }
-  #sub { position:absolute; left:104px; top:436px; font-size:28px; color:#9FBCF2; letter-spacing:0.04em; }
+  #sub { position:absolute; left:104px; top:436px; font-size:28px; color:#9FBCF2; letter-spacing:0.04em;
+    display:flex; align-items:center; gap:0.66em; }
+  #sub > svg { width:0.76em; height:0.82em; flex:none; }
+  #sub > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
 
   #draw { position:absolute; left:50%; top:760px; transform:translate(-50%,-50%); }
 
@@ -52,7 +55,7 @@
   <div id="frame"></div>
 
   <div id="h1">We hit this wall ourselves. <span class="a">So we drew the door.</span></div>
-  <div id="sub">// built by agent builders, for agent builders</div>
+  <div id="sub"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>built by agent builders, for agent builders</span><i></i></div>
 
   <div id="draw">
     <svg width="860" height="600" viewBox="0 0 860 600" fill="none" stroke="#E9F0FC">

@@ -19,7 +19,10 @@
 
   /* ── copy ── */
   #kick { position:absolute; left:88px; top:128px; font-family:"JetBrains Mono",monospace;
-    font-size:20px; letter-spacing:0.24em; text-transform:uppercase; color:#9A7433; }
+    font-size:20px; letter-spacing:0.24em; text-transform:uppercase; color:#9A7433;
+    display:flex; align-items:center; gap:0.66em; }
+  #kick > svg { width:0.76em; height:0.82em; flex:none; }
+  #kick > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
   #h1 { position:absolute; left:88px; top:180px; width:750px;
     font-size:86px; font-weight:700; letter-spacing:-0.035em; line-height:1.06; color:#3A2E15; }
   #h1 .r { color:#B0623A; }
@@ -281,7 +284,7 @@
     </g>
   </svg>
 
-  <div id="kick">// go on, log off</div>
+  <div id="kick"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>go on, log off</span><i></i></div>
   <div id="h1">Take the<br/>weekend off.<br/><span class="r">Your agent won't.</span></div>
   <div id="sub">It keeps working and paying while you're gone — inside the limits you already set.</div>
 

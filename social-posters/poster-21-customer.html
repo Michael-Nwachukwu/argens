@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#0A0908; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+  #sky { position:absolute; inset:0;
+    background: linear-gradient(180deg, #080907 0%, #100D0A 58%, #171208 100%); }
+  #tex { position:absolute; inset:0;
+    background-image: radial-gradient(rgba(64,60,56,0.30) 1.1px, transparent 1.1px);
+    background-size: 46px 46px; }
+
+  #kick { position:absolute; left:88px; top:112px; font-family:"JetBrains Mono",monospace;
+    font-size:20px; letter-spacing:0.24em; text-transform:uppercase; color:#706B65;
+    display:flex; align-items:center; gap:0.66em; }
+  #kick > svg { width:0.76em; height:0.82em; flex:none; }
+  #kick > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
+  #h1 { position:absolute; left:88px; top:164px; width:900px;
+    font-size:84px; font-weight:700; letter-spacing:-0.035em; line-height:1.06; color:#EDE9E3; }
+  #h1 .g { color:#C5A253; }
+  #sub { position:absolute; left:88px; top:406px; width:830px;
+    font-size:29px; font-weight:400; line-height:1.55; color:#A79F94; }
+
+  #wm { position:absolute; left:88px; bottom:74px; display:flex; align-items:center; gap:14px; z-index:6; }
+  #wm .nm { font-size:34px; font-weight:700; letter-spacing:-0.03em; color:#EDE9E3; }
+  #wm .nm .dot { color:#C5A253; }
+  #art { position:absolute; inset:0; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="sky"></div>
+  <div id="tex"></div>
+
+  <svg id="art" width="1080" height="1350" viewBox="0 0 1080 1350">
+    <defs>
+      <linearGradient id="winG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFEFC4"/><stop offset="1" stop-color="#E0B45E"/>
+      </linearGradient>
+      <linearGradient id="spillG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#F4D89A" stop-opacity="0.30"/>
+        <stop offset="1" stop-color="#F4D89A" stop-opacity="0"/>
+      </linearGradient>
+      <radialGradient id="coinG" cx="0.36" cy="0.3" r="0.78">
+        <stop offset="0" stop-color="#FFF9E4"/><stop offset="0.55" stop-color="#F0E0AC"/>
+        <stop offset="1" stop-color="#C09A45"/>
+      </radialGradient>
+      <g id="shop">
+        <!-- facade -->
+        <rect x="0" y="0" width="252" height="360" rx="8" fill="#15130F" stroke="#2A2724" stroke-width="2.5"/>
+        <!-- sign board -->
+        <rect x="14" y="16" width="224" height="62" rx="8" fill="#0E0C09" stroke="#332E28" stroke-width="2"/>
+        <!-- awning -->
+        <path d="M 4 100 L 248 100 L 262 150 L -10 150 Z" fill="#8F7437"/>
+        <path d="M 4 100 L 248 100 L 262 150 L -10 150 Z" fill="none" stroke="#5C4A22" stroke-width="2.5"/>
+        <g fill="#C5A253">
+          <path d="M 4 100 L 45 100 L 39 150 L -10 150 Z"/>
+          <path d="M 86 100 L 127 100 L 133 150 L 88 150 Z"/>
+          <path d="M 168 100 L 209 100 L 227 150 L 182 150 Z"/>
+        </g>
+        <!-- window -->
+        <rect x="26" y="176" width="200" height="150" rx="6" fill="url(#winG)"/>
+        <rect x="26" y="176" width="200" height="150" rx="6" fill="none" stroke="#5C4A22" stroke-width="3"/>
+        <line x1="126" y1="176" x2="126" y2="326" stroke="#5C4A22" stroke-width="3"/>
+        <line x1="26" y1="248" x2="226" y2="248" stroke="#5C4A22" stroke-width="3"/>
+        <!-- step -->
+        <rect x="10" y="336" width="232" height="18" rx="4" fill="#241F19"/>
+      </g>
+    </defs>
+
+    <!-- warm light pooling on the street -->
+    <path d="M 112 1122 L 364 1122 L 420 1224 L 56 1224 Z" fill="url(#spillG)"/>
+    <path d="M 402 1122 L 654 1122 L 710 1224 L 346 1224 Z" fill="url(#spillG)"/>
+    <path d="M 692 1122 L 944 1122 L 1000 1224 L 636 1224 Z" fill="url(#spillG)"/>
+
+    <!-- the high street of services -->
+    <g transform="translate(112,762)"><use href="#shop"/></g>
+    <g transform="translate(402,762)"><use href="#shop"/></g>
+    <g transform="translate(692,762)"><use href="#shop"/></g>
+
+    <!-- shop signs -->
+    <g font-family="JetBrains Mono" font-weight="600" font-size="23" letter-spacing="2.5"
+       fill="#E8CC85" text-anchor="middle">
+      <text x="238" y="800">EXA</text>
+      <text x="528" y="800">CLAUDE</text>
+      <text x="818" y="800">REPLICATE</text>
+    </g>
+    <g font-family="JetBrains Mono" font-size="15" letter-spacing="1.8"
+       fill="#706B65" text-anchor="middle">
+      <text x="238" y="824">search · $0.02</text>
+      <text x="528" y="824">tokens · $0.12</text>
+      <text x="818" y="824">gpu · $0.21</text>
+    </g>
+
+    <!-- open signs in the windows -->
+    <g font-family="JetBrains Mono" font-weight="600" font-size="15" letter-spacing="2"
+       fill="#5C4A22" text-anchor="middle">
+      <text x="238" y="1002">OPEN</text>
+      <text x="818" y="1002">OPEN</text>
+    </g>
+
+    <!-- street -->
+    <line x1="0" y1="1122" x2="1080" y2="1122" stroke="#2A2724" stroke-width="3"/>
+
+    <!-- the customer -->
+    <g transform="translate(496,996) scale(1.2)">
+      <!-- legs mid-stride -->
+      <g transform="translate(15,77) rotate(-12)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect x="-7" y="21" width="21" height="7" fill="#3E4346"/></g>
+      <g transform="translate(55,77) rotate(10)"><rect width="14" height="14" fill="#3E4346"/><rect y="14" width="14" height="7" fill="#B0623A"/><rect y="21" width="21" height="7" fill="#3E4346"/></g>
+      <rect x="35" y="0" width="14" height="7" fill="#3E4346"/><rect x="14" y="7" width="63" height="7" fill="#B0623A"/>
+      <rect x="14" y="14" width="63" height="28" fill="#F2E9D8"/><rect x="7" y="21" width="7" height="14" fill="#B0623A"/>
+      <rect x="77" y="21" width="7" height="14" fill="#B0623A"/>
+      <rect x="21" y="21" width="14" height="14" fill="#3E4346"/><rect x="49" y="21" width="14" height="14" fill="#3E4346"/>
+      <rect x="28" y="21" width="7" height="7" fill="#FFFFFF"/><rect x="56" y="21" width="7" height="7" fill="#FFFFFF"/>
+      <rect x="14" y="28" width="7" height="7" fill="#E0A096"/><rect x="70" y="28" width="7" height="7" fill="#E0A096"/>
+      <rect x="35" y="36" width="14" height="6" fill="#3E4346"/>
+      <rect x="28" y="42" width="35" height="7" fill="#3E4346"/><rect x="14" y="49" width="63" height="28" fill="#B0623A"/>
+      <rect x="63" y="56" width="7" height="7" fill="#3E4346"/>
+      <g transform="translate(0,56)"><rect width="7" height="14" fill="#3E4346"/><rect y="14" width="7" height="7" fill="#B0623A"/></g>
+      <!-- right arm raised, holding out payment -->
+      <g transform="translate(86,52) rotate(-42)"><rect width="7" height="16" fill="#3E4346"/><rect y="16" width="7" height="7" fill="#B0623A"/></g>
+    </g>
+    <circle cx="640" cy="1012" r="21" fill="url(#coinG)" stroke="#B59243" stroke-width="3.4"/>
+    <text x="640" y="1020" text-anchor="middle" font-family="JetBrains Mono" font-weight="700"
+          font-size="21" fill="#8F7437">$</text>
+
+    <!-- what it just bought — floated clear of the shopfronts -->
+    <g>
+      <rect x="442" y="656" width="228" height="56" rx="28" fill="#11200F" stroke="#25401F" stroke-width="2.5"/>
+      <circle cx="478" cy="684" r="8.5" fill="#4D9B6A"/>
+      <text x="500" y="691" font-family="JetBrains Mono" font-size="19" fill="#7FD49B">paid · no seat</text>
+    </g>
+  </svg>
+
+  <div id="kick"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>the buyer is the software</span><i></i></div>
+  <div id="h1">Your agent isn't a tool.<br/><span class="g">It's a customer.</span></div>
+  <div id="sub">It finds the service, checks the price and pays for itself — per call, not per seat. No procurement, no shared company card, no waiting on you.</div>
+
+  <div id="wm">
+    <svg width="30" height="32" viewBox="0 0 52 55"><g fill="#C5A253">
+      <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+      <circle cx="41" cy="41.5" r="8.8"/>
+    </g></svg>
+    <div class="nm">argens<span class="dot">.</span></div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="67"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

@@ -22,7 +22,10 @@
 
   /* ── copy ── */
   #kick { position:absolute; left:92px; top:150px; font-family:"JetBrains Mono",monospace;
-    font-size:19px; letter-spacing:0.26em; text-transform:uppercase; color:#8F7437; }
+    font-size:19px; letter-spacing:0.26em; text-transform:uppercase; color:#8F7437;
+    display:flex; align-items:center; gap:0.66em; }
+  #kick > svg { width:0.76em; height:0.82em; flex:none; }
+  #kick > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
   #h1 { position:absolute; left:92px; top:206px; width:700px;
     font-size:98px; font-weight:700; letter-spacing:-0.035em; line-height:1.03; color:#EDE9E3; }
   #h1 .g { color:#C5A253; }
@@ -244,7 +247,7 @@
     <path d="M 0 884 C 340 862, 700 894, 1600 872 L 1600 900 L 0 900 Z" fill="#0A0806" opacity="0.85"/>
   </svg>
 
-  <div id="kick">// autonomy, on a line you hold</div>
+  <div id="kick"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>autonomy, on a line you hold</span><i></i></div>
   <div id="h1">Let it fly.<br/><span class="g">Keep the line.</span></div>
   <div id="sub">Your agent pays for what it needs, on its own — inside the limits you set. Never a blank cheque.</div>
   <div id="rule"></div>

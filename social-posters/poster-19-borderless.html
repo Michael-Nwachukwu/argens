@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1350px; overflow:hidden; background:#07080C; }
+  body { font-family:"DM Sans",sans-serif; position:relative; }
+  #sky { position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 720px 620px at 50% 68%, rgba(197,162,83,0.16) 0%, rgba(197,162,83,0) 62%),
+      linear-gradient(180deg, #07080C 0%, #0B0C11 55%, #100E0C 100%); }
+  .star { position:absolute; border-radius:50%; background:#EDE9E3; }
+
+  #kick { position:absolute; left:88px; top:112px; font-family:"JetBrains Mono",monospace;
+    font-size:20px; letter-spacing:0.24em; text-transform:uppercase; color:#706B65;
+    display:flex; align-items:center; gap:0.66em; }
+  #kick > svg { width:0.76em; height:0.82em; flex:none; }
+  #kick > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
+  #h1 { position:absolute; left:88px; top:164px; width:900px;
+    font-size:84px; font-weight:700; letter-spacing:-0.035em; line-height:1.06; color:#EDE9E3; }
+  #h1 .g { color:#C5A253; }
+  #sub { position:absolute; left:88px; top:406px; width:820px;
+    font-size:29px; font-weight:400; line-height:1.55; color:#A79F94; }
+
+  #wm { position:absolute; left:88px; bottom:78px; display:flex; align-items:center; gap:14px; }
+  #wm .nm { font-size:34px; font-weight:700; letter-spacing:-0.03em; color:#EDE9E3; }
+  #wm .nm .dot { color:#C5A253; }
+  #art { position:absolute; inset:0; }
+  #grain { position:absolute; inset:0; z-index:9; pointer-events:none; }
+</style>
+</head>
+<body>
+  <div id="sky"></div>
+  <div class="star" style="left:158px; top:640px; width:4px; height:4px; opacity:0.6"></div>
+  <div class="star" style="left:906px; top:606px; width:3px; height:3px; opacity:0.45"></div>
+  <div class="star" style="left:842px; top:1136px; width:4px; height:4px; opacity:0.5"></div>
+  <div class="star" style="left:206px; top:1168px; width:3px; height:3px; opacity:0.4"></div>
+  <div class="star" style="left:978px; top:846px; width:3px; height:3px; opacity:0.5"></div>
+
+  <svg id="art" width="1080" height="1350" viewBox="0 0 1080 1350">
+    <defs>
+      <radialGradient id="core" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#F4E1AE" stop-opacity="0.55"/>
+        <stop offset="1" stop-color="#F4E1AE" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+
+    <!-- ══ wireframe globe ══ -->
+    <g fill="none" stroke="#8F7437" stroke-width="1.8" opacity="0.5">
+      <!-- longitudes -->
+      <ellipse cx="540" cy="900" rx="160" ry="240"/>
+      <ellipse cx="540" cy="900" rx="80"  ry="240"/>
+      <line x1="540" y1="660" x2="540" y2="1140"/>
+      <!-- latitudes -->
+      <ellipse cx="540" cy="900"  rx="240"   ry="67"/>
+      <ellipse cx="540" cy="780"  rx="207.8" ry="58"/>
+      <ellipse cx="540" cy="1020" rx="207.8" ry="58"/>
+      <ellipse cx="540" cy="692"  rx="120"   ry="34"/>
+      <ellipse cx="540" cy="1108" rx="120"   ry="34"/>
+    </g>
+    <circle cx="540" cy="900" r="240" fill="none" stroke="#C5A253" stroke-width="2.6" opacity="0.9"/>
+
+    <!-- one balance at the core -->
+    <circle cx="540" cy="900" r="96" fill="url(#core)"/>
+    <circle cx="540" cy="900" r="34" fill="#181307" stroke="#C5A253" stroke-width="3"/>
+    <g transform="translate(526,882) scale(0.54)" fill="#E8CC85">
+      <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+      <circle cx="41" cy="41.5" r="8.8"/>
+    </g>
+
+    <!-- payment arcs from the one balance out to each destination -->
+    <g fill="none" stroke="#C5A253" stroke-width="2.4" opacity="0.85" stroke-linecap="round">
+      <path d="M 512 878 Q 456 848 438 848"/>
+      <path d="M 566 880 Q 584 838 596 812"/>
+      <path d="M 560 928 Q 570 950 566 962"/>
+      <path d="M 516 924 Q 486 984 470 1012"/>
+    </g>
+
+    <!-- leader lines run under the nodes so the dots stay solid -->
+    <g stroke="#4A443C" stroke-width="1.8" stroke-dasharray="6 7">
+      <line x1="438" y1="848"  x2="286" y2="768"/>
+      <line x1="596" y1="812"  x2="790" y2="722"/>
+      <line x1="566" y1="962"  x2="806" y2="990"/>
+      <line x1="470" y1="1012" x2="284" y2="1082"/>
+    </g>
+
+    <!-- destination nodes -->
+    <g>
+      <circle cx="438" cy="848"  r="9" fill="#F0E0AC" stroke="#B59243" stroke-width="3"/>
+      <circle cx="596" cy="812"  r="9" fill="#F0E0AC" stroke="#B59243" stroke-width="3"/>
+      <circle cx="566" cy="962"  r="9" fill="#F0E0AC" stroke="#B59243" stroke-width="3"/>
+      <circle cx="470" cy="1012" r="9" fill="#F0E0AC" stroke="#B59243" stroke-width="3"/>
+    </g>
+    <g font-family="JetBrains Mono" font-size="19" letter-spacing="2" fill="#B0A99F">
+      <text x="96"  y="762">san francisco</text>
+      <text x="802" y="716">berlin</text>
+      <text x="818" y="996">lagos</text>
+      <text x="96"  y="1090">são paulo</text>
+    </g>
+    <g font-family="JetBrains Mono" font-size="15" letter-spacing="1.6" fill="#6A645C">
+      <text x="96"  y="788">$0.12 · gpu time</text>
+      <text x="802" y="742">$0.04 · dataset</text>
+      <text x="818" y="1022">$0.02 · scrape</text>
+      <text x="96"  y="1116">$0.09 · inference</text>
+    </g>
+  </svg>
+
+  <div id="kick"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>one balance, every border</span><i></i></div>
+  <div id="h1">No borders.<br/><span class="g">No banking hours.</span></div>
+  <div id="sub">USDC on Stellar doesn't know where your agent is spending. No correspondent banks, no cut-off times, no FX desk to open in the morning.</div>
+
+  <div id="wm">
+    <svg width="30" height="32" viewBox="0 0 52 55"><g fill="#C5A253">
+      <rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/>
+      <circle cx="41" cy="41.5" r="8.8"/>
+    </g></svg>
+    <div class="nm">argens<span class="dot">.</span></div>
+  </div>
+
+  <svg id="grain" width="1080" height="1350">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="41"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1080" height="1350" filter="url(#n)" opacity="0.05"/>
+  </svg>
+</body>
+</html>

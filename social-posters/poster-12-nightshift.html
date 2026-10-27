@@ -17,7 +17,10 @@
   .cloud { position:absolute; background:rgba(26,38,68,0.9); border-radius:999px; }
 
   #kick { position:absolute; left:84px; top:120px; font-family:"JetBrains Mono",monospace;
-    font-size:22px; letter-spacing:0.2em; text-transform:uppercase; color:#6E7FA8; }
+    font-size:22px; letter-spacing:0.2em; text-transform:uppercase; color:#6E7FA8;
+    display:flex; align-items:center; gap:0.66em; }
+  #kick > svg { width:0.76em; height:0.82em; flex:none; }
+  #kick > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
   #h1 { position:absolute; left:84px; top:172px; width:880px;
     font-size:86px; font-weight:700; letter-spacing:-0.028em; line-height:1.1; color:#EFE7F2; }
   #h1 .p { color:#E3A5C0; }
@@ -71,7 +74,7 @@
   <div class="cloud" style="left:-40px; top:300px; width:220px; height:52px;"></div>
   <div class="cloud" style="right:200px; top:260px; width:170px; height:44px; opacity:0.8"></div>
 
-  <div id="kick">// the night shift</div>
+  <div id="kick"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>the night shift</span><i></i></div>
   <div id="h1">What your agent did <span class="p">while you slept.</span></div>
   <div id="sub">Real services. Real USDC. Zero human input.</div>
 

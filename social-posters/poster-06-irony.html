@@ -15,7 +15,10 @@
     background-size: 24px 24px, auto, auto; }
 
   #kick { position:absolute; left:84px; top:88px; font-family:"JetBrains Mono",monospace;
-    font-size:22px; letter-spacing:0.18em; text-transform:uppercase; color:#8A7A55; }
+    font-size:22px; letter-spacing:0.18em; text-transform:uppercase; color:#8A7A55;
+    display:flex; align-items:center; gap:0.66em; }
+  #kick > svg { width:0.76em; height:0.82em; flex:none; }
+  #kick > i { width:2.7em; height:2px; flex:none; background:currentColor; opacity:0.35; }
   #h1 { position:absolute; left:84px; top:138px; width:920px;
     font-size:88px; font-weight:700; letter-spacing:-0.028em; line-height:1.1; }
   #h1 .red { color:#B4452F; }
@@ -35,7 +38,7 @@
 <body>
   <div id="tex"></div>
 
-  <div id="kick">// the irony of autonomy</div>
+  <div id="kick"><svg viewBox="0 0 52 55" fill="#C5A253"><rect x="14.5" y="0" width="14.5" height="51" rx="7.25" transform="rotate(30.5 21.75 25.5)"/><circle cx="41" cy="41.5" r="8.8"/></svg><span>the irony of autonomy</span><i></i></div>
   <div id="h1">You removed the human from the loop. <span class="red">Except at checkout.</span></div>
 
   <div id="loop">
