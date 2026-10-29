@@ -17,6 +17,7 @@ import { performMppRequest, type MppChallengeSnapshot, type MppRequestResult } f
 import {
   buildMppRouterUrl,
   findMppRouterService,
+  isDirectSettlement,
   listMppRouterServices,
   operationLabel,
   providerDisplayName,
@@ -27,11 +28,15 @@ import { sendBlockedEmail, sendPendingApprovalEmail, sendMarketplaceRefundAlertE
 import { consumeCredits, getActiveCreditsBalance, refundCredits } from './credits.js'
 import { examplePayloadFor, exampleQueryFor } from './marketplace-examples.js'
 import { ASYNC_SYNC_ALTERNATIVES, isAsyncOnlyEndpoint } from './marketplace-async.js'
+import { classifyMarketplaceRefund, type RefundOutcome } from './marketplace-refund.js'
 
 const MARKUP_RATE = new Decimal('0.20')
 const MPP_USDC_BASE_UNITS = new Decimal('10000000')
 const NETWORK = process.env['STELLAR_NETWORK'] === 'mainnet' ? 'mainnet' : 'testnet'
 const ROUTER_NETWORK = 'stellar:pubnet'
+// Mainnet USDC Stellar Asset Contract. Marketplace is mainnet-only (see the guard in
+// executeMarketplaceCallInternal), so no testnet variant is needed here.
+const MAINNET_USDC_SAC = 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75'
 
 export { isAsyncOnlyEndpoint } from './marketplace-async.js'
 
@@ -53,6 +58,39 @@ function assertNotAsyncOnlyEndpoint(serviceId: string): void {
       reason: 'x402_session_unsupported',
     },
   )
+}
+
+/**
+ * Reject request shapes MPP Router would 400 anyway, with a clearer message and before
+ * any wallet decrypt, credit, or policy work. No USDC is ever at stake here.
+ */
+function assertRequestShape(service: MppRouterService, input: MarketplaceCallInput): void {
+  const missing = (service.path_params ?? []).filter((name) => {
+    const v = input.query?.[name]
+    return v === undefined || v === null || String(v).trim() === ''
+  })
+  if (missing.length > 0) {
+    throw new AppError(
+      `This endpoint has templated path parameters. Send ${missing.map((m) => `"${m}"`).join(', ')} in "query" (not in "payload"). No USDC was charged.`,
+      'MARKETPLACE_MISSING_PATH_PARAMS',
+      400,
+      {
+        service_id: service.id,
+        path_params: service.path_params,
+        missing,
+        example_query: exampleQueryFor(service.id, service),
+      },
+    )
+  }
+
+  if (service.method === 'GET' && input.payload && Object.keys(input.payload).length > 0) {
+    throw new AppError(
+      'This endpoint is a GET route and takes no request body. Send its parameters in "query" instead of "payload". No USDC was charged.',
+      'MARKETPLACE_GET_USES_QUERY',
+      400,
+      { service_id: service.id, method: 'GET', example_query: exampleQueryFor(service.id, service) },
+    )
+  }
 }
 
 export class MarketplaceBlockedError extends AppError {
@@ -145,6 +183,7 @@ export async function getMarketplaceServicesForResponse(userId: string) {
       skill_url: `${publicWebBaseUrl()}/SKILL/${id}.md`,
       api_skill_url: `/v1/marketplace/services/${id}/skill.md`,
       endpoint_count: ops.length,
+      direct_settlement: ops.some(isDirectSettlement),
       endpoints: ops
         .map((o) => ({
           id: o.id,
@@ -153,8 +192,10 @@ export async function getMarketplaceServicesForResponse(userId: string) {
           path: o.public_path,
           description: o.description,
           price: o.price,
-          example_payload: examplePayloadFor(o.id, id),
-          example_query: exampleQueryFor(o.id),
+          example_payload: o.method === 'GET' ? null : examplePayloadFor(o.id, id),
+          example_query: exampleQueryFor(o.id, o),
+          path_params: o.path_params ?? [],
+          settlement: isDirectSettlement(o) ? ('direct' as const) : ('router' as const),
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     }
@@ -209,8 +250,8 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     JSON.stringify(
       {
         service_id: first.id,
-        payload: examplePayloadFor(first.id, providerId) ?? {},
-        query: {},
+        payload: first.method === 'GET' ? {} : examplePayloadFor(first.id, providerId) ?? {},
+        query: exampleQueryFor(first.id, first) ?? {},
       },
       null,
       2,
@@ -218,6 +259,15 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     '```',
     '',
     'Use `payload` for the upstream JSON body and `query` for URL query parameters. Omit either field when the endpoint does not need it. Where an endpoint below shows an example payload, copy it and adjust the values.',
+    ops.some((o) => o.path_params?.length)
+      ? '\n**Path parameters go in `query`.** Endpoints that list `Path params` below have templated upstream paths (e.g. `/inboxes/{inbox_id}/messages/send`). Send each one as a key in `query` — never in `payload` and never in the URL. A missing one returns `400 MARKETPLACE_MISSING_PATH_PARAMS` before any payment.'
+      : null,
+    ops.some((o) => o.method === 'GET')
+      ? '\n**GET endpoints take no body.** For endpoints with `Method: GET`, put every parameter in `query` and leave `payload` empty — a non-empty payload returns `400 MARKETPLACE_GET_USES_QUERY` before any payment.'
+      : null,
+    ops.some(isDirectSettlement)
+      ? `\n**Direct settlement.** Endpoints marked \`Settlement: direct\` are run by a third-party operator and pay that operator directly. MPP Router does **not** auto-refund them if the call fails.`
+      : null,
     '',
     '**Argens handles the payment challenge automatically.** You do not implement the MPP 402 probe-then-pay cycle. Submit your request body to `POST /v1/marketplace/call` and Argens manages credential negotiation, Stellar payment, and receipt verification.',
     '',
@@ -226,7 +276,7 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     '## Endpoints',
     '',
     ...ops.flatMap((op) => {
-      const example = examplePayloadFor(op.id, providerId)
+      const example = op.method === 'GET' ? null : examplePayloadFor(op.id, providerId)
       return [
         `### ${operationLabel(op)}`,
         '',
@@ -234,6 +284,12 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
         `- Method: \`${op.method}\``,
         `- Upstream path: \`${op.public_path}\``,
         `- Price shown by provider: ${op.price}`,
+        op.path_params?.length
+          ? `- Path params (send in \`query\`): ${op.path_params.map((p) => `\`${p}\``).join(', ')} — e.g. \`${JSON.stringify(exampleQueryFor(op.id, op))}\``
+          : null,
+        isDirectSettlement(op)
+          ? `- Settlement: direct to ${op.operator?.name ?? 'the provider'} (no automatic refund on failure)`
+          : null,
         op.verified_mode ? `- Verified mode: \`${op.verified_mode}\` (operator-tested)` : null,
         op.description ? `- Description: ${op.description}` : null,
         op.docs_url ? `- Docs: ${op.docs_url}` : null,
@@ -258,7 +314,8 @@ export async function getMarketplaceProviderSkillMarkdown(providerId: string): P
     '- `400 MARKETPLACE_ENDPOINT_REQUIRES_SESSION` — this endpoint is async-only (job id + poll) and needs an x402 session credential Argens does not support yet. **No USDC was charged.** Use a synchronous alternative if listed in `details.alternative` (e.g. `firecrawl_scrape`); do not retry the same endpoint.',
     '- `503 MARKETPLACE_SERVICE_PAUSED` — Argens paused this provider platform-wide (broken upstream). Do not retry; tell the user it is temporarily unavailable.',
     '- `MARKETPLACE_NOT_MPP` — upstream rejected the request **before** payment was processed. **No USDC was charged.** Fix the request payload or query and retry.',
-    '- `MARKETPLACE_UPSTREAM_FAILED` — the upstream provider errored. Check the response `payment_committed` field: if `true`, USDC was charged and a refund will be issued; if `false`, no USDC was taken (safe to retry). Check `GET /v1/transactions/{id}` for `upstream_body` detail.',
+    '- `400 MARKETPLACE_MISSING_PATH_PARAMS` / `400 MARKETPLACE_GET_USES_QUERY` — request shape is wrong for this endpoint. **No USDC was charged.** Move the named keys into `query` and retry.',
+    '- `MARKETPLACE_UPSTREAM_FAILED` — the upstream provider errored. Read `details.payment_committed` and `details.refund.outcome`: `none` = no USDC taken (safe to retry); `mpp_auto` = USDC was charged and MPP Router is refunding it to the wallet automatically (`details.refund.status_url` tracks it) — do not ask the user to request a refund; `direct_settlement`, `mpp_manual_review` or `unknown` = USDC was charged and Argens has flagged it for review. Credit-funded calls always restore the credits. See `details.upstream_body` for the provider error.',
     '',
     '## More Argens context',
     '',
@@ -401,6 +458,7 @@ async function executeMarketplaceCallInternal(
   // consume, or policy check. Even without this guard, charge is gated behind
   // `onChallenge` in mpp-client.ts so no USDC can move — but the upstream 401 is opaque.
   assertNotAsyncOnlyEndpoint(service.id)
+  assertRequestShape(service, input)
 
   // Global kill-switch wins over per-user enablement. A paused provider is fully
   // off for everyone — reject before any wallet/credit/policy work happens.
@@ -475,8 +533,9 @@ async function executeMarketplaceCallInternal(
       secretKey: fundingSecret,
       url,
       method: service.method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      ...(service.method === 'GET'
+        ? {}
+        : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
       onChallenge: async (challenge) => {
         state.challengeSnapshot = challenge
         state.cost = calculateCostsFromChallenge(challenge, service)
@@ -648,18 +707,27 @@ async function executeMarketplaceCallInternal(
   const finalChallenge = state.challengeSnapshot
 
   if (!mppResult.ok) {
-    // Credits were deducted before MPP Router was called, and the on-chain Stellar
-    // payment may or may not have committed. If the receipt indicates success but the
-    // upstream service returned non-2xx, the user paid but didn't get value — that's
-    // an upstream-service issue (handled by markMarketplaceFailed). If no receipt
-    // exists, the payment likely never went through — refund credits.
-    const paymentCommitted = Boolean(mppResult.receipt)
+    // MPP Router settles before calling upstream, and on non-delivery refunds the payer
+    // itself (`Refund-Status: pending`). Only the cases it will NOT refund need Argens ops.
+    // See services/marketplace-refund.ts.
+    const refundClass = classifyMarketplaceRefund(mppResult.receipt, mppResult.refund)
+    const paymentCommitted = refundClass.paymentCommitted
 
-    // The silent-loss case: the user's OWN USDC was pulled on-chain (receipt present)
-    // but the service failed. Credits auto-refund below, so only flag the USDC path.
-    const refundRequired = paymentCommitted && !state.paidWithCredits
+    // Credit path: the user never loses credits for an undelivered call. On an MPP
+    // auto-refund the pool gets its USDC back; otherwise the pool absorbs the loss and
+    // Argens chases it (the metadata below keeps the MPP refund id for that).
+    const refundRequired = refundClass.manualRefundRequired && !state.paidWithCredits
 
-    if (state.paidWithCredits && state.creditDeductions?.length && !paymentCommitted) {
+    if (state.paidWithCredits && state.creditDeductions?.length) {
+      if (paymentCommitted && refundClass.outcome !== 'mpp_auto') {
+        logger.warn('Credit pool paid for an undelivered marketplace call that MPP will not auto-refund', {
+          userId,
+          transactionId: finalTxId,
+          serviceId: service.id,
+          refundOutcome: refundClass.outcome,
+          amount: finalCost.baseString,
+        })
+      }
       await refundCredits(state.creditDeductions).catch((refundErr) =>
         logger.error('Credit refund failed after MPP upstream failure — manual reconciliation needed', {
           userId,
@@ -676,7 +744,15 @@ async function executeMarketplaceCallInternal(
       failureReason,
       mppResult,
       refundRequired ? { refundRequired: true, refundAmount: finalCost.totalString } : undefined,
+      refundClass.outcome,
     )
+
+    const refundDetails = {
+      outcome: refundClass.outcome,
+      mpp_refund_id: mppResult.refund?.id ?? null,
+      status_url: mppResult.refund?.status_url ?? null,
+    }
+    const refundNote = describeRefundOutcome(refundClass.outcome, state.paidWithCredits)
 
     if (refundRequired) {
       // Operator-facing: write an audit trail and alert so the manual refund happens.
@@ -692,6 +768,8 @@ async function executeMarketplaceCallInternal(
               amount: finalCost.totalString,
               upstreamStatus: mppResult.status,
               reason: failureReason,
+              refundOutcome: refundClass.outcome,
+              mppRefundStatus: mppResult.refund?.status ?? null,
             },
           },
         })
@@ -711,7 +789,12 @@ async function executeMarketplaceCallInternal(
           serviceId: service.id,
           amount: finalCost.totalString,
           upstreamStatus: mppResult.status,
-          reason: failureReason,
+          reason:
+            refundClass.outcome === 'direct_settlement'
+              ? `${failureReason} — direct-settlement route; MPP will not refund`
+              : refundClass.outcome === 'mpp_manual_review'
+                ? `${failureReason} — MPP parked its refund for manual review (${mppResult.refund?.id ?? 'no refund id'})`
+                : failureReason,
         })
       })().catch((e: unknown) =>
         logger.error('Marketplace refund alert email failed', {
@@ -738,25 +821,25 @@ async function executeMarketplaceCallInternal(
       })
       // Channel errors are pre-settlement: MPP can't route to the merchant, so no
       // USDC is charged. Only promise a refund if something was actually committed.
-      const channelMsg = paymentCommitted
-        ? 'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid and USDC was charged — contact support@argens.xyz with the transaction_id for a full refund.'
-        : 'This marketplace service is temporarily unavailable due to a provider configuration issue on Argens\'s side. Your request was valid and no payment was taken. Try again later or contact support@argens.xyz.'
       throw new AppError(
-        channelMsg,
+        `This marketplace service is temporarily unavailable due to a provider configuration issue on Argens's side. Your request was valid. ${refundNote}`,
         'MARKETPLACE_SERVICE_UNAVAILABLE',
         503,
-        { transaction_id: finalTxId, service_id: service.id, payment_committed: paymentCommitted },
+        {
+          transaction_id: finalTxId,
+          service_id: service.id,
+          payment_committed: paymentCommitted,
+          refund: refundDetails,
+        },
       )
     }
 
-    const upstreamMsg = paymentCommitted
-      ? 'Marketplace service call failed after payment. USDC was charged — a refund will be issued.'
-      : 'Marketplace service call failed. No payment was taken (the provider errored before payment settled).'
-    throw new AppError(upstreamMsg, 'MARKETPLACE_UPSTREAM_FAILED', 502, {
+    throw new AppError(`Marketplace service call failed. ${refundNote}`, 'MARKETPLACE_UPSTREAM_FAILED', 502, {
       transaction_id: finalTxId,
       upstream_status: mppResult.status,
       upstream_body: mppResult.body,
       payment_committed: paymentCommitted,
+      refund: refundDetails,
     })
   }
 
@@ -868,6 +951,31 @@ function calculateCostsFromChallenge(challenge: MppChallengeSnapshot, service: M
     })
   }
 
+  // Direct-settlement routes relay the PROVIDER's own 402, so the router's HMAC binding
+  // does not cover payTo. Pin it to the payout addresses the catalog publishes, and the
+  // asset to USDC (these entries carry no asset_sac hint).
+  if (isDirectSettlement(service)) {
+    const payouts = (service.operator?.payouts ?? [])
+      .filter((p) => !p.network || p.network === ROUTER_NETWORK)
+      .map((p) => p.pay_to)
+      .filter((p): p is string => Boolean(p))
+    if (service.payment_hints?.pay_to) payouts.push(service.payment_hints.pay_to)
+    if (!payouts.includes(challenge.recipient)) {
+      throw new AppError(
+        'Marketplace provider requested payment to an address it has not published. No payment was made.',
+        'MARKETPLACE_PAYEE_MISMATCH',
+        502,
+        { service_id: service.id, challenge_recipient: challenge.recipient, published_payouts: payouts },
+      )
+    }
+    if (challenge.currency !== (service.payment_hints?.asset_sac ?? MAINNET_USDC_SAC)) {
+      throw new AppError('Marketplace service did not request the expected USDC asset.', 'UNSUPPORTED_CURRENCY', 402, {
+        expected_currency: service.payment_hints?.asset_sac ?? MAINNET_USDC_SAC,
+        challenge_currency: challenge.currency,
+      })
+    }
+  }
+
   const expectedCurrency = service.payment_hints?.asset_sac
   if (expectedCurrency && challenge.currency !== expectedCurrency) {
     throw new AppError('Marketplace service did not request the expected USDC asset.', 'UNSUPPORTED_CURRENCY', 402, {
@@ -949,11 +1057,27 @@ async function createMarketplaceTransaction(params: {
   })
 }
 
+function describeRefundOutcome(outcome: RefundOutcome, paidWithCredits: boolean): string {
+  if (outcome === 'none') {
+    return 'No payment was taken (the provider errored before payment settled).'
+  }
+  if (paidWithCredits) return 'Your marketplace credits have been restored.'
+  switch (outcome) {
+    case 'mpp_auto':
+      return 'USDC was charged, but the provider did not deliver. MPP Router is refunding the full amount to your wallet automatically — no action needed. Track it with details.refund.status_url.'
+    case 'direct_settlement':
+      return 'USDC was paid directly to this third-party provider, which did not deliver. MPP Router does not refund direct-settlement routes; Argens has flagged the transaction for review.'
+    default:
+      return 'USDC was charged — Argens has flagged the transaction for a manual refund.'
+  }
+}
+
 async function markMarketplaceFailed(
   transactionId: string,
   reason: string,
   mppResult?: MppRequestResult,
   refund?: { refundRequired: boolean; refundAmount?: string },
+  refundOutcome?: RefundOutcome,
 ): Promise<void> {
   await prisma.transaction.update({
     where: { id: transactionId },
@@ -966,6 +1090,13 @@ async function markMarketplaceFailed(
           progress: mppResult?.progress ?? [],
           upstream_status: mppResult?.status ?? null,
           upstream_body: mppResult?.body ?? null,
+          // MPP's own refund (Refund-* headers). `outcome: mpp_auto` means MPP is
+          // returning the USDC to the payer — Argens ops must not refund it again.
+          refund: mppResult?.refund
+            ? { ...mppResult.refund, outcome: refundOutcome ?? null }
+            : refundOutcome
+              ? { outcome: refundOutcome }
+              : null,
         },
         // Marks the paid-but-undelivered case for the operator's manual-refund queue.
         // Surfaced in the Ops Console (GET /admin/transactions/failed) and aggregated
@@ -978,6 +1109,7 @@ async function markMarketplaceFailed(
                 reason,
                 receipt_reference: mppResult?.receipt?.reference ?? null,
                 upstream_status: mppResult?.status ?? null,
+                outcome: refundOutcome ?? null,
               },
             }
           : {}),

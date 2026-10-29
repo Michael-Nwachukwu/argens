@@ -1,4 +1,4 @@
-# Argens Skill — v8 — updated 2026-10-26
+# Argens Skill — v8 — updated 2026-10-27
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -371,8 +371,8 @@ POST /marketplace/call
 ```
 
 - `service_id` — the **endpoint id** from `endpoints[].id`, not the provider `id`
-- `payload` — the JSON request body the upstream service expects (optional for GET-like endpoints)
-- `query` — URL query parameters for the upstream service (optional)
+- `payload` — the JSON request body the upstream service expects. Leave it empty for `GET` endpoints
+- `query` — URL query parameters. **Path parameters go here too:** an endpoint with `path_params` (e.g. AgentMail's `inbox_id`) takes each one as a `query` key — never in `payload`. Endpoints show a ready-made `example_query`
 
 **Success (200):**
 ```json
@@ -405,7 +405,11 @@ POST /marketplace/call
 | `MARKETPLACE_ENDPOINT_REQUIRES_SESSION` | **No** | Async-only endpoint (job id + poll); needs x402 session Argens does not support yet — use `details.alternative` if present (e.g. `firecrawl_scrape`); do not retry the same endpoint |
 | `MARKETPLACE_SERVICE_PAUSED` | No | Provider paused platform-wide by Argens — do not retry; temporarily unavailable |
 | `MARKETPLACE_NOT_MPP` | **No** | Upstream rejected before payment — fix the request payload or query and retry |
-| `MARKETPLACE_UPSTREAM_FAILED` | **Yes** | Payment sent; upstream service errored — do not retry immediately; developer auto-notified; check `upstream_body` in error details |
+| `MARKETPLACE_MISSING_PATH_PARAMS` | **No** | A declared path parameter is missing from `query` — add the keys in `details.missing` and retry |
+| `MARKETPLACE_GET_USES_QUERY` | **No** | `GET` endpoint called with a `payload` — move the fields into `query` and retry |
+| `MARKETPLACE_UPSTREAM_FAILED` | See `details.refund.outcome` | Upstream errored. `none` — nothing charged, safe to retry. `mpp_auto` — charged, and MPP Router is refunding the wallet automatically (track `details.refund.status_url`); do not ask the user to chase a refund. `direct_settlement` / `mpp_manual_review` / `unknown` — charged; Argens has flagged it for review. Credit-funded calls always restore the credits. Check `upstream_body` |
+
+**Direct-settlement endpoints** (`settlement: "direct"` in the catalog) pay a third-party operator directly. MPP Router does not auto-refund them when they fail — mention that to the user before calling one.
 
 ---
 
@@ -431,7 +435,8 @@ POST /marketplace/call
    202 → pending approval, poll /v1/transactions/{id}
    MARKETPLACE_NOT_MPP → payload was wrong, no USDC charged — fix payload and retry
    MARKETPLACE_ENDPOINT_REQUIRES_SESSION → async-only endpoint; no USDC charged — use details.alternative if any; do not retry same id
-   MARKETPLACE_UPSTREAM_FAILED → USDC was charged, upstream errored — do not retry; developer auto-notified
+   MARKETPLACE_MISSING_PATH_PARAMS / MARKETPLACE_GET_USES_QUERY → no USDC charged — move the keys into "query" and retry
+   MARKETPLACE_UPSTREAM_FAILED → read details.refund.outcome: none = not charged; mpp_auto = charged, refunding automatically; otherwise charged and flagged for review — do not retry immediately
    503 MARKETPLACE_SERVICE_PAUSED → provider temporarily unavailable, do not retry
 ```
 
@@ -452,7 +457,8 @@ POST /marketplace/call
 - A `SERVICE_DISABLED` error means the provider is off in the user's dashboard — do not retry; tell the user to enable it
 - A `MARKETPLACE_SERVICE_PAUSED` error means Argens paused the provider platform-wide — do not retry; it's temporarily unavailable
 - A `MARKETPLACE_NOT_MPP` error means **no USDC was charged** — the request payload was wrong; fix it and retry
-- A `MARKETPLACE_UPSTREAM_FAILED` error means **USDC was charged** — the upstream service errored after payment; do not retry immediately; the developer is auto-notified
+- A `MARKETPLACE_UPSTREAM_FAILED` error: read `details.refund.outcome` — `none` means nothing was charged; `mpp_auto` means USDC was charged and MPP Router is refunding it automatically; anything else means it was charged and Argens flagged it for review. Do not retry immediately
+- Path parameters (`path_params`) and every `GET` endpoint parameter go in `query`, never in `payload`
 
 ---
 

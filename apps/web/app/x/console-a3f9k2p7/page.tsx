@@ -106,6 +106,7 @@ interface FailedTxRow {
       progress?: Array<Record<string, unknown>>
       upstream_status?: number | null
       upstream_body?: unknown
+      refund?: { status?: string; id?: string | null; status_url?: string | null; outcome?: string | null } | null
     }
   } | null
 }
@@ -724,6 +725,8 @@ function FailedPanel() {
             {rows.map(r => {
               const refundNeeded = Boolean(r.metadata?.refund?.required)
               const refundAmount = r.metadata?.refund?.amount
+              const mppRefund = r.metadata?.mpp_router?.refund ?? null
+              const mppAutoRefund = mppRefund?.outcome === 'mpp_auto'
               const mpp = asMppRouter(r.metadata)
               const body = mpp ? formatUpstreamBody(mpp.upstream_body) : null
               const settled = mpp ? paymentSettledLabel(mpp.receipt) : null
@@ -737,7 +740,11 @@ function FailedPanel() {
                 <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 10 }}>
                   {refundNeeded
                     ? <span style={{ color: t.error, border: '1px solid rgba(160,72,72,0.4)', background: t.errorLow, borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>● REFUND NEEDED{refundAmount ? ` $${parseFloat(refundAmount).toFixed(4)}` : ''}</span>
-                    : <span style={{ color: t.faint }}>—</span>}
+                    : mppAutoRefund
+                      ? (mppRefund?.status_url
+                          ? <a href={mppRefund.status_url} target="_blank" rel="noopener noreferrer" style={{ color: t.muted, whiteSpace: 'nowrap', textDecoration: 'none' }} title="MPP Router is refunding the payer automatically — do not refund manually">AUTO-REFUND (MPP) ↗</a>
+                          : <span style={{ color: t.muted, whiteSpace: 'nowrap' }} title="MPP Router is refunding the payer automatically — do not refund manually">AUTO-REFUND (MPP)</span>)
+                      : <span style={{ color: t.faint }}>—</span>}
                 </td>
                 <td style={{ padding: '10px 14px', color: t.error, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 380, wordBreak: 'break-word' }}>
                   <div>{r.blockedReason ?? '—'}</div>

@@ -46,7 +46,7 @@ recipient address and an amount string. Onboarding is a single public file at
 [`argens.xyz/SKILL.md`](https://argens.xyz/SKILL.md): point an agent at that URL and it can
 integrate itself. There is no SDK in V1, deliberately.
 
-**4. MPP marketplace.** A catalog of ~493 paid AI/data endpoints across ~86 providers, callable and
+**4. MPP marketplace.** A catalog of ~450 paid AI/data endpoints across ~85 providers, callable and
 payable in one step. Argens applies a 20% markup — this is the revenue model. Direct USDC transfers
 are free.
 

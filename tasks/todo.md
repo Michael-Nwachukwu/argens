@@ -1,3 +1,47 @@
+## Task: MPP Router auto-refunds, path params, GET routes
+
+**Goal:** Stop Argens double-refunding (and credit users losing credits) now that MPP Router auto-refunds non-delivered paid calls, and expose the catalog features agents currently can't use (path params, GET routes).
+
+**Why:** MPP Router settles before calling upstream and, on non-delivery (timeout / 5xx / 4xx after payment / empty body), queues a full refund to the payer and returns `Refund-Status: pending` + `Refund-Id`. Argens ignores those headers and flags every settled-but-failed call for a manual ops refund → ops would refund the user a second time. On the credit path MPP refunds the pool, but the user's credits stay deducted.
+
+**Refund-Status → Argens action** (source: rozo-mpprouter `src/mpp-proxy.ts`, `docs/receipts-and-refunds.md`):
+| `Refund-Status` | Meaning | USDC path | Credit path |
+|---|---|---|---|
+| `pending` | MPP auto-refund queued to payer | no manual flag; store refund id/url | restore credits (pool gets USDC back) |
+| `manual-review` | MPP couldn't queue / over its ceiling | manual flag (today's behaviour) | unchanged |
+| `not-applicable-direct-settlement` | third-party route, paid provider directly | manual flag for ops review (Argens decides) | unchanged |
+| absent | legacy / pre-settlement | unchanged | unchanged |
+
+**Files affected:**
+- `apps/api/src/services/mpp-client.ts` — parse `Refund-*` headers; no body on GET
+- `apps/api/src/services/marketplace-refund.ts` (new) + test — pure Refund-Status classification
+- `apps/api/src/services/marketplace.ts` — branch on classification; metadata; agent messages; path-param + GET handling; direct-settlement payTo check
+- `apps/api/src/services/mpp-router.ts` — allow GET; type `path_params`, `example_params`, `settlement`, `operator`
+- `apps/api/src/services/marketplace-examples.ts` — fall back to catalog `example_params`
+- `apps/web/app/x/console-*/page.tsx`, `apps/web/app/dashboard/marketplace` — AUTO-REFUND badge; path params / settlement shown
+- `apps/web/public/SKILL.md`, `CLAUDE.md`, `AGENTS.md` — refund semantics, path params, counts
+
+**Steps:**
+- [x] mpp-client: `refund: { status, id, status_url, mode } | null` on the result; derive status URL from `Refund-Id` when `Refund-Status-Url` is absent; never send a body on GET
+- [x] marketplace-refund.ts: `classifyMarketplaceRefund(receipt, refund)` → `{ outcome, paymentCommitted, manualRefundRequired }`; unit tests for every row of the table
+- [x] marketplace.ts failure branch: use the classification; restore credits on auto-refund; write `mpp_router.refund` metadata; ops alert/audit only when manual; agent message + `details.refund` per outcome
+- [x] Path params: surface `path_params` + example query in catalog and skill.md; reject a call missing a declared path param with `400 MARKETPLACE_MISSING_PATH_PARAMS` before any payment work
+- [x] GET routes: include them; send `payload` keys nowhere — reject non-empty payload on GET with `400 MARKETPLACE_GET_USES_QUERY`; skill example uses `query`
+- [x] Direct settlement (`settlement: "direct"`): require the challenge `payTo` ∈ `operator.payouts` and the asset to be the USDC SAC; label in catalog + skill.md ("no automatic refunds")
+- [x] Ops console: show `AUTO-REFUND (MPP)` with a link to the status URL instead of nothing
+- [x] Docs: SKILL.md, per-provider skill text, CLAUDE.md/AGENTS.md status + counts
+- [x] `pnpm verify` + web typecheck
+
+**Out of scope:** polling `/v1/refunds/{id}` to confirm completion (store the URL; ops can check); `/v1/services/select` capability routing; session/channel intents.
+
+**Risks:**
+- GET + direct-settlement routes are unverified against a live Argens call (no mainnet tests) → first live call should be a $0.001 Mercury lookup by the developer.
+- If MPP changes header names, we fall back to today's manual flag (fail-safe toward refunding).
+
+**Done when:** a failed call with `Refund-Status: pending` produces no ops refund flag and restores credits; `manual-review`/direct/absent behave as before; GET + path-param endpoints appear in the catalog with usable examples; verify + typecheck pass.
+
+---
+
 ## Task: Sponsored reserves + fee-bumped user transactions
 
 **Goal:** New user wallets are created with 0 XLM — the ops wallet sponsors the account and USDC trustline reserves (CAP-33) and pays every user-signed transaction fee via fee-bump (CAP-15) — instead of gifting 2.0 XLM per signup.

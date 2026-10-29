@@ -15,7 +15,11 @@ export interface MppRouterService {
   categories?: string[]
   description: string
   public_path: string
-  method: 'POST'
+  method: 'POST' | 'GET'
+  // Templated upstream path segments (e.g. AgentMail `inbox_id`). Supplied as QUERY params
+  // on the router URL — MPP substitutes them upstream. Missing → 400 before any 402.
+  path_params?: string[]
+  example_params?: Record<string, string>
   price: string
   payment_method: string
   network: string
@@ -54,6 +58,16 @@ export interface MppRouterService {
     llms_txt?: string
     api_reference?: string
   }
+  // Third-party routes that settle DIRECTLY to the operator's own address. MPP never
+  // holds the funds, so it never refunds a failed call (`Refund-Status:
+  // not-applicable-direct-settlement`).
+  settlement?: 'direct' | string
+  settlement_mode?: string
+  operator?: {
+    id?: string
+    name?: string
+    payouts?: Array<{ network?: string; pay_to?: string; asset?: string }>
+  }
 }
 
 interface CatalogResponse {
@@ -82,11 +96,15 @@ export async function listMppRouterServices(): Promise<MppRouterService[]> {
   const services = json.services
     .filter((service) => service.payment_method === 'stellar')
     .filter((service) => service.network === 'stellar-mainnet')
-    .filter((service) => service.method === 'POST')
+    .filter((service) => service.method === 'POST' || service.method === 'GET')
     .filter((service) => service.payment_status !== 'unavailable')
 
   catalogCache = { services, expiresAt: Date.now() + 60_000 }
   return services
+}
+
+export function isDirectSettlement(service: MppRouterService): boolean {
+  return service.settlement === 'direct' || Boolean(service.operator)
 }
 
 export async function findMppRouterService(serviceId: string): Promise<MppRouterService | null> {
@@ -96,7 +114,7 @@ export async function findMppRouterService(serviceId: string): Promise<MppRouter
 
 /**
  * Provider key for grouping operations into one card/toggle.
- * The MPP catalog flattens ~493 POST operations across ~86 providers; each operation is
+ * The MPP catalog flattens ~450 operations across ~83 providers; each operation is
  * its own catalog entry. The {provider} segment of `/v1/services/{provider}/{operation}`
  * (equivalently the part of the service id before the first underscore) is the group key.
  */

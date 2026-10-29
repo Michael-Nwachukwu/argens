@@ -700,8 +700,20 @@ export const ENDPOINT_QUERY_PARAMS: Record<string, Record<string, string>> = {
   'browserbase_browser_session_id_extend': { id: 'placeholder-session-id' },
 }
 
-/** Returns example query params for a path-placeholder endpoint, or null. */
-export function exampleQueryFor(endpointId: string): Record<string, string> | null {
-  const hit = ENDPOINT_QUERY_PARAMS[endpointId] ?? null
-  return hit ? { ...hit } : null
+/**
+ * Returns example query params for a path-placeholder endpoint, or null.
+ * Order: the curated map above → the catalog's own `example_params` → a `<name>`
+ * placeholder for each declared `path_params` entry, so every templated endpoint
+ * shows the agent which keys to send.
+ */
+export function exampleQueryFor(
+  endpointId: string,
+  catalog?: { path_params?: string[]; example_params?: Record<string, string> },
+): Record<string, string> | null {
+  const hit = ENDPOINT_QUERY_PARAMS[endpointId] ?? catalog?.example_params ?? null
+  if (hit && Object.keys(hit).length > 0) return { ...hit }
+  if (catalog?.path_params?.length) {
+    return Object.fromEntries(catalog.path_params.map((name) => [name, `<${name}>`]))
+  }
+  return null
 }
