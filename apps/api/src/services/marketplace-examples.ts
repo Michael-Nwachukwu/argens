@@ -680,6 +680,10 @@ export const ENDPOINT_QUERY_PARAMS: Record<string, Record<string, string>> = {
   // ── Alchemy ──────────────────────────────────────────────────────────────────
   alchemy_network_nft_v3_endpoint: { network: 'eth-mainnet', endpoint: 'getNFTsForOwner' },
 
+  // ── Mercury ──────────────────────────────────────────────────────────────────
+  // The catalog's example_params hash 404s upstream; this one returned 200 on 2026-10-29.
+  mercury_txs_by_hash: { tx_hash: '57f80b9cdf64006c67f3541a87de57f93b75e86d120ad1d080e50f9770950c5e' },
+
   // ── fal.ai dynamic model routes ──────────────────────────────────────────────
   fal_model: { model: 'fal-ai/flux/dev' },
   fal_namespace_model: { namespace: 'fal-ai', model: 'flux/dev' },
@@ -700,8 +704,20 @@ export const ENDPOINT_QUERY_PARAMS: Record<string, Record<string, string>> = {
   'browserbase_browser_session_id_extend': { id: 'placeholder-session-id' },
 }
 
-/** Returns example query params for a path-placeholder endpoint, or null. */
-export function exampleQueryFor(endpointId: string): Record<string, string> | null {
-  const hit = ENDPOINT_QUERY_PARAMS[endpointId] ?? null
-  return hit ? { ...hit } : null
+/**
+ * Returns example query params for a path-placeholder endpoint, or null.
+ * Order: the curated map above → the catalog's own `example_params` → a `<name>`
+ * placeholder for each declared `path_params` entry, so every templated endpoint
+ * shows the agent which keys to send.
+ */
+export function exampleQueryFor(
+  endpointId: string,
+  catalog?: { path_params?: string[]; example_params?: Record<string, string> },
+): Record<string, string> | null {
+  const hit = ENDPOINT_QUERY_PARAMS[endpointId] ?? catalog?.example_params ?? null
+  if (hit && Object.keys(hit).length > 0) return { ...hit }
+  if (catalog?.path_params?.length) {
+    return Object.fromEntries(catalog.path_params.map((name) => [name, `<${name}>`]))
+  }
+  return null
 }

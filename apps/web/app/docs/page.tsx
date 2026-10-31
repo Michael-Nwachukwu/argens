@@ -844,7 +844,7 @@ function MarketplaceSection() {
 ?category=vision      → filter by category
 ?enabled=true         → only your enabled providers
 
-# Response includes 86 providers
+# Response includes ~85 providers
 {
   "data": [{
     "provider_id": "flux-schnell",

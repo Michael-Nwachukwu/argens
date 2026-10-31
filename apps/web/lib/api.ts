@@ -261,6 +261,8 @@ export interface MarketplaceEndpoint {
   price: string                 // e.g. "$0.010/request"
   example_payload: Record<string, unknown> | null
   example_query: Record<string, string> | null
+  path_params?: string[]        // templated path segments — sent in `query`, never the body
+  settlement?: 'router' | 'direct' // direct = paid to a third-party operator; MPP never auto-refunds
 }
 
 // `MarketplaceService` is the PROVIDER (kept this name for continuity).
@@ -276,6 +278,7 @@ export interface MarketplaceService {
   status: 'active' | 'limited'
   docs_url: string | null
   endpoint_count: number
+  direct_settlement?: boolean
   endpoints: MarketplaceEndpoint[]
 }
 

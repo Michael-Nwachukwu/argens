@@ -51,7 +51,22 @@ export interface MppRequestResult {
   body: unknown
   text: string
   receipt: MppReceipt | null
+  refund: MppRefundSignal | null
   progress: Array<Record<string, unknown>>
+}
+
+/**
+ * MPP Router's automatic-refund signal, read from the `Refund-*` response headers.
+ * The router settles BEFORE calling upstream and, on non-delivery (timeout, 5xx,
+ * post-payment 4xx, empty body), queues a refund of the full settled amount to the
+ * payer. `status` is the raw `Refund-Status` value, e.g. `pending`, `manual-review`,
+ * `not-applicable-direct-settlement`. See services/marketplace-refund.ts.
+ */
+export interface MppRefundSignal {
+  status: string
+  id: string | null
+  status_url: string | null
+  mode: string | null
 }
 
 export interface MppReceipt {
@@ -71,7 +86,7 @@ const X402_NETWORK = NETWORK === 'mainnet' ? 'stellar:pubnet' : 'stellar:testnet
 // Mirrors the resolution used in services/cctp.ts.
 const SOROBAN_RPC_URL =
   process.env['SOROBAN_RPC_URL'] ??
-  (NETWORK === 'mainnet' ? 'https://soroban.stellar.org' : 'https://soroban-testnet.stellar.org')
+  (NETWORK === 'mainnet' ? 'https://mainnet.sorobanrpc.com' : 'https://soroban-testnet.stellar.org')
 
 export async function performMppRequest(params: MppRequestParams): Promise<MppRequestResult> {
   const [{ x402Client, x402HTTPClient }, { ExactStellarScheme, createEd25519Signer }] =
@@ -88,12 +103,14 @@ export async function performMppRequest(params: MppRequestParams): Promise<MppRe
   const http = new x402HTTPClient(client)
 
   const baseHeaders = { ...(params.headers ?? {}) }
+  // fetch() throws on a GET/HEAD with a body; MPP's GET routes take query params only.
+  const body = params.method === 'GET' || params.method === 'HEAD' ? undefined : params.body
 
   // 1. Initial request — expect a 402 Payment Required.
   let response = await fetch(params.url, {
     method: params.method,
     headers: baseHeaders,
-    body: params.body,
+    body,
   })
 
   if (response.status === 402) {
@@ -128,20 +145,20 @@ export async function performMppRequest(params: MppRequestParams): Promise<MppRe
     response = await fetch(params.url, {
       method: params.method,
       headers: { ...baseHeaders, ...paymentHeaders },
-      body: params.body,
+      body,
     })
   }
 
   const text = await response.text()
   const headers = Object.fromEntries(response.headers.entries())
 
-  let body: unknown = text
+  let responseBody: unknown = text
   const contentType = response.headers.get('content-type') ?? ''
   if (text && contentType.includes('application/json')) {
     try {
-      body = JSON.parse(text) as unknown
+      responseBody = JSON.parse(text) as unknown
     } catch {
-      body = text
+      responseBody = text
     }
   }
 
@@ -188,11 +205,25 @@ export async function performMppRequest(params: MppRequestParams): Promise<MppRe
     ok: response.ok,
     status: response.status,
     headers,
-    body,
+    body: responseBody,
     text,
     receipt,
+    refund: readRefundSignal(response.headers, params.url),
     progress,
   }
+}
+
+function readRefundSignal(headers: Headers, requestUrl: string): MppRefundSignal | null {
+  const status = headers.get('refund-status')?.trim()
+  if (!status) return null
+  const id = headers.get('refund-id')?.trim() || null
+  // The x402 path sets Refund-Id without Refund-Status-Url; the receipt lives at
+  // GET /v1/refunds/{id} on the router either way.
+  let statusUrl = headers.get('refund-status-url')?.trim() || null
+  if (!statusUrl && id) {
+    statusUrl = `${new URL(requestUrl).origin}/v1/refunds/${encodeURIComponent(id)}`
+  }
+  return { status, id, status_url: statusUrl, mode: headers.get('refund-mode')?.trim() || null }
 }
 
 function toChallengeSnapshot(paymentRequired: X402PaymentRequired): MppChallengeSnapshot {

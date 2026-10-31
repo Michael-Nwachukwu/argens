@@ -19,6 +19,7 @@ interface UpstreamErrorDetails {
   service_id?: string
   transaction_id?: string
   no_payment_made?: boolean
+  refund?: { outcome?: string; mpp_refund_id?: string | null; status_url?: string | null }
 }
 
 function isUpstreamErrorDetails(d: unknown): d is UpstreamErrorDetails {
@@ -85,6 +86,7 @@ export default function MarketplacePage() {
     [selected, endpointId],
   )
   const placeholderKeys = useMemo(() => Object.keys(endpoint?.example_query ?? {}), [endpoint])
+  const isGet = endpoint?.method === 'GET'
 
   const selectEndpoint = (e: MarketplaceEndpoint | null) => {
     setEndpointId(e?.id ?? null)
@@ -108,13 +110,16 @@ export default function MarketplacePage() {
   const callEndpoint = async () => {
     if (!selected || !endpoint || !selected.is_enabled) return
 
-    let payload: Record<string, unknown>
-    try {
-      const parsed = JSON.parse(payloadText) as unknown
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Body must be a JSON object.')
-      payload = parsed as Record<string, unknown>
-    } catch (e) {
-      setError(`Body JSON: ${(e as Error).message}`); setErrorDetails(null); return
+    // GET routes take no body — everything goes in the query string.
+    let payload: Record<string, unknown> = {}
+    if (endpoint.method !== 'GET') {
+      try {
+        const parsed = JSON.parse(payloadText) as unknown
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Body must be a JSON object.')
+        payload = parsed as Record<string, unknown>
+      } catch (e) {
+        setError(`Body JSON: ${(e as Error).message}`); setErrorDetails(null); return
+      }
     }
 
     let query: Record<string, string | number | boolean> | undefined
@@ -335,13 +340,20 @@ export default function MarketplacePage() {
                     <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: 6, opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       upstream: {endpoint.method} {MPP_BASE}{endpoint.path}
                     </div>
+                    {endpoint.settlement === 'direct' && (
+                      <div style={{ fontSize: 11, color: 'var(--warning)', fontFamily: 'var(--font-mono)', marginTop: 6 }}>
+                        Direct settlement — pays the third-party provider directly; not auto-refunded if the call fails.
+                      </div>
+                    )}
                   </div>
 
                   {/* path placeholders → query params */}
-                  {placeholderKeys.length > 0 && (
+                  {(placeholderKeys.length > 0 || isGet) && (
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
-                        Path parameters (sent as query string: {placeholderKeys.map(k => `?${k}=…`).join(' ')})
+                        {placeholderKeys.length > 0
+                          ? <>{isGet ? 'Query' : 'Path'} parameters (sent as query string: {placeholderKeys.map(k => `?${k}=…`).join(' ')})</>
+                          : 'Query parameters (JSON object, sent as query string)'}
                       </div>
                       <textarea
                         value={queryText}
@@ -352,10 +364,12 @@ export default function MarketplacePage() {
                     </div>
                   )}
 
+                  {!isGet && (<>
                   <div style={{ fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>Request body (JSON)</div>
                   <p style={{ color: 'var(--muted)', fontSize: 12, margin: '0 0 8px', lineHeight: 1.5 }}>
-                    See the service docs for required fields. Argens charges your wallet only after the upstream service responds.
+                    See the service docs for required fields. If the service fails after payment, MPP Router refunds the USDC to your wallet automatically{endpoint.settlement === 'direct' ? ' — except on direct-settlement endpoints like this one' : ''}.
                   </p>
+                  </>)}
 
                   {!selected.is_enabled && (
                     <div style={{ border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted)', borderRadius: 7, padding: 12, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
@@ -363,12 +377,12 @@ export default function MarketplacePage() {
                     </div>
                   )}
 
-                  <textarea
+                  {!isGet && <textarea
                     value={payloadText}
                     onChange={e => setPayloadText(e.target.value)}
                     spellCheck={false}
                     style={{ width: '100%', minHeight: 200, resize: 'vertical', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 7, padding: 12, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.55, boxSizing: 'border-box' }}
-                  />
+                  />}
 
                   {error && (
                     <div style={{ marginTop: 12, border: '1px solid rgba(160,72,72,0.3)', background: 'rgba(160,72,72,0.10)', borderRadius: 7, padding: 12 }}>
@@ -382,6 +396,11 @@ export default function MarketplacePage() {
                         </pre>
                         {errorDetails.transaction_id && (
                           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>Transaction logged: {errorDetails.transaction_id}</div>
+                        )}
+                        {errorDetails.refund?.status_url && (
+                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                            MPP refund: <a href={errorDetails.refund.status_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{errorDetails.refund.mpp_refund_id ?? 'status'} ↗</a>
+                          </div>
                         )}
                       </>)}
                     </div>
