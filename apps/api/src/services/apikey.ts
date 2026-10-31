@@ -7,12 +7,13 @@ import { sendApiKeyRegeneratedEmail } from './email.js'
 
 const BCRYPT_ROUNDS = 10
 
-export function generateApiKey(): { key: string; hash: string; prefix: string } {
+export async function generateApiKey(): Promise<{ key: string; hash: string; prefix: string }> {
   const raw = randomBytes(32).toString('hex')
   const key = `argns_live_${raw}`
   // Store enough of the key for the user to identify it in the UI (e.g. "argns_live_ab12ef...")
   const prefix = key.substring(0, 20)
-  const hash = bcrypt.hashSync(key, BCRYPT_ROUNDS)
+  // Async: hashSync at 10 rounds blocks the event loop for every request in flight.
+  const hash = await bcrypt.hash(key, BCRYPT_ROUNDS)
   return { key, hash, prefix }
 }
 
@@ -28,7 +29,7 @@ export async function createApiKey(userId: string): Promise<{ key: string; prefi
     throw new ForbiddenError('Email must be verified before generating an API key.')
   }
 
-  const { key, hash, prefix } = generateApiKey()
+  const { key, hash, prefix } = await generateApiKey()
 
   // Generating a key REPLACES the current one: the dashboard tells the user the old key
   // stops working immediately, so deactivate it in the same transaction as the create.
