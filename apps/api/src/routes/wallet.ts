@@ -12,7 +12,8 @@ import { Decimal } from '@prisma/client/runtime/library'
 import { requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { getUsdcBalance, getXlmBalance, getAccountBalances, isStellarAddress, validateMemo } from '../services/stellar.js'
+import { getXlmBalance, getAccountBalances, isStellarAddress, validateMemo } from '../services/stellar.js'
+import { refreshBalanceAndWarn } from '../services/balance.js'
 import {
   activateAccount,
   getSpendableXlm,
@@ -27,7 +28,7 @@ import { validate } from '../middleware/validate.js'
 import { authLimiter, checkPinAttempt, resetPinAttempts } from '../middleware/ratelimit.js'
 import { sendBlockedEmail, sendPendingApprovalEmail } from '../services/email.js'
 import { generateSecureToken } from '../lib/crypto.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 import bcrypt from 'bcryptjs'
 
 export const walletRouter: Router = ExpressRouter()
@@ -380,17 +381,8 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
       // Increment totalSpent
       await incrementTotalSpent(userId, amount)
 
-      // Refresh balance cache (fire-and-forget)
-      void getUsdcBalance(wallet.stellarPublicKey)
-        .then(async (live) => {
-          if (live !== null) {
-            await prisma.wallet.update({
-              where: { id: wallet.id },
-              data: { balanceCache: live, balanceCachedAt: new Date() },
-            })
-          }
-        })
-        .catch(() => undefined)
+      // Refresh balance cache + low-balance check (fire-and-forget)
+      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
       sendSuccess(res, {
         status: 'success',

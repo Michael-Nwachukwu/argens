@@ -448,6 +448,7 @@ argens/
 │           │   ├── email.ts          # Resend / ethereal templates
 │           │   ├── email-validation.ts       # disposable-domain + MX checks
 │           │   ├── watcher.ts        # Horizon payments SSE + 60s poll fallback
+│           │   ├── balance.ts        # user balance cache + low-balance email (24h rate limit)
 │           │   ├── alerting.ts       # low-balance alerts for all four platform wallets (ops on spendable XLM)
 │           │   └── admin-balances.ts # all four platform wallet balances
 │           ├── middleware/

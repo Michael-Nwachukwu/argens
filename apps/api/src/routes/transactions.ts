@@ -22,7 +22,8 @@ import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
 import { checkPolicy, checkPolicyAndReserve, releaseSpend, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
-import { isStellarAddress, isEvmAddress, validateMemo, getUsdcBalance } from '../services/stellar.js'
+import { isStellarAddress, isEvmAddress, validateMemo } from '../services/stellar.js'
+import { refreshBalanceAndWarn } from '../services/balance.js'
 import {
   burnUsdcOnStellar,
   encodeEvmRecipient,
@@ -35,7 +36,6 @@ import { enqueueRelay } from '../services/cctp-relay.js'
 import {
   sendBlockedEmail,
   sendPendingApprovalEmail,
-  sendLowBalanceEmail,
 } from '../services/email.js'
 
 // ─── Validation schemas ──────────────────────────────────────────────────────
@@ -213,8 +213,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
         })
 
-        void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance cache', { userId }))
-        void checkAndNotifyLowBalance(userId, wallet.id).catch(logBackgroundFailure('low-balance check', { userId }))
+        void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
         sendSuccess(res, {
           status: 'success',
@@ -361,8 +360,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         },
       })
 
-      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance cache', { userId }))
-      void checkAndNotifyLowBalance(userId, wallet.id).catch(logBackgroundFailure('low-balance check', { userId }))
+      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
       sendSuccess(res, {
         status: 'cross_chain_pending',
@@ -507,7 +505,7 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       })
 
       await incrementTotalSpent(userId, refundAmount)
-      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance cache', { userId }))
+      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
       sendSuccess(res, {
         status: 'success',
@@ -742,38 +740,5 @@ function buildQuotePolicyCheck(policyResult: {
       policyResult.status === 'PENDING_APPROVAL'
         ? 'would_require_approval'
         : policyResult.detail.approval_threshold === 'not_set' ? 'not_configured' : 'would_pass',
-  }
-}
-
-async function refreshBalanceCache(walletId: string, publicKey: string): Promise<void> {
-  const balance = await getUsdcBalance(publicKey)
-  if (balance !== null) {
-    await prisma.wallet.update({
-      where: { id: walletId },
-      data: { balanceCache: balance, balanceCachedAt: new Date() },
-    })
-  }
-}
-
-async function checkAndNotifyLowBalance(userId: string, walletId: string): Promise<void> {
-  const LOW_BALANCE_USDC = 10
-
-  const [wallet, policy] = await Promise.all([
-    prisma.wallet.findUnique({ where: { id: walletId } }),
-    prisma.policy.findUnique({ where: { userId } }),
-  ])
-
-  if (!wallet || !policy) return
-
-  let threshold = LOW_BALANCE_USDC
-  if (policy.allowanceLimit) {
-    const remaining = policy.allowanceLimit.minus(policy.totalSpent)
-    threshold = Math.max(LOW_BALANCE_USDC, remaining.mul('0.10').toNumber())
-  }
-
-  if (wallet.balanceCache.lessThan(threshold)) {
-    void sendLowBalanceEmail(userId, wallet.balanceCache.toFixed(7), String(threshold)).catch((e: unknown) =>
-      logger.error('Failed to send low-balance email', { userId, error: (e as Error).message }),
-    )
   }
 }

@@ -36,9 +36,8 @@ import { isStellarAddress, isEvmAddress } from '../services/stellar.js'
 import {
   sendBlockedEmail,
   sendPendingApprovalEmail,
-  sendLowBalanceEmail,
 } from '../services/email.js'
-import { getUsdcBalance } from '../services/stellar.js'
+import { refreshBalanceAndWarn } from '../services/balance.js'
 
 export const x402Router: Router = ExpressRouter()
 
@@ -256,7 +255,7 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
       await incrementTotalSpent(userId, amountUsdc)
 
       // Refresh balance + low-balance check
-      void refreshAndCheckBalance(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
       // Build the X-Payment proof header for the agent to use in its retry request
       const paymentProof = buildX402PaymentProof({
@@ -436,31 +435,5 @@ function buildPolicyCheck(detail: {
     allowance: detail.allowance === 'not_set' ? 'not_configured' : detail.allowance,
     max_transaction: detail.max_transaction === 'not_set' ? 'not_configured' : detail.max_transaction,
     approval_threshold: detail.approval_threshold === 'not_set' ? 'not_configured' : detail.approval_threshold,
-  }
-}
-
-async function refreshAndCheckBalance(
-  userId: string,
-  walletId: string,
-  publicKey: string,
-): Promise<void> {
-  const balance = await getUsdcBalance(publicKey)
-  if (balance !== null) {
-    await prisma.wallet.update({
-      where: { id: walletId },
-      data: { balanceCache: balance, balanceCachedAt: new Date() },
-    })
-
-    const policy = await prisma.policy.findUnique({ where: { userId } })
-    const LOW_FLOOR = 10
-    let threshold = LOW_FLOOR
-    if (policy?.allowanceLimit) {
-      const remaining = policy.allowanceLimit.minus(policy.totalSpent).toNumber()
-      threshold = Math.max(LOW_FLOOR, remaining * 0.1)
-    }
-
-    if (new Decimal(balance).lessThan(threshold)) {
-      void sendLowBalanceEmail(userId, balance, String(threshold)).catch(logBackgroundFailure('low-balance email', { userId }))
-    }
   }
 }
