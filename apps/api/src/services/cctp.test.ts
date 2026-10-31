@@ -47,4 +47,8 @@ describe('encodeEvmRecipient', () => {
       expect(buf[i]).toBe(0x11)
     }
   })
+
+  it('rejects a 42-char address with non-hex characters instead of truncating it', () => {
+    expect(() => encodeEvmRecipient('0x' + '11'.repeat(19) + 'zz')).toThrow(/Invalid EVM address/)
+  })
 })

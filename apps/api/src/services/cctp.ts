@@ -27,7 +27,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { Decimal } from '@prisma/client/runtime/library'
 import { logger } from '../lib/logger.js'
 import { AppError } from '../lib/errors.js'
-import { getUsdcBalance } from './stellar.js'
+import { getUsdcBalance, isEvmAddress } from './stellar.js'
 import { withFeeSponsor } from './sponsorship.js'
 
 // ─── Network config ────────────────────────────────────────────────────────────
@@ -176,7 +176,9 @@ export class CctpError extends AppError {
  * This is the mint_recipient format the CCTP Soroban contract expects.
  */
 export function encodeEvmRecipient(evmAddress: string): Buffer {
-  if (!evmAddress.startsWith('0x') || evmAddress.length !== 42) {
+  // Buffer.from(hex) silently stops at the first non-hex character, which would burn
+  // USDC to a truncated mint recipient. Validate fully before encoding.
+  if (!isEvmAddress(evmAddress)) {
     throw new CctpError(`Invalid EVM address: ${evmAddress}`)
   }
   return Buffer.concat([Buffer.alloc(12), Buffer.from(evmAddress.slice(2), 'hex')])
