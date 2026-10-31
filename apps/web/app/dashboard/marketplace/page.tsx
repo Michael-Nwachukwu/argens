@@ -11,6 +11,7 @@ import {
   type Transaction,
 } from '@/lib/api'
 import { Icon, Icons } from '@/components/dashboard/Icon'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 interface UpstreamErrorDetails {
   upstream_status?: number
@@ -43,7 +44,7 @@ export default function MarketplacePage() {
   const [errorDetails, setErrorDetails] = useState<UpstreamErrorDetails | null>(null)
   const [result, setResult] = useState<unknown>(null)
   const [search, setSearch] = useState('')
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard()
   const [endpointsExpanded, setEndpointsExpanded] = useState(false)
   const [skillOpen, setSkillOpen] = useState(false)
   const [skillContent, setSkillContent] = useState<string | null>(null)
@@ -163,9 +164,7 @@ export default function MarketplacePage() {
 
   const copyServiceId = () => {
     if (!endpoint) return
-    navigator.clipboard?.writeText(endpoint.id).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
+    copyText(endpoint.id)
   }
 
   const openSkill = async () => {

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 import { AddFundsModal } from '@/components/dashboard/AddFundsModal'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import type { WalletBalance } from '@/lib/api'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 const BACKUP_ACK_KEY = (userId: string) => `argens_key_acked_${userId}`
 
@@ -19,7 +20,7 @@ export default function WalletPage() {
   const [retryError, setRetryError]         = useState('')
   const [showFunds, setShowFunds]   = useState(false)
   const [showSend, setShowSend]         = useState(false)
-  const [copied, setCopied]             = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard()
   const [keyStep, setKeyStep]           = useState<'idle' | 'warning' | 'password' | 'done'>('idle')
   const [keyPassword, setKeyPassword]   = useState('')
   const [keyError, setKeyError]         = useState('')
@@ -148,9 +149,7 @@ export default function WalletPage() {
 
   const copy = () => {
     if (!address) return
-    navigator.clipboard?.writeText(address).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
+    copyText(address)
   }
 
   const explorerUrl = address ? `https://stellar.expert/explorer/public/account/${address}` : '#'

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { wallet as walletApi, isError } from '@/lib/api'
 import { PasswordInput } from '@/components/ui/PasswordInput'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 const BACKUP_ACK_KEY = (userId: string) => `argens_key_acked_${userId}`
 const ONBOARDING_API_KEY = 'argens_onboarding_api_key'
@@ -16,7 +17,7 @@ function PrivateKeyBackupModal({ userId, onClose }: { userId: string; onClose: (
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [apiKey, setApiKey] = useState<string | null>(null)
-  const [apiKeyCopied, setApiKeyCopied] = useState(false)
+  const { copied: apiKeyCopied, copy: copyText } = useCopyToClipboard()
 
   useEffect(() => {
     try { setApiKey(sessionStorage.getItem(ONBOARDING_API_KEY)) } catch { /* ignore */ }
@@ -30,9 +31,7 @@ function PrivateKeyBackupModal({ userId, onClose }: { userId: string; onClose: (
 
   const copyApiKey = () => {
     if (!apiKey) return
-    navigator.clipboard?.writeText(apiKey).catch(() => {})
-    setApiKeyCopied(true)
-    setTimeout(() => setApiKeyCopied(false), 1800)
+    copyText(apiKey)
   }
 
   const downloadKey = async () => {

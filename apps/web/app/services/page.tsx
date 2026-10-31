@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { Logo } from '@/components/ui/Logo'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 const t = {
   bg:         '#0C0B0A',
@@ -87,15 +88,14 @@ function ProviderAvatar({ name, size = 36 }: { name: string; size?: number }) {
 function ProviderRow({ provider }: { provider: Provider }) {
   const [expanded, setExpanded] = useState(false)
   const [activeEp, setActiveEp] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard(1600)
 
   const active = provider.endpoints.find(e => e.id === activeEp) ?? null
   const primaryCat = provider.categories[0] ?? 'Tools'
 
   const handleCopy = () => {
     if (!active?.example_payload) return
-    navigator.clipboard?.writeText(JSON.stringify(active.example_payload, null, 2)).catch(() => {})
-    setCopied(true); setTimeout(() => setCopied(false), 1600)
+    copyText(JSON.stringify(active.example_payload, null, 2))
   }
 
   const toggle = () => {

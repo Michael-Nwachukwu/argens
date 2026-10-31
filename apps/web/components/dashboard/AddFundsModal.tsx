@@ -1,21 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 import { FundingHelpCard } from './FundingHelpCard'
 
 /** Deposit instructions for the user's Stellar wallet (dashboard overview + wallet page). */
 export function AddFundsModal({ address, onClose }: { address: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    // Only confirm once the write lands — clipboard access can be denied (permissions, http).
-    navigator.clipboard
-      ?.writeText(address)
-      .then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1800)
-      })
-      .catch(() => setCopied(false))
-  }
+  const { copied, copy: copyText } = useCopyToClipboard()
+  const copy = () => copyText(address)
 
   return (
     <div

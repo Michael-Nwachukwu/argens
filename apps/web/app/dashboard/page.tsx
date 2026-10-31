@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { AddFundsModal } from '@/components/dashboard/AddFundsModal'
 import { transactions as txApi, wallet as walletApi, policies as policyApi, isError } from '@/lib/api'
 import type { Transaction, WalletBalance, Policy } from '@/lib/api'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 // ─── Stat Card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, subColor, side }: {
@@ -361,13 +362,11 @@ export default function OverviewPage() {
 }
 
 function WalletStrip({ address, onAddFunds }: { address: string; onAddFunds: () => void }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard(1600)
   const short = address ? (address.slice(0, 8) + '…' + address.slice(-6)) : '—'
   const copy = () => {
     if (!address) return
-    navigator.clipboard?.writeText(address).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1600)
+    copyText(address)
   }
   return (
     <div style={{
