@@ -14,3 +14,4 @@ social-posters/out/
 launch-video-vertical
 landing-demo
 fund_docs
+*.tsbuildinfo
