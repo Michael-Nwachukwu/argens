@@ -120,12 +120,6 @@ export function isEvmAddress(address: string): boolean {
   return address.startsWith('0x') && address.length === 42
 }
 
-export function detectChain(recipient: string): 'stellar' | 'base' {
-  if (isStellarAddress(recipient)) return 'stellar'
-  if (isEvmAddress(recipient)) return 'base'
-  throw new StellarError(`Cannot detect destination chain from recipient: ${recipient}`)
-}
-
 // ─── Memo validation ───────────────────────────────────────────────────────────
 export function validateMemo(memo: string): void {
   // Stellar transaction memo max: 28 bytes

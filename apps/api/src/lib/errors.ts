@@ -10,12 +10,6 @@ export class AppError extends Error {
   }
 }
 
-export class ValidationError extends AppError {
-  constructor(message: string, details?: unknown) {
-    super(message, 'VALIDATION_ERROR', 400, details)
-  }
-}
-
 export class UnauthorizedError extends AppError {
   constructor(message = 'Unauthorized') {
     super(message, 'UNAUTHORIZED', 401)
@@ -31,18 +25,6 @@ export class ForbiddenError extends AppError {
 export class NotFoundError extends AppError {
   constructor(resource: string) {
     super(`${resource} not found`, 'NOT_FOUND', 404)
-  }
-}
-
-export class ConflictError extends AppError {
-  constructor(message: string) {
-    super(message, 'CONFLICT', 409)
-  }
-}
-
-export class PaymentError extends AppError {
-  constructor(code: string, message: string, details?: unknown) {
-    super(message, code, 402, details)
   }
 }
 
