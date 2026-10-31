@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../lib/prisma.js'
 import { ForbiddenError, NotFoundError } from '../lib/errors.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { sendApiKeyRegeneratedEmail } from './email.js'
 
 const BCRYPT_ROUNDS = 10
@@ -79,7 +79,7 @@ export async function validateApiKey(rawKey: string): Promise<string> {
       // Update lastUsedAt without blocking the request.
       prisma.apiKey
         .update({ where: { id: candidate.id }, data: { lastUsedAt: new Date() } })
-        .catch(() => undefined)
+        .catch(logBackgroundFailure('update API key lastUsedAt', { userId: candidate.userId }))
       return candidate.userId
     }
   }

@@ -28,7 +28,7 @@ import { requireApiKey } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
 import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
@@ -256,7 +256,7 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
       await incrementTotalSpent(userId, amountUsdc)
 
       // Refresh balance + low-balance check
-      void refreshAndCheckBalance(userId, wallet.id, wallet.stellarPublicKey).catch(() => undefined)
+      void refreshAndCheckBalance(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
       // Build the X-Payment proof header for the agent to use in its retry request
       const paymentProof = buildX402PaymentProof({
@@ -460,7 +460,7 @@ async function refreshAndCheckBalance(
     }
 
     if (new Decimal(balance).lessThan(threshold)) {
-      void sendLowBalanceEmail(userId, balance, String(threshold)).catch(() => undefined)
+      void sendLowBalanceEmail(userId, balance, String(threshold)).catch(logBackgroundFailure('low-balance email', { userId }))
     }
   }
 }

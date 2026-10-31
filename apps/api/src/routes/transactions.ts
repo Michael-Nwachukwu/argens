@@ -18,7 +18,7 @@ import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError, sendPaginated } from '../lib/response.js'
 import { AppError, NotFoundError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
 import { checkPolicy, checkPolicyAndReserve, releaseSpend, incrementTotalSpent } from '../services/policy.js'
 import { submitPayment } from '../services/payment.js'
@@ -213,8 +213,8 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
         })
 
-        void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
-        void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
+        void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance cache', { userId }))
+        void checkAndNotifyLowBalance(userId, wallet.id).catch(logBackgroundFailure('low-balance check', { userId }))
 
         sendSuccess(res, {
           status: 'success',
@@ -361,8 +361,8 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         },
       })
 
-      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
-      void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
+      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance cache', { userId }))
+      void checkAndNotifyLowBalance(userId, wallet.id).catch(logBackgroundFailure('low-balance check', { userId }))
 
       sendSuccess(res, {
         status: 'cross_chain_pending',
@@ -507,7 +507,7 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       })
 
       await incrementTotalSpent(userId, refundAmount)
-      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
+      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance cache', { userId }))
 
       sendSuccess(res, {
         status: 'success',
