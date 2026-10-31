@@ -680,6 +680,10 @@ export const ENDPOINT_QUERY_PARAMS: Record<string, Record<string, string>> = {
   // ── Alchemy ──────────────────────────────────────────────────────────────────
   alchemy_network_nft_v3_endpoint: { network: 'eth-mainnet', endpoint: 'getNFTsForOwner' },
 
+  // ── Mercury ──────────────────────────────────────────────────────────────────
+  // The catalog's example_params hash 404s upstream; this one returned 200 on 2026-10-29.
+  mercury_txs_by_hash: { tx_hash: '57f80b9cdf64006c67f3541a87de57f93b75e86d120ad1d080e50f9770950c5e' },
+
   // ── fal.ai dynamic model routes ──────────────────────────────────────────────
   fal_model: { model: 'fal-ai/flux/dev' },
   fal_namespace_model: { namespace: 'fal-ai', model: 'flux/dev' },

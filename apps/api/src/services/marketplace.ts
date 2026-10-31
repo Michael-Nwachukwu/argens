@@ -858,6 +858,38 @@ async function executeMarketplaceCallInternal(
 
   const mppHash = mppResult.receipt?.reference ?? getProgressHash(mppResult)
 
+  // MPP Router settles only after the provider returns 2xx, and on a settle failure it
+  // logs and serves the content anyway — no X-Payment-Tx. The user still got the result,
+  // so the call stays SUCCESS, but the base cost never left the payer's wallet. Flag it.
+  const settlement = mppHash ? 'confirmed' : 'unconfirmed'
+  if (!mppHash) {
+    logger.warn('Marketplace call delivered without settlement evidence', {
+      userId,
+      transactionId: finalTxId,
+      serviceId: service.id,
+    })
+    void prisma.auditLog
+      .create({
+        data: {
+          userId,
+          eventType: 'MARKETPLACE_SETTLEMENT_UNCONFIRMED',
+          eventData: {
+            transactionId: finalTxId,
+            serviceId: service.id,
+            baseCost: finalCost.baseString,
+            paidWithCredits: state.paidWithCredits,
+          },
+        },
+      })
+      .catch((e: unknown) =>
+        logger.error('Audit write failed for MARKETPLACE_SETTLEMENT_UNCONFIRMED', {
+          userId,
+          transactionId: finalTxId,
+          error: (e as Error).message,
+        }),
+      )
+  }
+
   await prisma.transaction.update({
     where: { id: finalTxId },
     data: {
@@ -870,6 +902,7 @@ async function executeMarketplaceCallInternal(
           public_path: service.public_path,
           challenge: sanitizeChallenge(finalChallenge),
           receipt: mppResult.receipt,
+          settlement,
           progress: mppResult.progress,
         },
         ...(state.paidWithCredits

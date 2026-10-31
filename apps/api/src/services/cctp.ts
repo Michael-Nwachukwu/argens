@@ -38,7 +38,7 @@ const NETWORK_PASSPHRASE = NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TE
 
 const SOROBAN_RPC_URL =
   process.env['SOROBAN_RPC_URL'] ??
-  (NETWORK === 'mainnet' ? 'https://soroban.stellar.org' : 'https://soroban-testnet.stellar.org')
+  (NETWORK === 'mainnet' ? 'https://mainnet.sorobanrpc.com' : 'https://soroban-testnet.stellar.org')
 
 // ─── Contract addresses ────────────────────────────────────────────────────────
 

@@ -1,3 +1,11 @@
+## Task: Live verification follow-ups (2026-10-29)
+**Goal:** Fix what the first live GET call (`mercury_txs_by_hash`, credit pool) exposed.
+- [x] Live call: 404 with the catalog's example hash (no charge, classified `none`); 200 with a real hash — data delivered, **no settlement** (no `X-Payment-Tx`, pool balance unchanged)
+- [x] Unsettled-but-delivered calls: `metadata.mpp_router.settlement` + `AuditLog MARKETPLACE_SETTLEMENT_UNCONFIRMED` + warn log; stays SUCCESS, markup still charged
+- [x] Mainnet Soroban RPC fallback → `mainnet.sorobanrpc.com` (`mpp-client.ts`, `cctp.ts`)
+- [x] Curated working `tx_hash` for `mercury_txs_by_hash`
+- [ ] Raise the silent settle failure with MPP Router (Mercury, 2026-10-29 ~18:25 UTC, payer GADF…3ZJR)
+
 ## Task: MPP Router auto-refunds, path params, GET routes
 
 **Goal:** Stop Argens double-refunding (and credit users losing credits) now that MPP Router auto-refunds non-delivered paid calls, and expose the catalog features agents currently can't use (path params, GET routes).

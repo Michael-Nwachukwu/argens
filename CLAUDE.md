@@ -498,6 +498,7 @@ real file before writing a query or a migration.
 - **Money is `Decimal(18, 7)` everywhere**, and crosses the API boundary as a 7-decimal **string**. Never a float, never a JS number.
 - **`Policy.totalSpent` is incremented at policy-check time**, not at submission time — see [Policy Engine Logic](#policy-engine-logic). `checkPolicyAndReserve` does both in one `Serializable` transaction; `releaseSpend` compensates on failure.
 - **`Transaction.stellarTxHash` is null on marketplace rows** even when payment settled. The x402 settlement hash lives in `metadata.mpp_router.receipt.reference`. A null `stellarTxHash` on a marketplace row does **not** mean no money moved — check the receipt.
+- **The reverse also happens: a marketplace `SUCCESS` can be unsettled.** MPP settles after the provider's 2xx and serves the content even if that settle fails. Argens then stores `metadata.mpp_router.settlement = "unconfirmed"` and writes `AuditLog MARKETPLACE_SETTLEMENT_UNCONFIRMED`; the markup is still charged (the user got the data). Seen live on Mercury 2026-10-29.
 - **`Wallet.stellarSecretKeyEnc` is never returned by any endpoint** except the explicit, password-gated `POST /wallet/export-key`.
 - **Migrations apply automatically on deploy** — the API `Dockerfile` runs `prisma migrate deploy` in its `CMD`. A redeploy is a migration.
 

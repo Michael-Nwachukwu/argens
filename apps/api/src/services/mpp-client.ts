@@ -86,7 +86,7 @@ const X402_NETWORK = NETWORK === 'mainnet' ? 'stellar:pubnet' : 'stellar:testnet
 // Mirrors the resolution used in services/cctp.ts.
 const SOROBAN_RPC_URL =
   process.env['SOROBAN_RPC_URL'] ??
-  (NETWORK === 'mainnet' ? 'https://soroban.stellar.org' : 'https://soroban-testnet.stellar.org')
+  (NETWORK === 'mainnet' ? 'https://mainnet.sorobanrpc.com' : 'https://soroban-testnet.stellar.org')
 
 export async function performMppRequest(params: MppRequestParams): Promise<MppRequestResult> {
   const [{ x402Client, x402HTTPClient }, { ExactStellarScheme, createEd25519Signer }] =
