@@ -44,6 +44,13 @@ describe('requireJwt', () => {
   })
 })
 
+describe('requireJwt — algorithm pinning', () => {
+  it('rejects a token signed with a different HMAC algorithm', async () => {
+    const hs512 = jwt.sign({ userId: 'u1', email: 'a@b.co' }, SECRET, { algorithm: 'HS512' })
+    expect(statusOf((await call(requireJwt, `Bearer ${hs512}`)).res)).toBe(401)
+  })
+})
+
 describe('requireApiKey', () => {
   it('accepts a key validateApiKey resolves', async () => {
     mockValidate.mockResolvedValue('u2')

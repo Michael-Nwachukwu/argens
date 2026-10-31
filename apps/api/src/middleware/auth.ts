@@ -18,6 +18,9 @@ declare global {
   }
 }
 
+// Pinned on both sign and verify, so a token can never select its own algorithm.
+const JWT_ALGORITHM = 'HS256'
+
 function getJwtSecret(): string {
   const secret = process.env['JWT_SECRET']
   if (!secret || secret.length < 32) {
@@ -37,7 +40,7 @@ function bearerToken(req: Request, res: Response): string | null {
 
 function authenticateJwt(token: string, req: Request, res: Response, next: NextFunction): void {
   try {
-    const payload = jwt.verify(token, getJwtSecret()) as JwtPayload
+    const payload = jwt.verify(token, getJwtSecret(), { algorithms: [JWT_ALGORITHM] }) as JwtPayload
     req.userId = payload.userId
     req.userEmail = payload.email
     req.authType = 'jwt'
@@ -101,6 +104,7 @@ export function requireJwtOrApiKey(req: Request, res: Response, next: NextFuncti
  */
 export function signJwt(payload: JwtPayload): string {
   return jwt.sign(payload, getJwtSecret(), {
+    algorithm: JWT_ALGORITHM,
     expiresIn: (process.env['JWT_EXPIRES_IN'] ?? '1h') as jwt.SignOptions['expiresIn'],
   })
 }
