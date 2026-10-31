@@ -61,7 +61,7 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
     return
   }
 
-  // Ethereal — catches all emails in a test inbox, shows preview URL in console.
+  // Ethereal — catches all emails in a test inbox; the preview URL is in the log line.
   const transport = await getEtherealTransport()
   const info = await transport.sendMail({
     from: '"Argens" <noreply@argens.xyz>',
@@ -73,7 +73,6 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
     subject: payload.subject,
     previewUrl,
   })
-  console.log('\n📧  EMAIL PREVIEW:', previewUrl, '\n')
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
