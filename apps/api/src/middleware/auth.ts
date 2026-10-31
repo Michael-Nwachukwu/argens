@@ -24,17 +24,16 @@ function getJwtSecret(): string {
   return secret
 }
 
-/**
- * Requires a valid JWT (issued on login).
- * Used by dashboard routes.
- */
-export function requireJwt(req: Request, res: Response, next: NextFunction): void {
+function bearerToken(req: Request, res: Response): string | null {
   const header = req.headers.authorization
   if (!header?.startsWith('Bearer ')) {
     sendError(res, 'Missing Authorization header', 'UNAUTHORIZED', 401)
-    return
+    return null
   }
-  const token = header.slice(7)
+  return header.slice(7)
+}
+
+function authenticateJwt(token: string, req: Request, res: Response, next: NextFunction): void {
   try {
     const payload = jwt.verify(token, getJwtSecret()) as JwtPayload
     req.userId = payload.userId
@@ -46,18 +45,8 @@ export function requireJwt(req: Request, res: Response, next: NextFunction): voi
   }
 }
 
-/**
- * Requires a valid Argens API key (argns_live_...).
- * Used by agent-facing routes (/pay, /quote, /wallet/balance etc.)
- */
-export function requireApiKey(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization
-  if (!header?.startsWith('Bearer ')) {
-    sendError(res, 'Missing Authorization header', 'UNAUTHORIZED', 401)
-    return
-  }
-  const key = header.slice(7)
-  validateApiKey(key)
+function authenticateApiKey(token: string, req: Request, res: Response, next: NextFunction): void {
+  validateApiKey(token)
     .then((userId) => {
       req.userId = userId
       req.authType = 'apiKey'
@@ -69,41 +58,33 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction): 
 }
 
 /**
+ * Requires a valid JWT (issued on login).
+ * Used by dashboard routes.
+ */
+export function requireJwt(req: Request, res: Response, next: NextFunction): void {
+  const token = bearerToken(req, res)
+  if (token) authenticateJwt(token, req, res, next)
+}
+
+/**
+ * Requires a valid Argens API key (argns_live_...).
+ * Used by agent-facing routes (/pay, /quote, /wallet/balance etc.)
+ */
+export function requireApiKey(req: Request, res: Response, next: NextFunction): void {
+  const token = bearerToken(req, res)
+  if (token) authenticateApiKey(token, req, res, next)
+}
+
+/**
  * Accepts either a valid JWT (dashboard) OR a valid API key (agent).
  * Used by routes that must be accessible from both the dashboard and agent API.
  */
 export function requireJwtOrApiKey(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization
-  if (!header?.startsWith('Bearer ')) {
-    sendError(res, 'Missing Authorization header', 'UNAUTHORIZED', 401)
-    return
-  }
-  const token = header.slice(7)
-
-  // API keys start with "argns_" — try API key path first
-  if (token.startsWith('argns_')) {
-    validateApiKey(token)
-      .then((userId) => {
-        req.userId = userId
-        req.authType = 'apiKey'
-        next()
-      })
-      .catch(() => {
-        sendError(res, 'Invalid or revoked API key', 'UNAUTHORIZED', 401)
-      })
-    return
-  }
-
-  // Otherwise try JWT
-  try {
-    const payload = jwt.verify(token, getJwtSecret()) as JwtPayload
-    req.userId = payload.userId
-    req.userEmail = payload.email
-    req.authType = 'jwt'
-    next()
-  } catch {
-    sendError(res, 'Invalid or expired token', 'UNAUTHORIZED', 401)
-  }
+  const token = bearerToken(req, res)
+  if (!token) return
+  // API keys start with "argns_"; anything else is treated as a JWT.
+  if (token.startsWith('argns_')) authenticateApiKey(token, req, res, next)
+  else authenticateJwt(token, req, res, next)
 }
 
 /**
