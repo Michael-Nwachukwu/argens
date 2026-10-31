@@ -26,6 +26,13 @@ const ALLOWED_ORIGINS = (process.env['FRONTEND_URL'] ?? 'http://localhost:3000')
   .split(',').map(o => o.trim())
 
 // ─── Security ──────────────────────────────────────────────────────────────────
+// Behind Traefik every request arrives from the proxy's address. Without trusting that hop,
+// req.ip is the proxy for all clients and the IP rate limits become one shared bucket.
+const TRUST_PROXY_HOPS = Number(
+  process.env['TRUST_PROXY_HOPS'] || (process.env['NODE_ENV'] === 'production' ? 1 : 0),
+)
+app.set('trust proxy', TRUST_PROXY_HOPS)
+
 app.use(helmet())
 app.use(cors({
   origin: (origin, cb) => {
