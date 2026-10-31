@@ -1,3 +1,20 @@
+## Task: Code cleanup pass (2026-10-31)
+**Goal:** Fix the real defects a full survey turned up, remove dead code, and tighten error handling — one logical change per commit, `pnpm verify` + web typecheck green after each.
+**Branch:** `chore/cleanup`
+**Steps:**
+- [ ] API keys: generating a key must deactivate the previous ones (dashboard promises "immediately invalidated"; today every key ever issued stays valid) + audit log + the existing-but-never-sent regenerated email
+- [ ] Email links: every dashboard CTA (`/wallet`, `/policies`, `/transactions/:id`, `/marketplace`, `/api-keys`) 404s on argens.xyz — they live under `/dashboard`
+- [ ] API key hashing: `bcrypt.hashSync` blocks the event loop → async
+- [ ] Dead code: unused `ValidationError` / `ConflictError` / `PaymentError`, `detectChain`, unused `resetPinAttempts` import
+- [ ] Fire-and-forget `.catch(() => undefined)` → log the failure (CLAUDE.md rule 6)
+- [ ] `cctp.ts` `any`s → typed
+- [ ] `email.ts` Ethereal preview `console.log` → logger
+- [ ] Web: unused imports / variables (dashboard, docs, services pages)
+- [ ] Web: one shared `AddFundsModal` (two drifted copies)
+- [ ] `pnpm verify` also typechecks the web app
+**Risks:** key deactivation changes behaviour for anyone running two keys on purpose — the UI already says regenerate invalidates, so this matches the documented contract.
+**Done when:** every item committed separately, all tests + both typechecks pass.
+
 ## Task: Live verification follow-ups (2026-10-29)
 **Goal:** Fix what the first live GET call (`mercury_txs_by_hash`, credit pool) exposed.
 - [x] Live call: 404 with the catalog's example hash (no charge, classified `none`); 200 with a real hash — data delivered, **no settlement** (no `X-Payment-Tx`, pool balance unchanged)
