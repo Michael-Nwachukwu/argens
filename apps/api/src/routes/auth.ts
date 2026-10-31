@@ -231,6 +231,11 @@ authRouter.post('/resend-verification', emailResendLimiter, validate(resendSchem
   }
 })
 
+// A real cost-12 hash of a random secret nobody knows. It must be a well-formed 60-char
+// bcrypt hash: bcryptjs returns false instantly for a malformed one, which made unknown-email
+// logins ~2ms against ~370ms for real accounts and let anyone enumerate registered emails.
+const TIMING_DUMMY_HASH = '$2a$12$I6WKA89ohv0SdczAQvAof.KRPCyk1JUzSZbYHhioff2k5wa3YwEtq'
+
 // ─── POST /auth/login ──────────────────────────────────────────────────────────
 authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
   const { email, password } = req.body as z.infer<typeof loginSchema>
@@ -238,8 +243,8 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res) =
   try {
     const user = await prisma.user.findUnique({ where: { email } })
 
-    // Timing-safe: always run bcrypt even if user not found.
-    const passwordHash = user?.passwordHash ?? '$2a$12$invalidhashpadding000000000000000000000000000000000'
+    // Timing-safe: always run a full-cost bcrypt compare, even if the user does not exist.
+    const passwordHash = user?.passwordHash ?? TIMING_DUMMY_HASH
     const valid = await bcrypt.compare(password, passwordHash)
 
     if (!user || !valid) {
