@@ -9,6 +9,7 @@ import { signJwt, requireJwt } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { authLimiter, emailResendLimiter } from '../middleware/ratelimit.js'
 import { bootstrapWallet } from '../services/wallet.js'
+import { emailMatches, byEmailOldestFirst } from '../services/user.js'
 import { sendVerificationEmail, sendWalletReadyEmail, sendPasswordResetEmail } from '../services/email.js'
 import { createApiKey } from '../services/apikey.js'
 import { assertDeliverableEmail, EmailRejectedError } from '../services/email-validation.js'
@@ -19,7 +20,7 @@ export const authRouter: Router = ExpressRouter()
 
 // ─── Schemas ───────────────────────────────────────────────────────────────────
 const signupSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().trim().toLowerCase().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   accessCode: z.string().min(1, 'Access code is required during beta'),
 })
@@ -82,7 +83,7 @@ authRouter.post('/signup', authLimiter, validate(signupSchema), async (req, res)
       return
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } })
+    const existing = await prisma.user.findFirst({ where: emailMatches(email), orderBy: byEmailOldestFirst })
     if (existing) {
       sendError(res, 'An account with this email already exists.', 'CONFLICT', 409)
       return
@@ -204,7 +205,7 @@ authRouter.post('/resend-verification', emailResendLimiter, validate(resendSchem
   const { email } = req.body as z.infer<typeof resendSchema>
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findFirst({ where: emailMatches(email), orderBy: byEmailOldestFirst })
 
     // Always return the same response to avoid email enumeration.
     if (!user || user.emailVerified) {
@@ -220,7 +221,7 @@ authRouter.post('/resend-verification', emailResendLimiter, validate(resendSchem
       data: { emailVerificationToken, emailVerificationExpiry },
     })
 
-    sendVerificationEmail(email, emailVerificationToken).catch((e) =>
+    sendVerificationEmail(user.email, emailVerificationToken).catch((e) =>
       logger.error('Failed to resend verification email', { userId: user.id, error: (e as Error).message }),
     )
 
@@ -241,7 +242,7 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res) =
   const { email, password } = req.body as z.infer<typeof loginSchema>
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findFirst({ where: emailMatches(email), orderBy: byEmailOldestFirst })
 
     // Timing-safe: always run a full-cost bcrypt compare, even if the user does not exist.
     const passwordHash = user?.passwordHash ?? TIMING_DUMMY_HASH
@@ -286,7 +287,7 @@ authRouter.post('/forgot-password', emailResendLimiter, validate(forgotPasswordS
   const { email } = req.body as z.infer<typeof forgotPasswordSchema>
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findFirst({ where: emailMatches(email), orderBy: byEmailOldestFirst })
 
     if (user) {
       const passwordResetToken = generateSecureToken()
@@ -297,7 +298,7 @@ authRouter.post('/forgot-password', emailResendLimiter, validate(forgotPasswordS
         data: { passwordResetToken, passwordResetExpiry },
       })
 
-      sendPasswordResetEmail(email, passwordResetToken).catch((e) =>
+      sendPasswordResetEmail(user.email, passwordResetToken).catch((e) =>
         logger.error('Failed to send password reset email', { userId: user.id, error: (e as Error).message }),
       )
     }

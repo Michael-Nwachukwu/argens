@@ -436,6 +436,7 @@ argens/
 │           │   ├── policy.ts         # THE policy engine (checkPolicyAndReserve)
 │           │   ├── wallet.ts         # keypair generation, bootstrap, trustline
 │           │   ├── apikey.ts         # key generation + verification
+│           │   ├── user.ts           # case-insensitive email lookup (emailMatches)
 │           │   ├── cctp.ts           # CCTP V2 burn, fee maths, preflight
 │           │   ├── cctp-relay.ts     # attestation poll + Base mint; owns totalSpent on that path
 │           │   ├── marketplace.ts    # MPP call orchestration, markup, refund flagging

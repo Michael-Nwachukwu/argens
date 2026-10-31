@@ -36,6 +36,7 @@ import {
   providerDisplayName,
 } from '../services/mpp-router.js'
 import { AppError } from '../lib/errors.js'
+import { emailMatches, byEmailOldestFirst } from '../services/user.js'
 
 export const adminRouter: Router = ExpressRouter()
 
@@ -215,7 +216,11 @@ adminRouter.post('/credits/grant-by-email', validate(grantByEmailSchema), async 
       sendError(res, 'Amount must be greater than 0.', 'INVALID_AMOUNT', 400)
       return
     }
-    const user = await prisma.user.findUnique({ where: { email }, include: { wallet: true } })
+    const user = await prisma.user.findFirst({
+      where: emailMatches(email),
+      orderBy: byEmailOldestFirst,
+      include: { wallet: true },
+    })
     if (!user) {
       sendError(res, 'No user with that email.', 'NOT_FOUND', 404)
       return
