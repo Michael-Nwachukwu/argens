@@ -2,6 +2,8 @@ import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../lib/prisma.js'
 import { ForbiddenError, NotFoundError } from '../lib/errors.js'
+import { logger } from '../lib/logger.js'
+import { sendApiKeyRegeneratedEmail } from './email.js'
 
 const BCRYPT_ROUNDS = 10
 
@@ -28,9 +30,29 @@ export async function createApiKey(userId: string): Promise<{ key: string; prefi
 
   const { key, hash, prefix } = generateApiKey()
 
-  const apiKey = await prisma.apiKey.create({
-    data: { userId, keyHash: hash, keyPrefix: prefix },
+  // Generating a key REPLACES the current one: the dashboard tells the user the old key
+  // stops working immediately, so deactivate it in the same transaction as the create.
+  const { apiKey, revoked } = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.apiKey.updateMany({
+      where: { userId, isActive: true },
+      data: { isActive: false },
+    })
+    const created = await tx.apiKey.create({
+      data: { userId, keyHash: hash, keyPrefix: prefix },
+    })
+    if (count > 0) {
+      await tx.auditLog.create({
+        data: { userId, eventType: 'API_KEY_REGENERATED', eventData: { revokedKeys: count, newKeyPrefix: prefix } },
+      })
+    }
+    return { apiKey: created, revoked: count }
   })
+
+  if (revoked > 0) {
+    void sendApiKeyRegeneratedEmail(user.email).catch((e: unknown) =>
+      logger.error('API key regenerated email failed', { userId, error: (e as Error).message }),
+    )
+  }
 
   return { key, prefix, createdAt: apiKey.createdAt }
 }
