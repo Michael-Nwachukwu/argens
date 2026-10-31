@@ -335,10 +335,6 @@ function Callout({ type, children }: { type: 'tip' | 'warning' | 'error'; childr
   )
 }
 
-function Divider() {
-  return <div style={{ height: 1, background: t.border, margin: '40px 0' }} />
-}
-
 // ─── Section components ────────────────────────────────────────────────────────
 
 function OverviewSection() {
@@ -823,7 +819,6 @@ function ApprovalsSection() {
 }
 
 function MarketplaceSection() {
-  const [copied, setCopied] = useState(false)
   return (
     <section id="marketplace" style={{ padding: '56px 0', borderBottom: `1px solid ${t.border}` }}>
       <FadeUp>

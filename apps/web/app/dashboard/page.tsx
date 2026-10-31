@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { TopBar } from '@/components/dashboard/TopBar'
-import { Icon, Icons } from '@/components/dashboard/Icon'
 import { StatusBadge } from '@/components/ui/Badge'
 import { FundingHelpCard } from '@/components/dashboard/FundingHelpCard'
 import { transactions as txApi, wallet as walletApi, policies as policyApi, isError } from '@/lib/api'
@@ -87,7 +86,6 @@ function AddFundsModal({ address, onClose }: { address: string; onClose: () => v
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
   }
-  const short = address ? (address.slice(0, 10) + '…' + address.slice(-6)) : '—'
 
   return (
     <div
