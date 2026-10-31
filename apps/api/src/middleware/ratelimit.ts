@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import rateLimit from 'express-rate-limit'
 import { sendError } from '../lib/response.js'
 import type { Request, Response } from 'express'
@@ -6,11 +7,37 @@ const handler = (_req: Request, res: Response): void => {
   sendError(res, 'Too many requests — slow down.', 'RATE_LIMITED', 429)
 }
 
-/** General API rate limit: 100 requests per minute per IP */
+/**
+ * Agents are limited per API key, so several agents behind one NAT or cloud egress IP each
+ * get their own budget; everything else (dashboard JWTs, public routes) per client IP.
+ * The key is hashed so the raw credential never sits in the limiter's store.
+ */
+export function rateLimitKey(req: Request): string {
+  const auth = req.headers.authorization
+  if (auth?.startsWith('Bearer argns_live_')) {
+    return `key:${createHash('sha256').update(auth.slice('Bearer '.length)).digest('hex')}`
+  }
+  return `ip:${req.ip ?? 'unknown'}`
+}
+
+/** General API rate limit: 100 requests per minute per API key (per IP without one). */
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+  handler,
+})
+
+/**
+ * Per-IP ceiling behind apiLimiter. Keying by API key would otherwise let one client mint
+ * unlimited buckets by sending made-up keys; this bounds it without limiting real agents.
+ */
+export const ipCeilingLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 1000,
+  standardHeaders: false,
   legacyHeaders: false,
   handler,
 })

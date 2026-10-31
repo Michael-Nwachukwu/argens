@@ -11,7 +11,7 @@ import { approveRouter } from './routes/approve.js'
 import { x402Router } from './routes/x402.js'
 import { marketplaceRouter } from './routes/marketplace.js'
 import { adminRouter } from './routes/admin.js'
-import { apiLimiter } from './middleware/ratelimit.js'
+import { apiLimiter, ipCeilingLimiter } from './middleware/ratelimit.js'
 import { sendError } from './lib/response.js'
 import { AppError } from './lib/errors.js'
 import { logger } from './lib/logger.js'
@@ -47,7 +47,7 @@ app.use(cors({
 app.use(express.json({ limit: '64kb' }))
 
 // ─── Global rate limit ─────────────────────────────────────────────────────────
-app.use('/v1', apiLimiter)
+app.use('/v1', ipCeilingLimiter, apiLimiter)
 
 // ─── Routes ────────────────────────────────────────────────────────────────────
 app.use('/v1/auth', authRouter)
