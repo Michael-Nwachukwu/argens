@@ -104,6 +104,8 @@ function escapeHtml(value: string): string {
 
 // FRONTEND_URL may be comma-separated (multiple CORS origins); use only the first for link generation
 const FRONTEND_URL = ((process.env['FRONTEND_URL'] ?? 'http://localhost:3000').split(',')[0] ?? 'http://localhost:3000').trim()
+// Dashboard pages live under /dashboard; the bare paths (/wallet, /policies, …) 404.
+const DASHBOARD_URL = `${FRONTEND_URL}/dashboard`
 
 function buildEmailHtml(content: string): string {
   return `<!DOCTYPE html>
@@ -239,12 +241,12 @@ export function sendWalletReadyEmail(to: string, publicKey: string): Promise<voi
       ['Network', 'Stellar Mainnet'],
       ['Asset', 'USDC'],
     ])}
-    ${ctaButton('View your wallet', `${FRONTEND_URL}/wallet`)}
+    ${ctaButton('View your wallet', `${DASHBOARD_URL}/wallet`)}
     ${divider()}
     ${mutedText("Send USDC to the address above from any Stellar-compatible wallet or exchange. Your balance will appear in the dashboard within a few seconds of the transaction confirming.")}
   `)
 
-  const text = `Your Argens wallet is ready.\n\nDeposit address: ${publicKey}\nNetwork: Stellar Mainnet\nAsset: USDC\n\nFund it and your agent can start paying.\n\n${FRONTEND_URL}/wallet`
+  const text = `Your Argens wallet is ready.\n\nDeposit address: ${publicKey}\nNetwork: Stellar Mainnet\nAsset: USDC\n\nFund it and your agent can start paying.\n\n${DASHBOARD_URL}/wallet`
 
   return sendEmail({ to, subject: 'Your Argens wallet is ready', html, text })
 }
@@ -255,12 +257,12 @@ export function sendApiKeyRegeneratedEmail(to: string): Promise<void> {
     <div style="height:14px;"></div>
     ${sectionHeading('Your API key was regenerated')}
     ${bodyText("Any agents or integrations using the previous API key will stop working immediately. Update them with the new key from your dashboard.")}
-    ${ctaButton('Go to API keys', `${FRONTEND_URL}/api-keys`)}
+    ${ctaButton('Go to API keys', `${DASHBOARD_URL}/api-keys`)}
     ${divider()}
     ${mutedText("If you did not regenerate this key, someone else may have access to your account. Contact us immediately at <a href='mailto:hello@argens.xyz' style='color:#9C9490;'>hello@argens.xyz</a>.")}
   `)
 
-  const text = `Your Argens API key was regenerated.\n\nAny agents using the old key will stop working. Update them with the new key from your dashboard.\n\n${FRONTEND_URL}/api-keys\n\nIf you didn't do this, contact hello@argens.xyz immediately.`
+  const text = `Your Argens API key was regenerated.\n\nAny agents using the old key will stop working. Update them with the new key from your dashboard.\n\n${DASHBOARD_URL}/api-keys\n\nIf you didn't do this, contact hello@argens.xyz immediately.`
 
   return sendEmail({ to, subject: 'Your Argens API key was regenerated', html, text })
 }
@@ -294,12 +296,12 @@ export async function sendBlockedEmail(
       ['Block reason', escapeHtml(reasonLabel)],
       ['Transaction ID', escapeHtml(transactionId)],
     ])}
-    ${ctaButton('Review your policies', `${FRONTEND_URL}/policies`)}
+    ${ctaButton('Review your policies', `${DASHBOARD_URL}/policies`)}
     ${divider()}
     ${mutedText("If this payment was intentional, raise your policy limits in the dashboard and have your agent retry.")}
   `)
 
-  const text = `A payment was blocked by your Argens policy.\n\nAmount: ${amount} USDC\nRecipient: ${recipient}\nReason: ${reasonLabel}\nTransaction ID: ${transactionId}\n\nReview your policies: ${FRONTEND_URL}/policies`
+  const text = `A payment was blocked by your Argens policy.\n\nAmount: ${amount} USDC\nRecipient: ${recipient}\nReason: ${reasonLabel}\nTransaction ID: ${transactionId}\n\nReview your policies: ${DASHBOARD_URL}/policies`
 
   return sendEmail({ to, subject: `Payment blocked — ${amount} USDC`, html, text })
 }
@@ -363,10 +365,10 @@ export async function sendApprovalActedEmail(
       ['Amount', `${escapeHtml(amount)} USDC`],
       ['Transaction ID', escapeHtml(transactionId)],
     ])}
-    ${ctaButton('View transaction', `${FRONTEND_URL}/transactions/${transactionId}`)}
+    ${ctaButton('View transaction', `${DASHBOARD_URL}/transactions`)}
   `)
 
-  const text = `Payment ${action}.\n\nAmount: ${amount} USDC\nTransaction ID: ${transactionId}\n\n${detail}\n\nView details: ${FRONTEND_URL}/transactions/${transactionId}`
+  const text = `Payment ${action}.\n\nAmount: ${amount} USDC\nTransaction ID: ${transactionId}\n\n${detail}\n\nView details: ${DASHBOARD_URL}/transactions`
 
   return sendEmail({ to, subject: `Payment ${action} — ${amount} USDC`, html, text })
 }
@@ -387,12 +389,12 @@ export async function sendLowBalanceEmail(
       ['Current balance', `${escapeHtml(currentBalance)} USDC`],
       ['Warning threshold', `${escapeHtml(threshold)} USDC`],
     ])}
-    ${ctaButton('Fund your wallet', `${FRONTEND_URL}/wallet`)}
+    ${ctaButton('Fund your wallet', `${DASHBOARD_URL}/wallet`)}
     ${divider()}
     ${mutedText("Payments will continue as long as your balance is above $0, but blocked or failed payments may disrupt your agent's workflow.")}
   `)
 
-  const text = `Your Argens wallet balance is low.\n\nCurrent balance: ${currentBalance} USDC\nWarning threshold: ${threshold} USDC\n\nFund your wallet: ${FRONTEND_URL}/wallet`
+  const text = `Your Argens wallet balance is low.\n\nCurrent balance: ${currentBalance} USDC\nWarning threshold: ${threshold} USDC\n\nFund your wallet: ${DASHBOARD_URL}/wallet`
 
   return sendEmail({ to, subject: 'Low wallet balance — fund your agent', html, text })
 }
@@ -413,10 +415,10 @@ export async function sendWalletFundedEmail(
       ['Deposit amount', `${escapeHtml(depositAmount)} USDC`],
       ['New balance', `${escapeHtml(newBalance)} USDC`],
     ])}
-    ${ctaButton('View your wallet', `${FRONTEND_URL}/wallet`)}
+    ${ctaButton('View your wallet', `${DASHBOARD_URL}/wallet`)}
   `)
 
-  const text = `Your Argens wallet received ${depositAmount} USDC.\n\nNew balance: ${newBalance} USDC\n\nYour agent is ready to pay.\n\n${FRONTEND_URL}/wallet`
+  const text = `Your Argens wallet received ${depositAmount} USDC.\n\nNew balance: ${newBalance} USDC\n\nYour agent is ready to pay.\n\n${DASHBOARD_URL}/wallet`
 
   return sendEmail({ to, subject: `${depositAmount} USDC received`, html, text })
 }
@@ -447,12 +449,12 @@ export async function sendCreditsGrantedEmail(
       ['Expires', expiryFormatted],
       ...reasonRow,
     ])}
-    ${ctaButton('Explore the marketplace', `${FRONTEND_URL}/marketplace`)}
+    ${ctaButton('Explore the marketplace', `${DASHBOARD_URL}/marketplace`)}
     ${divider()}
     ${mutedText("Credits apply to marketplace service calls only. They are not withdrawable and do not count toward direct wallet transfers. Unused credits expire on the date shown above.")}
   `)
 
-  const text = `You received ${amount} USDC in Argens marketplace credits.\n\nExpires: ${expiresAt.toISOString()}\n${cleanReason ? `Reason: ${cleanReason}\n` : ''}\nUse them in the marketplace: ${FRONTEND_URL}/marketplace`
+  const text = `You received ${amount} USDC in Argens marketplace credits.\n\nExpires: ${expiresAt.toISOString()}\n${cleanReason ? `Reason: ${cleanReason}\n` : ''}\nUse them in the marketplace: ${DASHBOARD_URL}/marketplace`
 
   return sendEmail({ to, subject: `${amount} USDC marketplace credits added`, html, text })
 }
@@ -554,12 +556,12 @@ export async function sendPolicyChangedEmail(
     ${sectionHeading('Spending policies updated')}
     ${bodyText("Your Argens spending policies were just updated. Here's a summary of the new settings:")}
     ${summaryHtml}
-    ${ctaButton('Review your policies', `${FRONTEND_URL}/policies`)}
+    ${ctaButton('Review your policies', `${DASHBOARD_URL}/policies`)}
     ${divider()}
     ${mutedText("If you did not make this change, contact us immediately at <a href='mailto:hello@argens.xyz' style='color:#9C9490;'>hello@argens.xyz</a>.")}
   `)
 
-  const text = `Your Argens spending policies were updated.\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n') || 'All limits cleared.'}\n\nIf you didn't make this change, contact hello@argens.xyz immediately.\n\n${FRONTEND_URL}/policies`
+  const text = `Your Argens spending policies were updated.\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n') || 'All limits cleared.'}\n\nIf you didn't make this change, contact hello@argens.xyz immediately.\n\n${DASHBOARD_URL}/policies`
 
   return sendEmail({ to, subject: 'Spending policies updated', html, text })
 }
