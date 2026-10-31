@@ -60,7 +60,8 @@ export async function createApiKey(userId: string): Promise<{ key: string; prefi
 
 /**
  * Validates an API key from an Authorization header.
- * Returns the userId if valid, throws UnauthorizedError if not.
+ * Returns the userId if valid; throws ForbiddenError if the key is malformed, unknown or revoked.
+ * Any other error is a lookup failure (e.g. database down), not a verdict on the key.
  */
 export async function validateApiKey(rawKey: string): Promise<string> {
   if (!rawKey.startsWith('argns_live_')) {

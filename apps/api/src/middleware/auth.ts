@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { sendError } from '../lib/response.js'
 import { validateApiKey } from '../services/apikey.js'
+import { ForbiddenError } from '../lib/errors.js'
+import { logger } from '../lib/logger.js'
 
 export type JwtPayload = { userId: string; email: string }
 
@@ -52,8 +54,15 @@ function authenticateApiKey(token: string, req: Request, res: Response, next: Ne
       req.authType = 'apiKey'
       next()
     })
-    .catch(() => {
-      sendError(res, 'Invalid or revoked API key', 'UNAUTHORIZED', 401)
+    .catch((e: unknown) => {
+      if (e instanceof ForbiddenError) {
+        sendError(res, 'Invalid or revoked API key', 'UNAUTHORIZED', 401)
+        return
+      }
+      // Not a verdict on the key — the lookup itself failed (e.g. database down). A 401 here
+      // would tell the agent its key is revoked; make it retryable instead.
+      logger.error('API key validation failed', { error: e instanceof Error ? e.message : String(e) })
+      sendError(res, 'Could not verify the API key right now. Retry shortly.', 'AUTH_UNAVAILABLE', 503)
     })
 }
 

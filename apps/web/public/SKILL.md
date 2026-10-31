@@ -1,4 +1,4 @@
-# Argens Skill — v8 — updated 2026-10-27
+# Argens Skill — v8 — updated 2026-10-31
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -446,6 +446,7 @@ POST /marketplace/call
 
 - Never log or expose the API key
 - Never retry a 402 — the payment was blocked by policy, not a transient error
+- A `401 UNAUTHORIZED` means the API key is invalid or revoked (generating a new key in the dashboard revokes the old one) — stop and ask the user for their current key. A `503 AUTH_UNAVAILABLE` is temporary: the key is fine, retry after a few seconds
 - Never call `/pay` or `/marketplace/call` without stating the amount and purpose to the user first
 - Always call `/quote` before a large payment if you are unsure whether the policy allows it
 - Always call `GET /agent/status` to confirm key + balance before starting a session

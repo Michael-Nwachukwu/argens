@@ -63,6 +63,16 @@ describe('requireApiKey', () => {
   })
 })
 
+describe('requireApiKey — lookup failure', () => {
+  it('returns a retryable 503, not a 401, when validation itself fails', async () => {
+    mockValidate.mockRejectedValue(new Error('Can\'t reach database server'))
+    const { res, nextCalled } = await call(requireApiKey, 'Bearer argns_live_abc')
+    expect(nextCalled).toBe(false)
+    expect(statusOf(res)).toBe(503)
+    expect(codeOf(res)).toBe('AUTH_UNAVAILABLE')
+  })
+})
+
 describe('requireJwtOrApiKey', () => {
   it('routes argns_ tokens to API key validation and others to JWT', async () => {
     mockValidate.mockResolvedValue('u3')
