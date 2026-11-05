@@ -4,7 +4,7 @@
  * GET  /policies — retrieve current policy settings
  * POST /policies — update policy limits
  *
- * Policy writes: Postgres only in Phase 2 (Soroban contract writes added in Phase 4).
+ * Policy writes go to Postgres only (plus an AuditLog entry) — there is no on-chain write.
  */
 
 import { type Router } from 'express'
@@ -17,6 +17,7 @@ import { prisma } from '../lib/prisma.js'
 import { savePolicy } from '../services/policy.js'
 import { sendPolicyChangedEmail } from '../services/email.js'
 import { logger } from '../lib/logger.js'
+import { DecimalAmountSchema } from '../lib/money.js'
 
 export const policiesRouter: Router = ExpressRouter()
 
@@ -25,7 +26,7 @@ export const policiesRouter: Router = ExpressRouter()
 // null = remove limit; string with 7 decimal places = set limit
 const LimitField = z
   .union([
-    z.string().regex(/^\d+(\.\d{1,7})?$/, 'Must be a decimal string (e.g. "50.0000000")'),
+    DecimalAmountSchema,
     z.null(),
   ])
   .optional()
@@ -75,7 +76,7 @@ policiesRouter.post('/policies', requireJwt, validate(PolicyUpdateSchema), async
   const body = req.body as z.infer<typeof PolicyUpdateSchema>
 
   try {
-    // Save to Postgres (Phase 2 stand-in — Phase 4 adds Soroban write first)
+    // Postgres is the source of truth for policy; there is no on-chain write.
     const updated = await savePolicy(userId, {
       allowanceLimit: body.allowance_limit,
       maxTransactionLimit: body.max_transaction_limit,

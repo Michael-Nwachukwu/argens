@@ -3,7 +3,9 @@ import {
   Networks,
   Keypair,
   Asset,
+  StrKey,
 } from '@stellar/stellar-sdk'
+import { isAddress } from 'viem'
 import { StellarError } from '../lib/errors.js'
 
 // ─── Network config ────────────────────────────────────────────────────────────
@@ -112,18 +114,17 @@ export async function getAccountBalances(
 }
 
 // ─── Address validation helpers ────────────────────────────────────────────────
+// Prefix + length checks are not enough: "G" + 55 junk characters passed and only failed
+// at signing, and "0x" + 40 non-hex characters passed all the way to the CCTP burn.
+
+/** Valid ed25519 public key (G..., base32, correct checksum). */
 export function isStellarAddress(address: string): boolean {
-  return address.startsWith('G') && address.length === 56
+  return StrKey.isValidEd25519PublicKey(address)
 }
 
+/** 0x + 40 hex chars; a mixed-case address must also match its EIP-55 checksum. */
 export function isEvmAddress(address: string): boolean {
-  return address.startsWith('0x') && address.length === 42
-}
-
-export function detectChain(recipient: string): 'stellar' | 'base' {
-  if (isStellarAddress(recipient)) return 'stellar'
-  if (isEvmAddress(recipient)) return 'base'
-  throw new StellarError(`Cannot detect destination chain from recipient: ${recipient}`)
+  return isAddress(address)
 }
 
 // ─── Memo validation ───────────────────────────────────────────────────────────

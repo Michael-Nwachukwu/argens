@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Logo } from './ui/Logo'
 import { SHOWCASE_PROJECTS, type ShowcaseProject } from '@/lib/showcase'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const t = {
@@ -796,10 +797,9 @@ function Marketplace() {
 
 // ─── Two Ways ────────────────────────────────────────────────────────────────
 function TwoWays() {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard()
   const copy = () => {
-    navigator.clipboard?.writeText(SKILL_PROMPT).catch(() => {})
-    setCopied(true); setTimeout(() => setCopied(false), 1800)
+    copyText(SKILL_PROMPT)
   }
   return (
     <section className="lp-section-lg" style={{ padding: '96px 0', borderTop: `1px solid ${t.border}` }} id="integration">

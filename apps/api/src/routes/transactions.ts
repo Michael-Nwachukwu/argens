@@ -18,11 +18,12 @@ import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError, sendPaginated } from '../lib/response.js'
 import { AppError, NotFoundError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
-import { checkPolicy, checkPolicyAndReserve, releaseSpend, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment } from '../services/payment.js'
-import { isStellarAddress, isEvmAddress, validateMemo, getUsdcBalance } from '../services/stellar.js'
+import { checkPolicy, checkPolicyAndReserve, releaseSpend } from '../services/policy.js'
+import { submitPayment, recordLandedPayment } from '../services/payment.js'
+import { isStellarAddress, isEvmAddress, validateMemo } from '../services/stellar.js'
+import { refreshBalanceAndWarn } from '../services/balance.js'
 import {
   burnUsdcOnStellar,
   encodeEvmRecipient,
@@ -32,18 +33,15 @@ import {
   BASE_DOMAIN,
 } from '../services/cctp.js'
 import { enqueueRelay } from '../services/cctp-relay.js'
+import { PositiveAmountSchema } from '../lib/money.js'
 import {
   sendBlockedEmail,
   sendPendingApprovalEmail,
-  sendLowBalanceEmail,
 } from '../services/email.js'
 
 // ─── Validation schemas ──────────────────────────────────────────────────────
 
-const AmountSchema = z
-  .string()
-  .regex(/^\d+(\.\d{1,7})?$/, 'Amount must be a string with up to 7 decimal places')
-  .refine((v) => parseFloat(v) > 0, 'Amount must be greater than 0')
+const AmountSchema = PositiveAmountSchema
 
 const PaySchema = z.object({
   recipient: z.string().min(1, 'Recipient is required'),
@@ -199,31 +197,14 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
 
     if (isStellar) {
       // ── Stellar direct payment ──────────────────────────────────────────────
+      let stellarResult: { hash: string }
       try {
         const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-        const stellarResult = await submitPayment({
+        stellarResult = await submitPayment({
           senderSecretKey: secretKey,
           recipientPublicKey: recipient,
           amount,
           memo: memo ?? null,
-        })
-
-        await prisma.transaction.update({
-          where: { id: tx.id },
-          data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-        })
-
-        void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
-        void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
-
-        sendSuccess(res, {
-          status: 'success',
-          transaction_id: tx.id,
-          stellar_tx_hash: stellarResult.hash,
-          amount,
-          recipient,
-          timestamp: new Date().toISOString(),
-          policy_check: buildPolicyCheckResponse(policyResult.detail),
         })
       } catch (stellarErr) {
         logger.error('Stellar payment failed', { userId, transactionId: tx.id, error: (stellarErr as Error).message })
@@ -240,7 +221,24 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           error: (stellarErr as Error).message,
           transaction_id: tx.id,
         })
+        return
       }
+
+      // The payment is on-chain from here. Nothing below may report failure or release the
+      // reservation — an agent told "failed" would retry and pay twice.
+      await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId })
+
+      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+      sendSuccess(res, {
+        status: 'success',
+        transaction_id: tx.id,
+        stellar_tx_hash: stellarResult.hash,
+        amount,
+        recipient,
+        timestamp: new Date().toISOString(),
+        policy_check: buildPolicyCheckResponse(policyResult.detail),
+      })
     } else {
       // ── CCTP cross-chain: burn on Stellar → fee → fire-and-forget relay ─────
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
@@ -315,7 +313,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           data: {
             status: 'FAILED',
             blockedReason: errMsg || errStr,
-            metadata: { failureReason: 'cctp_burn_failed' },
+            metadata: { ...(metadata ?? {}), failureReason: 'cctp_burn_failed' },
           },
         })
         sendError(res, 'Cross-chain payment failed during burn on Stellar. No fee was charged.', 'CCTP_BURN_FAILED', 502, {
@@ -351,6 +349,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         data: {
           stellarTxHash,
           metadata: {
+            ...(metadata ?? {}),
             cctpFee: {
               rate: CCTP_FEE_RATE.toString(),
               amount: feeAmount,
@@ -361,8 +360,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         },
       })
 
-      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
-      void checkAndNotifyLowBalance(userId, wallet.id).catch(() => undefined)
+      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
       sendSuccess(res, {
         status: 'cross_chain_pending',
@@ -492,31 +490,14 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       },
     })
 
+    let stellarResult: { hash: string }
     try {
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
+      stellarResult = await submitPayment({
         senderSecretKey: secretKey,
         recipientPublicKey: original.recipientAddress,
         amount: refundAmount,
         memo: `Refund ${original.id.slice(0, 12)}`,
-      })
-
-      await prisma.transaction.update({
-        where: { id: refundTx.id },
-        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-      })
-
-      await incrementTotalSpent(userId, refundAmount)
-      void refreshBalanceCache(wallet.id, wallet.stellarPublicKey).catch(() => undefined)
-
-      sendSuccess(res, {
-        status: 'success',
-        refund_transaction_id: refundTx.id,
-        original_transaction_id: original.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount: refundAmount,
-        recipient: original.recipientAddress,
-        timestamp: new Date().toISOString(),
       })
     } catch (stellarErr) {
       logger.error('Refund Stellar payment failed', {
@@ -531,7 +512,22 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       sendError(res, 'Refund failed due to Stellar error.', 'STELLAR_PAYMENT_FAILED', 502, {
         transaction_id: refundTx.id,
       })
+      return
     }
+
+    // On-chain from here — see /pay.
+    await recordLandedPayment({ transactionId: refundTx.id, stellarTxHash: stellarResult.hash, userId, incrementSpend: refundAmount })
+    void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+    sendSuccess(res, {
+      status: 'success',
+      refund_transaction_id: refundTx.id,
+      original_transaction_id: original.id,
+      stellar_tx_hash: stellarResult.hash,
+      amount: refundAmount,
+      recipient: original.recipientAddress,
+      timestamp: new Date().toISOString(),
+    })
   } catch (err) {
     next(err)
   }
@@ -742,38 +738,5 @@ function buildQuotePolicyCheck(policyResult: {
       policyResult.status === 'PENDING_APPROVAL'
         ? 'would_require_approval'
         : policyResult.detail.approval_threshold === 'not_set' ? 'not_configured' : 'would_pass',
-  }
-}
-
-async function refreshBalanceCache(walletId: string, publicKey: string): Promise<void> {
-  const balance = await getUsdcBalance(publicKey)
-  if (balance !== null) {
-    await prisma.wallet.update({
-      where: { id: walletId },
-      data: { balanceCache: balance, balanceCachedAt: new Date() },
-    })
-  }
-}
-
-async function checkAndNotifyLowBalance(userId: string, walletId: string): Promise<void> {
-  const LOW_BALANCE_USDC = 10
-
-  const [wallet, policy] = await Promise.all([
-    prisma.wallet.findUnique({ where: { id: walletId } }),
-    prisma.policy.findUnique({ where: { userId } }),
-  ])
-
-  if (!wallet || !policy) return
-
-  let threshold = LOW_BALANCE_USDC
-  if (policy.allowanceLimit) {
-    const remaining = policy.allowanceLimit.minus(policy.totalSpent)
-    threshold = Math.max(LOW_BALANCE_USDC, remaining.mul('0.10').toNumber())
-  }
-
-  if (wallet.balanceCache.lessThan(threshold)) {
-    void sendLowBalanceEmail(userId, wallet.balanceCache.toFixed(7), String(threshold)).catch((e: unknown) =>
-      logger.error('Failed to send low-balance email', { userId, error: (e as Error).message }),
-    )
   }
 }

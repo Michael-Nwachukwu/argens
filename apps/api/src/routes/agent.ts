@@ -14,7 +14,7 @@ import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { getUsdcBalance } from '../services/stellar.js'
 import { getActiveCreditsBalance } from '../services/credits.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 
 export const agentRouter: Router = ExpressRouter()
 
@@ -49,10 +49,12 @@ agentRouter.get('/agent/status', requireJwtOrApiKey, async (req, res, next) => {
           const live = await getUsdcBalance(wallet.stellarPublicKey)
           if (live !== null) {
             walletBalance = live
-            void prisma.wallet.update({
-              where: { id: wallet.id },
-              data: { balanceCache: live, balanceCachedAt: new Date() },
-            })
+            void prisma.wallet
+              .update({
+                where: { id: wallet.id },
+                data: { balanceCache: live, balanceCachedAt: new Date() },
+              })
+              .catch(logBackgroundFailure('cache balance in /agent/status', { userId }))
           }
         } catch (e) {
           logger.warn('Balance fetch failed in /agent/status — using cache', {

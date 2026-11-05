@@ -34,3 +34,13 @@ export const logger = {
     if (isDev) log('debug', message, meta)
   },
 }
+
+/**
+ * `.catch()` handler for fire-and-forget work (cache refreshes, notification emails).
+ * The request has already succeeded, so a failure must not throw — but it must be visible.
+ */
+export function logBackgroundFailure(task: string, meta?: Record<string, unknown>) {
+  return (e: unknown): void => {
+    log('warn', `Background task failed: ${task}`, { ...meta, error: e instanceof Error ? e.message : String(e) })
+  }
+}

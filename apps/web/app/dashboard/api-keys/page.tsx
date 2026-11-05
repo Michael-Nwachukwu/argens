@@ -4,10 +4,11 @@ import { useState } from 'react'
 import { TopBar } from '@/components/dashboard/TopBar'
 import { Icon, Icons } from '@/components/dashboard/Icon'
 import { apiKeys as apiKeysApi, isError } from '@/lib/api'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 export default function ApiKeysPage() {
   const [revealed, setRevealed]   = useState(false)
-  const [copied, setCopied]       = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard()
   const [regenOpen, setRegenOpen] = useState(false)
   const [newKey, setNewKey]       = useState<string | null>(null)
   const [loading, setLoading]     = useState(false)
@@ -23,9 +24,7 @@ export default function ApiKeysPage() {
 
   const copy = () => {
     if (!newKey) return
-    navigator.clipboard?.writeText(newKey).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
+    copyText(newKey)
   }
 
   const confirmRegen = async () => {
@@ -159,12 +158,10 @@ export default function ApiKeysPage() {
 }
 
 function SkillPromptBox() {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard()
   const prompt = 'Hi, read https://argens.xyz/SKILL.md and continue with the onboarding steps.'
   const copy = () => {
-    navigator.clipboard?.writeText(prompt).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
+    copyText(prompt)
   }
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, overflow: 'hidden' }}>

@@ -11,7 +11,7 @@ import { prisma } from '../lib/prisma.js'
 import { AppError } from '../lib/errors.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
 import { logger } from '../lib/logger.js'
-import { checkPolicy, incrementTotalSpent, type PolicyResult } from './policy.js'
+import { checkPolicyAndReserve, incrementTotalSpent, releaseSpend, type PolicyResult } from './policy.js'
 import { submitPayment } from './payment.js'
 import { performMppRequest, type MppChallengeSnapshot, type MppRequestResult } from './mpp-client.js'
 import {
@@ -525,7 +525,20 @@ async function executeMarketplaceCallInternal(
     policyResultForTx?: PolicyResult
     paidWithCredits: boolean
     creditDeductions?: Array<{ grantId: string; deducted: string }>
+    /** Amount checkPolicyAndReserve added to totalSpent; must be released if the call fails. */
+    reservedSpend?: string
   } = { txId: options.approvedTransaction?.id ?? null, paidWithCredits: false }
+
+  const releaseReservation = async (): Promise<void> => {
+    const amount = state.reservedSpend
+    if (!amount) return
+    state.reservedSpend = undefined
+    await releaseSpend(userId, amount).catch((e: unknown) =>
+      logger.error('Failed to release reserved marketplace spend — reconcile totalSpent', {
+        userId, serviceId: service.id, amount, error: (e as Error).message,
+      }),
+    )
+  }
 
   let mppResult: MppRequestResult
   try {
@@ -573,8 +586,11 @@ async function executeMarketplaceCallInternal(
           return
         }
 
-        const policyResult = await checkPolicy(userId, challengeCost.totalString)
+        // Reserves the cost atomically when APPROVED, so concurrent calls cannot jointly
+        // exceed the allowance. Every exit below that ends without a charge releases it.
+        const policyResult = await checkPolicyAndReserve(userId, challengeCost.totalString)
         state.policyResultForTx = policyResult
+        if (policyResult.status === 'APPROVED') state.reservedSpend = challengeCost.totalString
 
         if (policyResult.status === 'BLOCKED') {
           const tx = await createMarketplaceTransaction({
@@ -657,6 +673,7 @@ async function executeMarketplaceCallInternal(
       },
     })
   } catch (e) {
+    await releaseReservation()
     // If credits were deducted before MPP Router commit, refund them — the on-chain
     // payment didn't complete so the user should be made whole. AppError throws inside
     // onChallenge (BLOCKED, PENDING_APPROVAL, INSUFFICIENT_CREDITS) happen before the
@@ -686,6 +703,7 @@ async function executeMarketplaceCallInternal(
   }
 
   if (!state.challengeSnapshot || !state.cost || !state.txId) {
+    await releaseReservation()
     // The upstream service rejected the request before any MPP payment challenge
     // was issued. No USDC was charged. Surface the upstream body so the caller
     // can fix their request.
@@ -707,6 +725,8 @@ async function executeMarketplaceCallInternal(
   const finalChallenge = state.challengeSnapshot
 
   if (!mppResult.ok) {
+    // An undelivered call does not count toward the allowance (refunds are handled below).
+    await releaseReservation()
     // MPP Router settles before calling upstream, and on non-delivery refunds the payer
     // itself (`Refund-Status: pending`). Only the cases it will NOT refund need Argens ops.
     // See services/marketplace-refund.ts.
@@ -923,7 +943,8 @@ async function executeMarketplaceCallInternal(
     },
   })
 
-  await incrementTotalSpent(userId, finalCost.totalString)
+  // Fresh calls reserved their cost at check time; approval execution did not.
+  if (!state.reservedSpend) await incrementTotalSpent(userId, finalCost.totalString)
 
   return {
     status: 'success',

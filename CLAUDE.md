@@ -436,6 +436,7 @@ argens/
 │           │   ├── policy.ts         # THE policy engine (checkPolicyAndReserve)
 │           │   ├── wallet.ts         # keypair generation, bootstrap, trustline
 │           │   ├── apikey.ts         # key generation + verification
+│           │   ├── user.ts           # case-insensitive email lookup (emailMatches)
 │           │   ├── cctp.ts           # CCTP V2 burn, fee maths, preflight
 │           │   ├── cctp-relay.ts     # attestation poll + Base mint; owns totalSpent on that path
 │           │   ├── marketplace.ts    # MPP call orchestration, markup, refund flagging
@@ -447,6 +448,7 @@ argens/
 │           │   ├── email.ts          # Resend / ethereal templates
 │           │   ├── email-validation.ts       # disposable-domain + MX checks
 │           │   ├── watcher.ts        # Horizon payments SSE + 60s poll fallback
+│           │   ├── balance.ts        # user balance cache + low-balance email (24h rate limit)
 │           │   ├── alerting.ts       # low-balance alerts for all four platform wallets (ops on spendable XLM)
 │           │   └── admin-balances.ts # all four platform wallet balances
 │           ├── middleware/
@@ -1487,7 +1489,7 @@ Do not re-litigate these. They are settled.
 | Transfer PIN | Optional 4-digit PIN (bcrypt-hashed) on `POST /wallet/send` | Protects manual dashboard transfers even if session is compromised; agents use API key path, unaffected |
 | Session security | JWT expires 1h; client-side tab-idle logout after 5 min hidden | Short-lived tokens + idle logout reduce exposure without degrading UX |
 | Separate send endpoint | `POST /wallet/send` is JWT-only; agent payments via `POST /pay` (API key only) | Keeps agent and human-initiated spend on separate auth paths — no mixing |
-| Policy applies to marketplace | Same policy check (`checkPolicy`) runs for marketplace calls as for direct payments | Agents cannot bypass policy limits by routing through marketplace |
+| Policy applies to marketplace | Same atomic policy check (`checkPolicyAndReserve`) runs for marketplace calls as for direct payments | Agents cannot bypass policy limits by routing through marketplace |
 
 ---
 

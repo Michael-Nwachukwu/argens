@@ -17,14 +17,14 @@
 
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
-import type { ApprovalQueue, Transaction } from '@prisma/client'
+import type { ApprovalQueue, Prisma, Transaction } from '@prisma/client'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import { decryptSecretKey } from '../lib/crypto.js'
-import { submitPayment } from '../services/payment.js'
-import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
+import { submitPayment, recordLandedPayment } from '../services/payment.js'
+import { checkPolicy } from '../services/policy.js'
 import { sendApprovalActedEmail } from '../services/email.js'
 import { executeApprovedMarketplaceTransaction } from '../services/marketplace.js'
 import { isEvmAddress } from '../services/stellar.js'
@@ -260,7 +260,7 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
           data: {
             status: 'FAILED',
             blockedReason: errMsg || errStr,
-            metadata: { failureReason: 'cctp_burn_failed' },
+            metadata: { ...storedMetadata(transaction.metadata), failureReason: 'cctp_burn_failed' },
           },
         })
         sendError(res, 'Cross-chain payment failed during burn on Stellar. No fee was charged.', 'CCTP_BURN_FAILED', 502, {
@@ -297,6 +297,7 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
           crossChain: true,
           destinationChain: 'base',
           metadata: {
+            ...storedMetadata(transaction.metadata),
             cctpFee: {
               rate: CCTP_FEE_RATE.toString(),
               amount: feeAmount,
@@ -327,34 +328,13 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
       void enqueueRelay(transaction.id, { incrementOnSuccess: true })
     } else {
       // ── Stellar direct payment ───────────────────────────────────────────────
+      let stellarResult: { hash: string }
       try {
-        const stellarResult = await submitPayment({
+        stellarResult = await submitPayment({
           senderSecretKey: secretKey,
           recipientPublicKey: transaction.recipientAddress,
           amount,
           memo: transaction.memo ?? null,
-        })
-
-        await prisma.transaction.update({
-          where: { id: transaction.id },
-          data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-        })
-
-        await incrementTotalSpent(userId, amount)
-
-        void sendApprovalActedEmail(userId, transaction.id, 'approved', amount).catch(
-          (e: unknown) =>
-            logger.error('Failed to send approval acted email', {
-              userId,
-              error: (e as Error).message,
-            }),
-        )
-
-        sendSuccess(res, {
-          status: 'approved',
-          transaction_id: transaction.id,
-          stellar_tx_hash: stellarResult.hash,
-          amount,
         })
       } catch (stellarErr) {
         logger.error('Stellar payment failed on approval', {
@@ -374,7 +354,31 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
         sendError(res, 'Payment failed after approval due to Stellar error.', 'STELLAR_PAYMENT_FAILED', 502, {
           transaction_id: transaction.id,
         })
+        return
       }
+
+      // The payment is on-chain from here — never report failure (see recordLandedPayment).
+      await recordLandedPayment({
+        transactionId: transaction.id,
+        stellarTxHash: stellarResult.hash,
+        userId,
+        incrementSpend: amount,
+      })
+
+      void sendApprovalActedEmail(userId, transaction.id, 'approved', amount).catch(
+        (e: unknown) =>
+          logger.error('Failed to send approval acted email', {
+            userId,
+            error: (e as Error).message,
+          }),
+      )
+
+      sendSuccess(res, {
+        status: 'approved',
+        transaction_id: transaction.id,
+        stellar_tx_hash: stellarResult.hash,
+        amount,
+      })
     }
   } catch (err) {
     next(err)
@@ -458,4 +462,9 @@ async function consumeToken(
   })
   if (!queue) return null // deleted between update and read — treat as lost
   return { queue, transaction: queue.transaction }
+}
+
+/** The agent's metadata on the stored row, so status writes add to it instead of replacing it. */
+function storedMetadata(value: Prisma.JsonValue): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }

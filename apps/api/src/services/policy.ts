@@ -1,12 +1,12 @@
 /**
  * services/policy.ts
  *
- * TypeScript policy stand-in for Phase 2.
- * Reads policy rules from Postgres and enforces them in-process.
+ * The V1 policy engine. Reads policy rules from Postgres and enforces them in-process.
+ * This is permanent for V1 — the Soroban contract was dropped (see CLAUDE.md).
  *
- * Phase 4 replaces checkPolicy() with a Soroban contract call.
- * Every downstream consumer (routes/transactions.ts, routes/approve.ts)
- * uses the PolicyResult type — the swap-out is transparent to callers.
+ * Payment paths enforce through checkPolicyAndReserve, which also reserves the amount
+ * atomically; checkPolicy is the read-only form, used by /quote, the approval re-check and
+ * (pending a decision on its semantics) /refund.
  *
  * Policy check order (CLAUDE.md):
  *   1. Max Transaction  → BLOCKED if amount > maxTransactionLimit

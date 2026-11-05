@@ -23,6 +23,11 @@ describe('isStellarAddress', () => {
   it('returns false for a 56-char string not starting with G', () => {
     expect(isStellarAddress('S' + 'A'.repeat(55))).toBe(false)
   })
+
+  it('returns false for a G-prefixed 56-char string with a bad checksum', () => {
+    expect(isStellarAddress('G' + 'A'.repeat(55))).toBe(false)
+    expect(isStellarAddress(USDC_ISSUER.slice(0, -1) + 'A')).toBe(false)
+  })
 })
 
 describe('isEvmAddress', () => {
@@ -36,6 +41,17 @@ describe('isEvmAddress', () => {
 
   it('returns false for a short 0x string', () => {
     expect(isEvmAddress('0xabc')).toBe(false)
+  })
+
+  it('returns false for 40 non-hex characters', () => {
+    expect(isEvmAddress('0x' + 'zz'.repeat(20))).toBe(false)
+    expect(isEvmAddress('0x' + 'ab'.repeat(19) + 'gg')).toBe(false)
+  })
+
+  it('returns false for a mixed-case address with a wrong EIP-55 checksum', () => {
+    // Correct checksum: 0x52908400098527886E0F7030069857D2E4169EE7
+    expect(isEvmAddress('0x52908400098527886E0F7030069857D2E4169EE7')).toBe(true)
+    expect(isEvmAddress('0x52908400098527886e0F7030069857D2E4169EE7')).toBe(false)
   })
 
   it('returns false for an address without 0x prefix', () => {

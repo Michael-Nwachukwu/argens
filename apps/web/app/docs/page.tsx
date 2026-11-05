@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { Logo } from '@/components/ui/Logo'
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const t = {
@@ -237,14 +238,12 @@ function syntaxHighlight(code: string): React.ReactNode {
 }
 
 function TerminalBlock({ file, tag, children }: { file?: string; tag?: React.ReactNode; children: React.ReactNode }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard(1600)
   const codeRef = useRef<HTMLPreElement>(null)
 
   const handleCopy = () => {
     const text = codeRef.current?.textContent ?? ''
-    navigator.clipboard?.writeText(text).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1600)
+    copyText(text)
   }
 
   const highlighted = typeof children === 'string' ? syntaxHighlight(children) : children
@@ -333,10 +332,6 @@ function Callout({ type, children }: { type: 'tip' | 'warning' | 'error'; childr
       <div style={{ fontSize: 13, color: t.text2, lineHeight: 1.7 }}>{children}</div>
     </div>
   )
-}
-
-function Divider() {
-  return <div style={{ height: 1, background: t.border, margin: '40px 0' }} />
 }
 
 // ─── Section components ────────────────────────────────────────────────────────
@@ -823,7 +818,6 @@ function ApprovalsSection() {
 }
 
 function MarketplaceSection() {
-  const [copied, setCopied] = useState(false)
   return (
     <section id="marketplace" style={{ padding: '56px 0', borderBottom: `1px solid ${t.border}` }}>
       <FadeUp>
@@ -933,11 +927,10 @@ function MarketplaceSection() {
 }
 
 function DiscoverabilitySection() {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopyToClipboard(1600)
   const SKILL_PROMPT = 'Hi, read https://argens.xyz/SKILL.md and continue with the onboarding steps.'
   const copy = () => {
-    navigator.clipboard?.writeText(SKILL_PROMPT).catch(() => {})
-    setCopied(true); setTimeout(() => setCopied(false), 1600)
+    copyText(SKILL_PROMPT)
   }
   return (
     <section id="discoverability" style={{ padding: '56px 0', borderBottom: `1px solid ${t.border}` }}>

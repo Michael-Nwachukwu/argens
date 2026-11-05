@@ -12,23 +12,25 @@ import { Decimal } from '@prisma/client/runtime/library'
 import { requireJwt, requireJwtOrApiKey } from '../middleware/auth.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { getUsdcBalance, getXlmBalance, getAccountBalances, isStellarAddress, validateMemo } from '../services/stellar.js'
+import { getXlmBalance, getAccountBalances, isStellarAddress, validateMemo } from '../services/stellar.js'
+import { refreshBalanceAndWarn } from '../services/balance.js'
 import {
   activateAccount,
   getSpendableXlm,
   inspectAccount,
   SPONSORED_RESERVE_PER_WALLET_XLM,
 } from '../services/sponsorship.js'
-import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment } from '../services/payment.js'
+import { checkPolicyAndReserve, releaseSpend } from '../services/policy.js'
+import { submitPayment, recordLandedPayment } from '../services/payment.js'
 import { getActiveCreditsBalance } from '../services/credits.js'
 import { decryptSecretKey } from '../lib/crypto.js'
 import { validate } from '../middleware/validate.js'
 import { authLimiter, checkPinAttempt, resetPinAttempts } from '../middleware/ratelimit.js'
 import { sendBlockedEmail, sendPendingApprovalEmail } from '../services/email.js'
 import { generateSecureToken } from '../lib/crypto.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 import bcrypt from 'bcryptjs'
+import { PositiveAmountSchema } from '../lib/money.js'
 
 export const walletRouter: Router = ExpressRouter()
 
@@ -36,10 +38,7 @@ const CACHE_TTL_MS = 30_000 // 30 seconds
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
-const AmountSchema = z
-  .string()
-  .regex(/^\d+(\.\d{1,7})?$/, 'Amount must be a string with up to 7 decimal places')
-  .refine((v) => parseFloat(v) > 0, 'Amount must be greater than 0')
+const AmountSchema = PositiveAmountSchema
 
 const SendSchema = z.object({
   recipient: z.string().min(1, 'Recipient is required'),
@@ -270,7 +269,9 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
     }
 
     // 5. Run policy check
-    const policyResult = await checkPolicy(userId, amount)
+    // Reserves the amount atomically when APPROVED, so concurrent sends cannot jointly
+    // exceed the allowance; released below if the payment fails.
+    const policyResult = await checkPolicyAndReserve(userId, amount)
 
     // ── BLOCKED ─────────────────────────────────────────────────────────────
     if (policyResult.status === 'BLOCKED') {
@@ -359,58 +360,14 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
       },
     })
 
+    let stellarResult: { hash: string }
     try {
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
+      stellarResult = await submitPayment({
         senderSecretKey: secretKey,
         recipientPublicKey: recipient,
         amount,
         memo: memo ?? null,
-      })
-
-      // Mark SUCCESS + record hash
-      await prisma.transaction.update({
-        where: { id: tx.id },
-        data: {
-          status: 'SUCCESS',
-          stellarTxHash: stellarResult.hash,
-        },
-      })
-
-      // Increment totalSpent
-      await incrementTotalSpent(userId, amount)
-
-      // Refresh balance cache (fire-and-forget)
-      void getUsdcBalance(wallet.stellarPublicKey)
-        .then(async (live) => {
-          if (live !== null) {
-            await prisma.wallet.update({
-              where: { id: wallet.id },
-              data: { balanceCache: live, balanceCachedAt: new Date() },
-            })
-          }
-        })
-        .catch(() => undefined)
-
-      sendSuccess(res, {
-        status: 'success',
-        transaction_id: tx.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount,
-        recipient,
-        timestamp: new Date().toISOString(),
-        policy_check: {
-          allowance:
-            policyResult.detail.allowance === 'not_set' ? 'not_configured' : policyResult.detail.allowance,
-          max_transaction:
-            policyResult.detail.max_transaction === 'not_set'
-              ? 'not_configured'
-              : policyResult.detail.max_transaction,
-          approval_threshold:
-            policyResult.detail.approval_threshold === 'not_set'
-              ? 'not_configured'
-              : policyResult.detail.approval_threshold,
-        },
       })
     } catch (stellarErr) {
       logger.error('Stellar payment failed (dashboard send)', {
@@ -418,6 +375,11 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         transactionId: tx.id,
         error: (stellarErr as Error).message,
       })
+      await releaseSpend(userId, amount).catch((releaseErr: unknown) =>
+        logger.error('Failed to release reserved spend after Stellar failure', {
+          userId, transactionId: tx.id, error: (releaseErr as Error).message,
+        }),
+      )
 
       await prisma.transaction.update({
         where: { id: tx.id },
@@ -431,7 +393,35 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         error: (stellarErr as Error).message,
         transaction_id: tx.id,
       })
+      return
     }
+
+    // The payment is on-chain from here — never report failure (see recordLandedPayment).
+    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId })
+
+    // Refresh balance cache + low-balance check (fire-and-forget)
+    void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+    sendSuccess(res, {
+      status: 'success',
+      transaction_id: tx.id,
+      stellar_tx_hash: stellarResult.hash,
+      amount,
+      recipient,
+      timestamp: new Date().toISOString(),
+      policy_check: {
+        allowance:
+          policyResult.detail.allowance === 'not_set' ? 'not_configured' : policyResult.detail.allowance,
+        max_transaction:
+          policyResult.detail.max_transaction === 'not_set'
+            ? 'not_configured'
+            : policyResult.detail.max_transaction,
+        approval_threshold:
+          policyResult.detail.approval_threshold === 'not_set'
+            ? 'not_configured'
+            : policyResult.detail.approval_threshold,
+      },
+    })
   } catch (err) {
     next(err)
   }

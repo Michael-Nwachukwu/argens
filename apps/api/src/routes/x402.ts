@@ -9,7 +9,8 @@
  *
  * Supported networks in V1:
  *   - stellar / stellar-testnet / stellar-mainnet  → native Stellar USDC payment (live)
- *   - base / base-sepolia / base-mainnet            → CCTP V2 burn-and-mint (Phase 4)
+ *   - base / base-sepolia / base-mainnet            → not supported: returns 501 CCTP_NOT_YET_IMPLEMENTED
+ *     (a Base paywall expects a Base-side payment proof, which a CCTP burn on Stellar cannot provide)
  *
  * x402 amount formats:
  *   - EVM USDC: 6 decimal integer string ("1000000" = 1 USDC)
@@ -28,17 +29,16 @@ import { requireApiKey } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
-import { logger } from '../lib/logger.js'
+import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
-import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment } from '../services/payment.js'
+import { checkPolicyAndReserve, releaseSpend } from '../services/policy.js'
+import { submitPayment, recordLandedPayment } from '../services/payment.js'
 import { isStellarAddress, isEvmAddress } from '../services/stellar.js'
 import {
   sendBlockedEmail,
   sendPendingApprovalEmail,
-  sendLowBalanceEmail,
 } from '../services/email.js'
-import { getUsdcBalance } from '../services/stellar.js'
+import { refreshBalanceAndWarn } from '../services/balance.js'
 
 export const x402Router: Router = ExpressRouter()
 
@@ -116,17 +116,17 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
 
     // ── 2. Route by network ───────────────────────────────────────────────────
     if (BASE_NETWORKS.has(network.toLowerCase()) || isEvmAddress(payTo)) {
-      // CCTP V2 — Base USDC settlement — Phase 4
+      // Code and status kept stable for existing integrations; the old message promised a
+      // "Phase 4" that shipped CCTP for POST /pay, not Base paywalls here.
       sendError(
         res,
-        'Base USDC settlement via CCTP V2 is coming in Phase 4. Currently only Stellar USDC payments are supported.',
+        'Paying x402 paywalls on Base is not supported. /pay/x402 settles Stellar USDC paywalls only.',
         'CCTP_NOT_YET_IMPLEMENTED',
         501,
         {
           detected_network: network,
           recipient: payTo,
-          phase: 'Phase 4 — Soroban + CCTP V2',
-          workaround: 'Use a Stellar USDC address (G... 56 chars) as recipient for immediate payment.',
+          workaround: 'If the paywall also accepts Stellar USDC, use its Stellar requirements. To send USDC to a Base address without a paywall, use POST /pay with the 0x recipient.',
         },
       )
       return
@@ -159,7 +159,8 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
     }
 
     // ── 4. Policy check ───────────────────────────────────────────────────────
-    const policyResult = await checkPolicy(userId, amountUsdc)
+    // Reserves the amount atomically when APPROVED; released below if the payment fails.
+    const policyResult = await checkPolicyAndReserve(userId, amountUsdc)
     const effectiveMemo = memo ?? (description ? description.slice(0, 28) : undefined) ?? null
 
     if (policyResult.status === 'BLOCKED') {
@@ -239,55 +240,14 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
       },
     })
 
+    let stellarResult: { hash: string }
     try {
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
+      stellarResult = await submitPayment({
         senderSecretKey: secretKey,
         recipientPublicKey: payTo,
         amount: amountUsdc,
         memo: effectiveMemo,
-      })
-
-      await prisma.transaction.update({
-        where: { id: tx.id },
-        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-      })
-
-      await incrementTotalSpent(userId, amountUsdc)
-
-      // Refresh balance + low-balance check
-      void refreshAndCheckBalance(userId, wallet.id, wallet.stellarPublicKey).catch(() => undefined)
-
-      // Build the X-Payment proof header for the agent to use in its retry request
-      const paymentProof = buildX402PaymentProof({
-        network: normalizeNetworkName(network),
-        txHash: stellarResult.hash,
-        amount: amountUsdc,
-        payTo,
-      })
-
-      logger.info('x402 payment executed', {
-        userId,
-        transactionId: tx.id,
-        txHash: stellarResult.hash,
-        resource: normalized.resource,
-      })
-
-      sendSuccess(res, {
-        status: 'success',
-        transaction_id: tx.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount: amountUsdc,
-        recipient: payTo,
-        network: normalizeNetworkName(network),
-        resource: normalized.resource,
-        timestamp: new Date().toISOString(),
-        /**
-         * Include this header value in your retry request to the paywall:
-         *   X-Payment: <payment_header>
-         */
-        payment_header: paymentProof,
-        policy_check: buildPolicyCheck(policyResult.detail),
       })
     } catch (stellarErr) {
       logger.error('x402 Stellar payment failed', {
@@ -295,6 +255,11 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
         transactionId: tx.id,
         error: (stellarErr as Error).message,
       })
+      await releaseSpend(userId, amountUsdc).catch((releaseErr: unknown) =>
+        logger.error('Failed to release reserved spend after Stellar failure', {
+          userId, transactionId: tx.id, error: (releaseErr as Error).message,
+        }),
+      )
       await prisma.transaction.update({
         where: { id: tx.id },
         data: { status: 'FAILED', blockedReason: (stellarErr as Error).message },
@@ -303,7 +268,46 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
         error: (stellarErr as Error).message,
         transaction_id: tx.id,
       })
+      return
     }
+
+    // The payment is on-chain from here — never report failure (see recordLandedPayment).
+    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId })
+
+    // Refresh balance + low-balance check
+    void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+    // Build the X-Payment proof header for the agent to use in its retry request
+    const paymentProof = buildX402PaymentProof({
+      network: normalizeNetworkName(network),
+      txHash: stellarResult.hash,
+      amount: amountUsdc,
+      payTo,
+    })
+
+    logger.info('x402 payment executed', {
+      userId,
+      transactionId: tx.id,
+      txHash: stellarResult.hash,
+      resource: normalized.resource,
+    })
+
+    sendSuccess(res, {
+      status: 'success',
+      transaction_id: tx.id,
+      stellar_tx_hash: stellarResult.hash,
+      amount: amountUsdc,
+      recipient: payTo,
+      network: normalizeNetworkName(network),
+      resource: normalized.resource,
+      timestamp: new Date().toISOString(),
+      /**
+       * Include this header value in your retry request to the paywall:
+       *   X-Payment: <payment_header>
+       */
+      payment_header: paymentProof,
+      policy_check: buildPolicyCheck(policyResult.detail),
+    })
   } catch (err) {
     next(err)
   }
@@ -436,31 +440,5 @@ function buildPolicyCheck(detail: {
     allowance: detail.allowance === 'not_set' ? 'not_configured' : detail.allowance,
     max_transaction: detail.max_transaction === 'not_set' ? 'not_configured' : detail.max_transaction,
     approval_threshold: detail.approval_threshold === 'not_set' ? 'not_configured' : detail.approval_threshold,
-  }
-}
-
-async function refreshAndCheckBalance(
-  userId: string,
-  walletId: string,
-  publicKey: string,
-): Promise<void> {
-  const balance = await getUsdcBalance(publicKey)
-  if (balance !== null) {
-    await prisma.wallet.update({
-      where: { id: walletId },
-      data: { balanceCache: balance, balanceCachedAt: new Date() },
-    })
-
-    const policy = await prisma.policy.findUnique({ where: { userId } })
-    const LOW_FLOOR = 10
-    let threshold = LOW_FLOOR
-    if (policy?.allowanceLimit) {
-      const remaining = policy.allowanceLimit.minus(policy.totalSpent).toNumber()
-      threshold = Math.max(LOW_FLOOR, remaining * 0.1)
-    }
-
-    if (new Decimal(balance).lessThan(threshold)) {
-      void sendLowBalanceEmail(userId, balance, String(threshold)).catch(() => undefined)
-    }
   }
 }

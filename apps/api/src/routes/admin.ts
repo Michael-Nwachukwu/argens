@@ -36,6 +36,8 @@ import {
   providerDisplayName,
 } from '../services/mpp-router.js'
 import { AppError } from '../lib/errors.js'
+import { emailMatches, byEmailOldestFirst } from '../services/user.js'
+import { DecimalAmountSchema } from '../lib/money.js'
 
 export const adminRouter: Router = ExpressRouter()
 
@@ -126,7 +128,7 @@ adminRouter.get('/access-codes', async (req, res) => {
 // ─── Credit grants (Track 2) ───────────────────────────────────────────────────
 
 const grantCreditsSchema = z.object({
-  amount: z.string().regex(/^\d+(\.\d{1,7})?$/, 'amount must be a decimal string with up to 7 places'),
+  amount: DecimalAmountSchema,
   reason: z.string().max(200).optional(),
   expiresInDays: z.number().int().min(1).max(365).optional(),
   expiresAt: z.string().datetime().optional(), // overrides expiresInDays if both set
@@ -215,7 +217,11 @@ adminRouter.post('/credits/grant-by-email', validate(grantByEmailSchema), async 
       sendError(res, 'Amount must be greater than 0.', 'INVALID_AMOUNT', 400)
       return
     }
-    const user = await prisma.user.findUnique({ where: { email }, include: { wallet: true } })
+    const user = await prisma.user.findFirst({
+      where: emailMatches(email),
+      orderBy: byEmailOldestFirst,
+      include: { wallet: true },
+    })
     if (!user) {
       sendError(res, 'No user with that email.', 'NOT_FOUND', 404)
       return
