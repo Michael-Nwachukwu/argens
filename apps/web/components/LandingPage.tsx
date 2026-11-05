@@ -36,7 +36,6 @@ const SYN = {
 }
 
 const SKILL_PROMPT = 'Hi, read https://argens.xyz/SKILL.md and continue with the onboarding steps.'
-const TALLY_FORM_ID = 'xX9AxG'
 const TALLY_SHOWCASE_ID = 'NpPPjW'
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -84,30 +83,6 @@ function FadeUp({ children, delay = 0, style }: { children: React.ReactNode; del
     }}>
       {children}
     </div>
-  )
-}
-
-function WaitlistButton({ size = 'sm', label = 'Join the waitlist', full }: { size?: 'sm' | 'lg'; label?: string; full?: boolean }) {
-  const pad  = size === 'lg' ? '13px 28px' : '8px 16px'
-  const font = size === 'lg' ? 15 : 13
-  return (
-    <button
-      data-tally-open={TALLY_FORM_ID}
-      data-tally-layout="modal"
-      data-tally-width="480"
-      data-tally-emoji-text="👋"
-      data-tally-emoji-animation="wave"
-      style={{
-        padding: pad, borderRadius: 7, fontSize: font, fontWeight: 600,
-        background: t.accent, color: t.bg, border: 'none', cursor: 'pointer',
-        fontFamily: 'DM Sans, sans-serif',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: full ? '100%' : undefined,
-        letterSpacing: '-0.01em',
-      }}
-    >
-      {label}
-    </button>
   )
 }
 
@@ -199,7 +174,6 @@ function Nav() {
               <a href="/login" onClick={() => setMenuOpen(false)} style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 8, border: `1px solid ${t.border2}`, color: t.text2, fontFamily: 'DM Sans, sans-serif', fontSize: 15, textDecoration: 'none' }}>
                 Log in
               </a>
-              <WaitlistButton size="lg" full label="Join the waitlist" />
             </div>
           </div>
         </div>
@@ -468,7 +442,6 @@ function Hero() {
               <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '13px 28px', borderRadius: 7, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', letterSpacing: '-0.01em' }}>
                 Sign up →
               </a>
-              <WaitlistButton size="lg" label="Join the waitlist" />
             </div>
             <div className="lp-hero-stats" style={{ marginTop: 40, display: 'flex', alignItems: 'center', gap: 28, animation: 'fadeInUp 0.6s 0.42s both ease-out' }}>
               {[
@@ -1361,23 +1334,19 @@ function CtaFooter() {
           <div style={{ maxWidth: 600, margin: '0 auto' }}>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: t.accent, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.accent, display: 'inline-block', animation: 'glow 2s infinite alternate' }}/>
-              Early access — mainnet live
+              Live on Stellar mainnet
             </div>
             <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 'clamp(32px,5vw,60px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.08, marginBottom: 20, color: t.text }}>
               Your agent is waiting<br/>to pay its first bill.
             </h2>
             <p style={{ fontSize: 17, color: t.muted, lineHeight: 1.75, marginBottom: 40, maxWidth: 460, margin: '0 auto 40px' }}>
-              A wallet, a policy engine, and a marketplace of 40+ AI services — all behind one API key. Request access and put your agent to work.
+              A wallet, a policy engine, and a marketplace of 40+ AI services — all behind one API key. Sign up and put your agent to work.
             </p>
             <div className="lp-cta-btns" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' as const }}>
               <a href="/signup" style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 32px', borderRadius: 8, fontSize: 15, fontWeight: 600, color: t.bg, background: t.accent, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', letterSpacing: '-0.01em' }}>
                 Sign up →
               </a>
-              <WaitlistButton size="lg" label="Join the waitlist" />
             </div>
-            <p style={{ marginTop: 20, fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace' }}>
-              Have a code? <a href="/signup" style={{ color: t.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>Sign up directly</a> · No code? Join the waitlist above.
-            </p>
           </div>
         </FadeUp>
       </section>
