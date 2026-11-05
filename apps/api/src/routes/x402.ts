@@ -9,7 +9,8 @@
  *
  * Supported networks in V1:
  *   - stellar / stellar-testnet / stellar-mainnet  → native Stellar USDC payment (live)
- *   - base / base-sepolia / base-mainnet            → CCTP V2 burn-and-mint (Phase 4)
+ *   - base / base-sepolia / base-mainnet            → not supported: returns 501 CCTP_NOT_YET_IMPLEMENTED
+ *     (a Base paywall expects a Base-side payment proof, which a CCTP burn on Stellar cannot provide)
  *
  * x402 amount formats:
  *   - EVM USDC: 6 decimal integer string ("1000000" = 1 USDC)
@@ -115,17 +116,17 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
 
     // ── 2. Route by network ───────────────────────────────────────────────────
     if (BASE_NETWORKS.has(network.toLowerCase()) || isEvmAddress(payTo)) {
-      // CCTP V2 — Base USDC settlement — Phase 4
+      // Code and status kept stable for existing integrations; the old message promised a
+      // "Phase 4" that shipped CCTP for POST /pay, not Base paywalls here.
       sendError(
         res,
-        'Base USDC settlement via CCTP V2 is coming in Phase 4. Currently only Stellar USDC payments are supported.',
+        'Paying x402 paywalls on Base is not supported. /pay/x402 settles Stellar USDC paywalls only.',
         'CCTP_NOT_YET_IMPLEMENTED',
         501,
         {
           detected_network: network,
           recipient: payTo,
-          phase: 'Phase 4 — Soroban + CCTP V2',
-          workaround: 'Use a Stellar USDC address (G... 56 chars) as recipient for immediate payment.',
+          workaround: 'If the paywall also accepts Stellar USDC, use its Stellar requirements. To send USDC to a Base address without a paywall, use POST /pay with the 0x recipient.',
         },
       )
       return
