@@ -37,6 +37,7 @@ import {
 import { AppError } from '../lib/errors.js'
 import { emailMatches, byEmailOldestFirst } from '../services/user.js'
 import { DecimalAmountSchema } from '../lib/money.js'
+import { getUsdcBalance } from '../services/stellar.js'
 
 export const adminRouter: Router = ExpressRouter()
 
@@ -364,13 +365,22 @@ adminRouter.get('/users', async (req, res) => {
   }
 })
 
-// GET /admin/users/:userId — detail view: wallet, active credits, recent grants, transaction summary.
+// GET /admin/users/:userId — everything the ops console's user sheet shows: account, wallet
+// with a live USDC balance, credits, policy, API keys, spend totals and recent activity.
+// Selects fields explicitly: password/PIN hashes and verification/reset tokens never leave.
 adminRouter.get('/users/:userId', async (req, res) => {
   const { userId } = req.params as { userId: string }
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
+        accessCodeId: true,
+        createdAt: true,
+        updatedAt: true,
+        transferPinHash: true, // read only to report pin_set; stripped below
         wallet: {
           select: {
             id: true,
@@ -382,7 +392,13 @@ adminRouter.get('/users/:userId', async (req, res) => {
             createdAt: true,
           },
         },
-        policies: true,
+        policies: {
+          select: { allowanceLimit: true, maxTransactionLimit: true, approvalThreshold: true, totalSpent: true, updatedAt: true },
+        },
+        apiKeys: {
+          orderBy: [{ createdAt: 'desc' }],
+          select: { id: true, keyPrefix: true, isActive: true, lastUsedAt: true, createdAt: true },
+        },
         creditGrants: { orderBy: [{ createdAt: 'desc' }], take: 20 },
         _count: { select: { transactions: true } },
       },
@@ -391,30 +407,105 @@ adminRouter.get('/users/:userId', async (req, res) => {
       sendError(res, 'User not found.', 'NOT_FOUND', 404)
       return
     }
-    const activeCredits = await prisma.creditGrant.aggregate({
-      where: {
-        userId,
-        amountRemaining: { gt: 0 },
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      _sum: { amountRemaining: true },
-    })
-    const txByStatus = await prisma.transaction.groupBy({
-      by: ['status'],
-      where: { userId },
-      _count: { _all: true },
-    })
+
+    const [activeCredits, txByStatus, spendByType, activity, liveUsdc] = await Promise.all([
+      prisma.creditGrant.aggregate({
+        where: {
+          userId,
+          amountRemaining: { gt: 0 },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        _sum: { amountRemaining: true },
+      }),
+      prisma.transaction.groupBy({ by: ['status'], where: { userId }, _count: { _all: true } }),
+      prisma.transaction.groupBy({
+        by: ['type'],
+        where: { userId, status: 'SUCCESS' },
+        _count: { _all: true },
+        _sum: { amount: true, costPaid: true },
+      }),
+      prisma.auditLog.findMany({
+        where: { userId },
+        orderBy: [{ createdAt: 'desc' }],
+        take: 30,
+        select: { id: true, eventType: true, eventData: true, createdAt: true },
+      }),
+      // Live read so ops sees the real balance, not a cache that only refreshes on activity.
+      user.wallet
+        ? getUsdcBalance(user.wallet.stellarPublicKey).catch((e: unknown) => {
+            logger.warn('Admin user detail: live USDC read failed, using cache', { userId, error: (e as Error).message })
+            return null
+          })
+        : Promise.resolve(null),
+    ])
+
+    // Marketplace rows charge costPaid (cost + markup); direct payments charge amount.
+    const spend = spendByType.map((r) => ({
+      type: r.type,
+      count: r._count._all,
+      total: ((r.type === 'marketplace' ? r._sum.costPaid : null) ?? r._sum.amount ?? new Decimal(0)).toFixed(7),
+    }))
+
+    const { transferPinHash, ...safeUser } = user
     sendSuccess(res, {
-      ...user,
-      passwordHash: undefined,
-      emailVerificationToken: undefined,
-      transferPinHash: undefined,
+      ...safeUser,
+      transfer_pin_set: transferPinHash !== null,
+      usdc_live: liveUsdc,
       active_credits_balance: (activeCredits._sum.amountRemaining ?? new Decimal(0)).toFixed(7),
       tx_by_status: txByStatus.map((r) => ({ status: r.status, count: r._count._all })),
+      spend_by_type: spend,
+      activity,
     })
   } catch (e) {
     logger.error('Admin user detail failed', { userId, error: (e as Error).message })
     sendError(res, 'Could not load user.', 'INTERNAL_ERROR', 500)
+  }
+})
+
+// GET /admin/users/:userId/transactions — paginated, newest first, optional ?status= filter.
+const TX_STATUSES = ['SUCCESS', 'BLOCKED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'FAILED'] as const
+
+adminRouter.get('/users/:userId/transactions', async (req, res) => {
+  const { userId } = req.params as { userId: string }
+  const page  = Math.max(1, parseInt(String(req.query['page']  ?? '1'),  10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query['limit'] ?? '25'), 10) || 25))
+  const statusParam = typeof req.query['status'] === 'string' ? req.query['status'] : ''
+  const status = (TX_STATUSES as readonly string[]).includes(statusParam)
+    ? (statusParam as (typeof TX_STATUSES)[number])
+    : undefined
+  const where = { userId, ...(status ? { status } : {}) }
+
+  try {
+    const [items, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          amount: true,
+          costPaid: true,
+          currency: true,
+          recipientAddress: true,
+          serviceId: true,
+          memo: true,
+          stellarTxHash: true,
+          crossChain: true,
+          destinationChain: true,
+          destinationTxHash: true,
+          blockedReason: true,
+          createdAt: true,
+        },
+      }),
+      prisma.transaction.count({ where }),
+    ])
+    sendPaginated(res, items, { page, total, pages: Math.max(1, Math.ceil(total / limit)) })
+  } catch (e) {
+    logger.error('Admin user transactions failed', { userId, error: (e as Error).message })
+    sendError(res, 'Could not list transactions.', 'INTERNAL_ERROR', 500)
   }
 })
 

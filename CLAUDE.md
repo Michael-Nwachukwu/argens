@@ -571,7 +571,7 @@ surface — if an endpoint is not here, it does not exist.
 | JWT | `POST /marketplace/services/:serviceId/enable\|disable` | Per-user provider enablement |
 | Token | `GET /approve/:token` | Read-only transaction detail for the confirm page (public) |
 | Token | `POST /approve/:token`, `POST /reject/:token` | Act on a pending approval |
-| Admin | `GET /admin/stats`, `/wallets`, `/users`, `/users/:id`, `/credit-grants` | Ops console reads |
+| Admin | `GET /admin/stats`, `/wallets`, `/users`, `/users/:id`, `/users/:id/transactions`, `/credit-grants` | Ops console reads (`/users/:id` powers the user detail sheet) |
 | Admin | `GET /admin/transactions/failed` | Manual reconciliation queue (includes `metadata`) |
 | Admin | `POST /admin/access-codes`, `GET /admin/access-codes` | Beta code issuance |
 | Admin | `POST /admin/users/:userId/credits`, `POST /admin/credits/grant-by-email` | Credit grants |
