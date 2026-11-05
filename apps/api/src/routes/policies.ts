@@ -4,7 +4,7 @@
  * GET  /policies — retrieve current policy settings
  * POST /policies — update policy limits
  *
- * Policy writes: Postgres only in Phase 2 (Soroban contract writes added in Phase 4).
+ * Policy writes go to Postgres only (plus an AuditLog entry) — there is no on-chain write.
  */
 
 import { type Router } from 'express'
@@ -76,7 +76,7 @@ policiesRouter.post('/policies', requireJwt, validate(PolicyUpdateSchema), async
   const body = req.body as z.infer<typeof PolicyUpdateSchema>
 
   try {
-    // Save to Postgres (Phase 2 stand-in — Phase 4 adds Soroban write first)
+    // Postgres is the source of truth for policy; there is no on-chain write.
     const updated = await savePolicy(userId, {
       allowanceLimit: body.allowance_limit,
       maxTransactionLimit: body.max_transaction_limit,
