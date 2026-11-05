@@ -17,7 +17,7 @@
 
 import { type Router } from 'express'
 import { Router as ExpressRouter } from 'express'
-import type { ApprovalQueue, Transaction } from '@prisma/client'
+import type { ApprovalQueue, Prisma, Transaction } from '@prisma/client'
 import { sendSuccess, sendError } from '../lib/response.js'
 import { AppError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
@@ -260,7 +260,7 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
           data: {
             status: 'FAILED',
             blockedReason: errMsg || errStr,
-            metadata: { failureReason: 'cctp_burn_failed' },
+            metadata: { ...storedMetadata(transaction.metadata), failureReason: 'cctp_burn_failed' },
           },
         })
         sendError(res, 'Cross-chain payment failed during burn on Stellar. No fee was charged.', 'CCTP_BURN_FAILED', 502, {
@@ -297,6 +297,7 @@ approveRouter.post('/approve/:token', async (req, res, next) => {
           crossChain: true,
           destinationChain: 'base',
           metadata: {
+            ...storedMetadata(transaction.metadata),
             cctpFee: {
               rate: CCTP_FEE_RATE.toString(),
               amount: feeAmount,
@@ -458,4 +459,9 @@ async function consumeToken(
   })
   if (!queue) return null // deleted between update and read — treat as lost
   return { queue, transaction: queue.transaction }
+}
+
+/** The agent's metadata on the stored row, so status writes add to it instead of replacing it. */
+function storedMetadata(value: Prisma.JsonValue): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }

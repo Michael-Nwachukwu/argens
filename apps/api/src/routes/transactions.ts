@@ -315,7 +315,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           data: {
             status: 'FAILED',
             blockedReason: errMsg || errStr,
-            metadata: { failureReason: 'cctp_burn_failed' },
+            metadata: { ...(metadata ?? {}), failureReason: 'cctp_burn_failed' },
           },
         })
         sendError(res, 'Cross-chain payment failed during burn on Stellar. No fee was charged.', 'CCTP_BURN_FAILED', 502, {
@@ -351,6 +351,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
         data: {
           stellarTxHash,
           metadata: {
+            ...(metadata ?? {}),
             cctpFee: {
               rate: CCTP_FEE_RATE.toString(),
               amount: feeAmount,
