@@ -199,30 +199,14 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
 
     if (isStellar) {
       // ── Stellar direct payment ──────────────────────────────────────────────
+      let stellarResult: { hash: string }
       try {
         const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-        const stellarResult = await submitPayment({
+        stellarResult = await submitPayment({
           senderSecretKey: secretKey,
           recipientPublicKey: recipient,
           amount,
           memo: memo ?? null,
-        })
-
-        await prisma.transaction.update({
-          where: { id: tx.id },
-          data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-        })
-
-        void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
-
-        sendSuccess(res, {
-          status: 'success',
-          transaction_id: tx.id,
-          stellar_tx_hash: stellarResult.hash,
-          amount,
-          recipient,
-          timestamp: new Date().toISOString(),
-          policy_check: buildPolicyCheckResponse(policyResult.detail),
         })
       } catch (stellarErr) {
         logger.error('Stellar payment failed', { userId, transactionId: tx.id, error: (stellarErr as Error).message })
@@ -239,7 +223,24 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
           error: (stellarErr as Error).message,
           transaction_id: tx.id,
         })
+        return
       }
+
+      // The payment is on-chain from here. Nothing below may report failure or release the
+      // reservation — an agent told "failed" would retry and pay twice.
+      await recordPaymentSuccess(tx.id, stellarResult.hash, { userId })
+
+      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+      sendSuccess(res, {
+        status: 'success',
+        transaction_id: tx.id,
+        stellar_tx_hash: stellarResult.hash,
+        amount,
+        recipient,
+        timestamp: new Date().toISOString(),
+        policy_check: buildPolicyCheckResponse(policyResult.detail),
+      })
     } else {
       // ── CCTP cross-chain: burn on Stellar → fee → fire-and-forget relay ─────
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
@@ -381,6 +382,24 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
   }
 })
 
+/**
+ * Marks a submitted payment SUCCESS. Called only after the Stellar transaction has landed,
+ * so a failed write must not surface as a payment failure: log it for reconciliation (the
+ * hash is in the log) and let the caller report success.
+ */
+async function recordPaymentSuccess(transactionId: string, stellarTxHash: string, ctx: { userId: string }): Promise<void> {
+  try {
+    await prisma.transaction.update({
+      where: { id: transactionId },
+      data: { status: 'SUCCESS', stellarTxHash },
+    })
+  } catch (e) {
+    logger.error('Payment landed on-chain but recording SUCCESS failed — reconcile manually', {
+      ...ctx, transactionId, stellarTxHash, error: (e as Error).message,
+    })
+  }
+}
+
 // ─── POST /quote ─────────────────────────────────────────────────────────────
 
 transactionsRouter.post('/quote', requireApiKey, validate(PaySchema), async (req, res, next) => {
@@ -490,31 +509,14 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       },
     })
 
+    let stellarResult: { hash: string }
     try {
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
+      stellarResult = await submitPayment({
         senderSecretKey: secretKey,
         recipientPublicKey: original.recipientAddress,
         amount: refundAmount,
         memo: `Refund ${original.id.slice(0, 12)}`,
-      })
-
-      await prisma.transaction.update({
-        where: { id: refundTx.id },
-        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-      })
-
-      await incrementTotalSpent(userId, refundAmount)
-      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
-
-      sendSuccess(res, {
-        status: 'success',
-        refund_transaction_id: refundTx.id,
-        original_transaction_id: original.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount: refundAmount,
-        recipient: original.recipientAddress,
-        timestamp: new Date().toISOString(),
       })
     } catch (stellarErr) {
       logger.error('Refund Stellar payment failed', {
@@ -529,7 +531,27 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
       sendError(res, 'Refund failed due to Stellar error.', 'STELLAR_PAYMENT_FAILED', 502, {
         transaction_id: refundTx.id,
       })
+      return
     }
+
+    // On-chain from here — see /pay.
+    await recordPaymentSuccess(refundTx.id, stellarResult.hash, { userId })
+    await incrementTotalSpent(userId, refundAmount).catch((e: unknown) =>
+      logger.error('Refund sent but totalSpent was not incremented — reconcile', {
+        userId, refundTxId: refundTx.id, amount: refundAmount, error: (e as Error).message,
+      }),
+    )
+    void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+    sendSuccess(res, {
+      status: 'success',
+      refund_transaction_id: refundTx.id,
+      original_transaction_id: original.id,
+      stellar_tx_hash: stellarResult.hash,
+      amount: refundAmount,
+      recipient: original.recipientAddress,
+      timestamp: new Date().toISOString(),
+    })
   } catch (err) {
     next(err)
   }
