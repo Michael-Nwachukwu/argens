@@ -30,7 +30,7 @@ import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
-import { checkPolicy } from '../services/policy.js'
+import { checkPolicyAndReserve, releaseSpend } from '../services/policy.js'
 import { submitPayment, recordLandedPayment } from '../services/payment.js'
 import { isStellarAddress, isEvmAddress } from '../services/stellar.js'
 import {
@@ -158,7 +158,8 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
     }
 
     // ── 4. Policy check ───────────────────────────────────────────────────────
-    const policyResult = await checkPolicy(userId, amountUsdc)
+    // Reserves the amount atomically when APPROVED; released below if the payment fails.
+    const policyResult = await checkPolicyAndReserve(userId, amountUsdc)
     const effectiveMemo = memo ?? (description ? description.slice(0, 28) : undefined) ?? null
 
     if (policyResult.status === 'BLOCKED') {
@@ -253,6 +254,11 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
         transactionId: tx.id,
         error: (stellarErr as Error).message,
       })
+      await releaseSpend(userId, amountUsdc).catch((releaseErr: unknown) =>
+        logger.error('Failed to release reserved spend after Stellar failure', {
+          userId, transactionId: tx.id, error: (releaseErr as Error).message,
+        }),
+      )
       await prisma.transaction.update({
         where: { id: tx.id },
         data: { status: 'FAILED', blockedReason: (stellarErr as Error).message },
@@ -265,7 +271,7 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
     }
 
     // The payment is on-chain from here — never report failure (see recordLandedPayment).
-    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId, incrementSpend: amountUsdc })
+    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId })
 
     // Refresh balance + low-balance check
     void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))

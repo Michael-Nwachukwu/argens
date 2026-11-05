@@ -20,7 +20,7 @@ import {
   inspectAccount,
   SPONSORED_RESERVE_PER_WALLET_XLM,
 } from '../services/sponsorship.js'
-import { checkPolicy } from '../services/policy.js'
+import { checkPolicyAndReserve, releaseSpend } from '../services/policy.js'
 import { submitPayment, recordLandedPayment } from '../services/payment.js'
 import { getActiveCreditsBalance } from '../services/credits.js'
 import { decryptSecretKey } from '../lib/crypto.js'
@@ -271,7 +271,9 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
     }
 
     // 5. Run policy check
-    const policyResult = await checkPolicy(userId, amount)
+    // Reserves the amount atomically when APPROVED, so concurrent sends cannot jointly
+    // exceed the allowance; released below if the payment fails.
+    const policyResult = await checkPolicyAndReserve(userId, amount)
 
     // ── BLOCKED ─────────────────────────────────────────────────────────────
     if (policyResult.status === 'BLOCKED') {
@@ -375,6 +377,11 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         transactionId: tx.id,
         error: (stellarErr as Error).message,
       })
+      await releaseSpend(userId, amount).catch((releaseErr: unknown) =>
+        logger.error('Failed to release reserved spend after Stellar failure', {
+          userId, transactionId: tx.id, error: (releaseErr as Error).message,
+        }),
+      )
 
       await prisma.transaction.update({
         where: { id: tx.id },
@@ -392,7 +399,7 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
     }
 
     // The payment is on-chain from here — never report failure (see recordLandedPayment).
-    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId, incrementSpend: amount })
+    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId })
 
     // Refresh balance cache + low-balance check (fire-and-forget)
     void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
