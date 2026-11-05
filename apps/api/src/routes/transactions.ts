@@ -33,6 +33,7 @@ import {
   BASE_DOMAIN,
 } from '../services/cctp.js'
 import { enqueueRelay } from '../services/cctp-relay.js'
+import { PositiveAmountSchema } from '../lib/money.js'
 import {
   sendBlockedEmail,
   sendPendingApprovalEmail,
@@ -40,10 +41,7 @@ import {
 
 // ─── Validation schemas ──────────────────────────────────────────────────────
 
-const AmountSchema = z
-  .string()
-  .regex(/^\d+(\.\d{1,7})?$/, 'Amount must be a string with up to 7 decimal places')
-  .refine((v) => parseFloat(v) > 0, 'Amount must be greater than 0')
+const AmountSchema = PositiveAmountSchema
 
 const PaySchema = z.object({
   recipient: z.string().min(1, 'Recipient is required'),

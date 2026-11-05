@@ -30,6 +30,7 @@ import { sendBlockedEmail, sendPendingApprovalEmail } from '../services/email.js
 import { generateSecureToken } from '../lib/crypto.js'
 import { logger, logBackgroundFailure } from '../lib/logger.js'
 import bcrypt from 'bcryptjs'
+import { PositiveAmountSchema } from '../lib/money.js'
 
 export const walletRouter: Router = ExpressRouter()
 
@@ -37,10 +38,7 @@ const CACHE_TTL_MS = 30_000 // 30 seconds
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
-const AmountSchema = z
-  .string()
-  .regex(/^\d+(\.\d{1,7})?$/, 'Amount must be a string with up to 7 decimal places')
-  .refine((v) => parseFloat(v) > 0, 'Amount must be greater than 0')
+const AmountSchema = PositiveAmountSchema
 
 const SendSchema = z.object({
   recipient: z.string().min(1, 'Recipient is required'),

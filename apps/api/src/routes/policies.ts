@@ -17,6 +17,7 @@ import { prisma } from '../lib/prisma.js'
 import { savePolicy } from '../services/policy.js'
 import { sendPolicyChangedEmail } from '../services/email.js'
 import { logger } from '../lib/logger.js'
+import { DecimalAmountSchema } from '../lib/money.js'
 
 export const policiesRouter: Router = ExpressRouter()
 
@@ -25,7 +26,7 @@ export const policiesRouter: Router = ExpressRouter()
 // null = remove limit; string with 7 decimal places = set limit
 const LimitField = z
   .union([
-    z.string().regex(/^\d+(\.\d{1,7})?$/, 'Must be a decimal string (e.g. "50.0000000")'),
+    DecimalAmountSchema,
     z.null(),
   ])
   .optional()
