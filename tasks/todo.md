@@ -1,19 +1,29 @@
-## Task: Code cleanup pass (2026-10-31)
+## Task: Code cleanup pass (2026-10-31 → 2026-11-05)
 **Goal:** Fix the real defects a full survey turned up, remove dead code, and tighten error handling — one logical change per commit, `pnpm verify` + web typecheck green after each.
 **Branch:** `chore/cleanup`
-**Steps:**
-- [ ] API keys: generating a key must deactivate the previous ones (dashboard promises "immediately invalidated"; today every key ever issued stays valid) + audit log + the existing-but-never-sent regenerated email
-- [ ] Email links: every dashboard CTA (`/wallet`, `/policies`, `/transactions/:id`, `/marketplace`, `/api-keys`) 404s on argens.xyz — they live under `/dashboard`
-- [ ] API key hashing: `bcrypt.hashSync` blocks the event loop → async
-- [ ] Dead code: unused `ValidationError` / `ConflictError` / `PaymentError`, `detectChain`, unused `resetPinAttempts` import
-- [ ] Fire-and-forget `.catch(() => undefined)` → log the failure (CLAUDE.md rule 6)
-- [ ] `cctp.ts` `any`s → typed
-- [ ] `email.ts` Ethereal preview `console.log` → logger
-- [ ] Web: unused imports / variables (dashboard, docs, services pages)
-- [ ] Web: one shared `AddFundsModal` (two drifted copies)
-- [ ] `pnpm verify` also typechecks the web app
-**Risks:** key deactivation changes behaviour for anyone running two keys on purpose — the UI already says regenerate invalidates, so this matches the documented contract.
-**Done when:** every item committed separately, all tests + both typechecks pass.
+**Done:**
+- [x] API keys: generating a key revokes the previous ones (+ audit log + the regenerated email)
+- [x] Email links: dashboard CTAs pointed at 404s; now `/dashboard/*`
+- [x] Async bcrypt for API key hashing
+- [x] Dead code: unused error classes, `detectChain`, unused imports
+- [x] Fire-and-forget failures logged (`logBackgroundFailure`); unhandled rejection in `/agent/status`
+- [x] Recipient validation: StrKey for Stellar, viem `isAddress` for Base (truncated CCTP mint recipient)
+- [x] Low-balance check consolidated in `services/balance.ts`: refresh-then-check, Decimal threshold, 24h rate limit
+- [x] `cctp.ts` typed (no `any`), unsigned-burn guard
+- [x] Web: unused code, one `AddFundsModal`, `useCopyToClipboard` (no false "Copied")
+- [x] `pnpm verify` typechecks the web app; `tsconfig.tsbuildinfo` untracked
+- [x] `trust proxy` (rate limits were one shared bucket behind Traefik); per-API-key limiter + IP ceiling
+- [x] Auth middleware deduplicated; DB failure → 503 `AUTH_UNAVAILABLE` (not "revoked"); JWT pinned to HS256
+- [x] Login timing equaliser was a malformed hash (email enumeration); emails matched case-insensitively
+- [x] Landed payments never reported as failed (`recordLandedPayment`) on all five payment paths
+- [x] Cross-chain writes keep the agent's metadata
+- [x] Atomic `checkPolicyAndReserve` on `/wallet/send`, `/pay/x402` and the marketplace
+- [x] Amounts validated against Decimal(18, 7) (`lib/money.ts`)
+- [x] Stale x402 "Phase 4" error message and Soroban-era policy comments
+**Open — needs a product decision:**
+- [ ] `/refund` sends the amount *again to the original recipient*, any SUCCESS tx can be refunded repeatedly, cross-chain originals would try to pay a 0x address on Stellar, and it bypasses the approval threshold and the atomic reservation
+- [ ] Approval execution re-checks with read-only `checkPolicy` then increments (concurrent approvals could overspend)
+- [ ] Case-insensitive unique index on `User.email` (schema change)
 
 ## Task: Live verification follow-ups (2026-10-29)
 **Goal:** Fix what the first live GET call (`mercury_txs_by_hash`, credit pool) exposed.
