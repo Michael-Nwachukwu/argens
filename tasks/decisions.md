@@ -4,6 +4,11 @@ Format: most recent first. Do not re-litigate these without a strong reason.
 
 ---
 
+## 2026-11-05 — Signup opened: the beta access-code gate is removed
+**Decision:** `POST /auth/signup` takes only email + password. It no longer reads, validates or redeems an `AccessCode`; an `accessCode` field sent by an old client is stripped by validation and ignored. The signup page drops the code field, the private-beta banner and the waitlist links.
+**Kept:** the `AccessCode` table, `User.accessCodeId`, and the admin generate/list endpoints and console tab — historical redemptions stay intact and no migration is needed.
+**Still guarding signups:** email verification before any wallet is created, disposable-domain + MX checks, and the per-IP auth rate limit. Each verified signup locks 1.5 XLM of ops-wallet reserve, so watch the ops wallet's spendable XLM (alerting covers it).
+
 ## 2026-10-29 — A delivered marketplace call with no settlement evidence stays SUCCESS, is flagged, and still pays markup
 **Context:** First live call through the new GET path (`mercury_txs_by_hash`, $0.001, credit pool) returned 200 with data but no `X-Payment-Tx`, and no USDC left the payer. MPP Router settles only after the provider's 2xx and, on a settle failure, logs `SETTLE FAILED` and serves the content anyway (rozo-mpprouter `src/mpp-proxy.ts`). Argens was recording the full base cost and charging markup as if settled.
 **Decision:** When neither a receipt nor a settle hash is present on a 2xx, keep the transaction `SUCCESS` (the user received the result), store `metadata.mpp_router.settlement = "unconfirmed"` (`"confirmed"` otherwise), write `AuditLog MARKETPLACE_SETTLEMENT_UNCONFIRMED`, and log a warning. Markup is still charged — it pays for the delivered call, not for MPP's settlement.

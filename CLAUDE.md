@@ -18,7 +18,7 @@ This file is the **single source of truth** for the Claude Code agent building A
 - **Marketplace refunds: MPP auto-refund aware.** MPP Router settles before calling upstream and refunds the payer itself on non-delivery (`Refund-Status: pending`). `services/marketplace-refund.ts` classifies the `Refund-*` headers: `pending` → no Argens flag, refund id + status URL stored in `metadata.mpp_router.refund` (Ops Console shows "AUTO-REFUND (MPP)"). `manual-review`, `not-applicable-direct-settlement` (third-party routes MPP never refunds), or a receipt with no header → `metadata.refund.required=true` + `AuditLog MARKETPLACE_REFUND_REQUIRED` + ops-alert email ("REFUND NEEDED" badge; refunds stay manual). Credit-funded calls always restore the user's credits on failure.
 - **Marketplace example payloads + skill coupling: LIVE.** `services/marketplace-examples.ts` provides per-endpoint/provider `example_payload`s (surfaced in the catalog, embedded in per-provider skill markdown, used by the catalog test harness). The dashboard marketplace detail view prefills the payload box and has a `skill.md` button (view/download). `apps/api/scripts/marketplace-catalog-test.ts` is a committed catalog health harness.
 - **Marketplace credits: LIVE.** Admin can grant expirable credits. Marketplace calls consume credits via the credit-pool wallet, refund deductions on no-payment failure paths, and re-check credits at approval execution. The credit-pool Stellar account is bootstrapped and funded on mainnet.
-- **Auth: password reset LIVE.** `POST /auth/forgot-password` + `POST /auth/reset-password` (single-use 1h token in `User.passwordResetToken`/`passwordResetExpiry`), `sendPasswordResetEmail`, web pages at `/auth/forgot-password` + `/auth/reset-password`. Beta signup requires an `AccessCode`. Email validation rejects disposable domains and MX-less addresses.
+- **Auth: password reset LIVE.** `POST /auth/forgot-password` + `POST /auth/reset-password` (single-use 1h token in `User.passwordResetToken`/`passwordResetExpiry`), `sendPasswordResetEmail`, web pages at `/auth/forgot-password` + `/auth/reset-password`. Signup is open (access-code gate removed 2026-11-05). Email validation rejects disposable domains and MX-less addresses.
 - **Dashboard: dismiss pending approvals.** `POST /transactions/:id/dismiss` (JWT) rejects a PENDING_APPROVAL tx the owner no longer wants, even after the approval token has expired. `/login` redirects already-authenticated users to `/dashboard`.
 - **Admin ops console: implemented.** Stats, wallet balances (ops/fee/Base relayer/credit-pool), users, access codes, credit grants, failed transactions (+ refund-needed), and the marketplace pause tab.
 - **SKILL.md: v7.** Per-service skill discovery is a mandatory pre-call step (`GET /SKILL/{provider}.md`); documents example payloads, `MARKETPLACE_SERVICE_PAUSED`, CCTP response shapes/fee, Base recipient rules, `/docs`, and `/llms.txt`.
@@ -492,7 +492,7 @@ real file before writing a query or a migration.
 | `AuditLog` | `eventType` + `eventData` — policy changes, key regeneration, refund-required flags |
 | `MarketplaceServiceSetting` | Per-user provider enablement. Unique on `(userId, serviceId)` |
 | `GlobalServiceSetting` | Platform-wide kill-switch keyed by provider. **Absence of a row means enabled** — a row is written only to pause. Overrides any per-user setting |
-| `AccessCode` | Single-use beta codes; `redeemedBy` links to the user |
+| `AccessCode` | Beta-era single-use codes; `redeemedBy` links to the user. No longer required or read at signup |
 | `CreditGrant` | Prepaid marketplace budget. Per-grant `amountRemaining`, optional `expiresAt`. Consumed FIFO by soonest expiry |
 
 ### Invariants that are not visible in the schema file
@@ -558,7 +558,7 @@ surface — if an endpoint is not here, it does not exist.
 | Either | `GET /marketplace/services`, `GET /marketplace/services/:providerId` | Catalog, searchable |
 | Either | `POST /marketplace/call` | Call + pay a marketplace service in one step |
 | Public | `GET /marketplace/services/:providerId/skill.md` | Per-provider agent instructions |
-| JWT | `POST /auth/signup`, `GET /auth/verify/:token`, `POST /auth/resend-verification` | Signup + email verification (access code required in beta) |
+| JWT | `POST /auth/signup`, `GET /auth/verify/:token`, `POST /auth/resend-verification` | Signup + email verification (open — no access code) |
 | JWT | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | Session |
 | JWT | `POST /auth/forgot-password`, `POST /auth/reset-password` | Single-use 1h reset token |
 | JWT | `POST /auth/api-keys` | Generate a key (requires `emailVerified`) |

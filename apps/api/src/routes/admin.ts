@@ -10,9 +10,8 @@
  *   GET  /admin/access-codes              — list codes (with redemption status)
  *   POST /admin/users/:userId/credits     — grant credits to a user (Track 2)
  *
- * Note: there is no waitlist admin endpoint here. Waitlist collection lives in
- * Tally (form id xX9AxG embedded on the landing page). Admin reviews waitlist
- * responses in Tally's UI and distributes generated access codes manually.
+ * Signup is open (2026-11-05): access codes are no longer required, and the
+ * Tally waitlist was removed. The access-code endpoints remain for history.
  */
 
 import { type Router, type Request, type Response, type NextFunction } from 'express'

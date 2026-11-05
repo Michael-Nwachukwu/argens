@@ -16,7 +16,7 @@ This file is the **single source of truth** for the Codex agent building Argens.
 - **Marketplace: LIVE on mainnet.** ~85 providers / ~450 endpoints via MPP Router. Per-user enablement toggles **plus a platform-wide kill-switch** (`GlobalServiceSetting`): globally paused providers are hidden from `GET /marketplace/services` and rejected at `POST /marketplace/call` with `503 MARKETPLACE_SERVICE_PAUSED` (Ops Console "Marketplace" tab + `POST /admin/marketplace/services/:providerId`). ~20% markup to `ARGENS_FEE_WALLET`. Catalog includes `GET` routes and `path_params` (sent as `query` keys; checked before payment). Direct-settlement routes (`settlement: "direct"`) have their challenge `payTo` pinned to the catalog's `operator.payouts`.
 - **Marketplace refunds: MPP auto-refund aware.** MPP Router settles before calling upstream and refunds the payer itself on non-delivery (`Refund-Status: pending`). `services/marketplace-refund.ts` classifies the `Refund-*` headers: `pending` → no Argens flag, refund id + status URL stored in `metadata.mpp_router.refund` (Ops Console shows "AUTO-REFUND (MPP)"). `manual-review`, `not-applicable-direct-settlement` (third-party routes MPP never refunds), or a receipt with no header → `metadata.refund.required=true` + `AuditLog MARKETPLACE_REFUND_REQUIRED` + ops-alert email ("REFUND NEEDED" badge; refunds stay manual). Credit-funded calls always restore the user's credits on failure.
 - **Marketplace example payloads + skill coupling: LIVE.** `services/marketplace-examples.ts` provides per-endpoint/provider `example_payload`s (catalog + per-provider skill markdown + catalog test harness). Dashboard prefills the payload box and offers a `skill.md` view/download. Committed catalog health harness at `apps/api/scripts/marketplace-catalog-test.ts`.
-- **Beta access codes: LIVE.** `AccessCode` schema; signup requires a code (supports `?code=...` autofill). Admin can generate/list codes.
+- **Signup is open (2026-11-05).** The beta access-code gate was removed; signup no longer reads `AccessCode`. Admin can still generate/list codes (historical records).
 - **Marketplace credits: LIVE.** `CreditGrant` expirable FIFO accounting via `ARGENS_CREDIT_POOL_SECRET`; approved marketplace calls re-check credits at execution and fall back to USDC. Deductions refunded on failure paths. Credit-pool Stellar account is bootstrapped and funded on mainnet.
 - **CCTP V2 / Base settlement: LIVE & available.** `POST /pay` accepts Base `0x...` addresses and routes Stellar → Base via Circle CCTP V2. Argens fee `clamp(amount × 0.5%, $0.01, $2.00)` (`computeCctpFee()`), with a fail-closed `verifyCctpPreflightBalance()` before the fee (`402 INSUFFICIENT_FUNDS_PLUS_FEES` / `503 CCTP_PREFLIGHT_UNAVAILABLE`). Latest mainnet verification: tx `cmpn8yh5900011uqzobaa94qn`, Stellar burn `5d889c2691236a068a22d900fd86996862dc9022ab8ea667a51945fb53114044`, Base relay `0xb086f56e0259d9241043d051dc2b2280567c85775997594ff966aad9496bb2ef`. Approval-token CCTP path still needs live verification.
 - **Auth: password reset LIVE.** `POST /auth/forgot-password` + `POST /auth/reset-password` (single-use 1h token), `sendPasswordResetEmail`, web pages at `/auth/forgot-password` + `/auth/reset-password`. Email validation rejects disposable/MX-less addresses.
@@ -493,7 +493,7 @@ real file before writing a query or a migration.
 | `AuditLog` | `eventType` + `eventData` — policy changes, key regeneration, refund-required flags |
 | `MarketplaceServiceSetting` | Per-user provider enablement. Unique on `(userId, serviceId)` |
 | `GlobalServiceSetting` | Platform-wide kill-switch keyed by provider. **Absence of a row means enabled** — a row is written only to pause. Overrides any per-user setting |
-| `AccessCode` | Single-use beta codes; `redeemedBy` links to the user |
+| `AccessCode` | Beta-era single-use codes; `redeemedBy` links to the user. No longer required or read at signup |
 | `CreditGrant` | Prepaid marketplace budget. Per-grant `amountRemaining`, optional `expiresAt`. Consumed FIFO by soonest expiry |
 
 ### Invariants that are not visible in the schema file
@@ -559,7 +559,7 @@ surface — if an endpoint is not here, it does not exist.
 | Either | `GET /marketplace/services`, `GET /marketplace/services/:providerId` | Catalog, searchable |
 | Either | `POST /marketplace/call` | Call + pay a marketplace service in one step |
 | Public | `GET /marketplace/services/:providerId/skill.md` | Per-provider agent instructions |
-| JWT | `POST /auth/signup`, `GET /auth/verify/:token`, `POST /auth/resend-verification` | Signup + email verification (access code required in beta) |
+| JWT | `POST /auth/signup`, `GET /auth/verify/:token`, `POST /auth/resend-verification` | Signup + email verification (open — no access code) |
 | JWT | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | Session |
 | JWT | `POST /auth/forgot-password`, `POST /auth/reset-password` | Single-use 1h reset token |
 | JWT | `POST /auth/api-keys` | Generate a key (requires `emailVerified`) |
