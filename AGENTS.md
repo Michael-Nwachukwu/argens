@@ -1477,7 +1477,7 @@ Do not re-litigate these. They are settled.
 | Transfer PIN | Optional 4-digit PIN (bcrypt-hashed) on `POST /wallet/send` | Protects manual dashboard transfers even if session is compromised; agents use API key path, unaffected |
 | Session security | JWT expires 1h; client-side tab-idle logout after 5 min hidden | Short-lived tokens + idle logout reduce exposure without degrading UX |
 | Separate send endpoint | `POST /wallet/send` is JWT-only; agent payments via `POST /pay` (API key only) | Keeps agent and human-initiated spend on separate auth paths — no mixing |
-| Policy applies to marketplace | Same policy check (`checkPolicy`) runs for marketplace calls as for direct payments | Agents cannot bypass policy limits by routing through marketplace |
+| Policy applies to marketplace | Same atomic policy check (`checkPolicyAndReserve`) runs for marketplace calls as for direct payments | Agents cannot bypass policy limits by routing through marketplace |
 
 ---
 
