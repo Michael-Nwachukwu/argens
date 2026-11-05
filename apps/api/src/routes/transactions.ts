@@ -20,8 +20,8 @@ import { AppError, NotFoundError } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
 import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
-import { checkPolicy, checkPolicyAndReserve, releaseSpend, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment } from '../services/payment.js'
+import { checkPolicy, checkPolicyAndReserve, releaseSpend } from '../services/policy.js'
+import { submitPayment, recordLandedPayment } from '../services/payment.js'
 import { isStellarAddress, isEvmAddress, validateMemo } from '../services/stellar.js'
 import { refreshBalanceAndWarn } from '../services/balance.js'
 import {
@@ -228,7 +228,7 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
 
       // The payment is on-chain from here. Nothing below may report failure or release the
       // reservation — an agent told "failed" would retry and pay twice.
-      await recordPaymentSuccess(tx.id, stellarResult.hash, { userId })
+      await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId })
 
       void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
@@ -383,24 +383,6 @@ transactionsRouter.post('/pay', requireApiKey, validate(PaySchema), async (req, 
   }
 })
 
-/**
- * Marks a submitted payment SUCCESS. Called only after the Stellar transaction has landed,
- * so a failed write must not surface as a payment failure: log it for reconciliation (the
- * hash is in the log) and let the caller report success.
- */
-async function recordPaymentSuccess(transactionId: string, stellarTxHash: string, ctx: { userId: string }): Promise<void> {
-  try {
-    await prisma.transaction.update({
-      where: { id: transactionId },
-      data: { status: 'SUCCESS', stellarTxHash },
-    })
-  } catch (e) {
-    logger.error('Payment landed on-chain but recording SUCCESS failed — reconcile manually', {
-      ...ctx, transactionId, stellarTxHash, error: (e as Error).message,
-    })
-  }
-}
-
 // ─── POST /quote ─────────────────────────────────────────────────────────────
 
 transactionsRouter.post('/quote', requireApiKey, validate(PaySchema), async (req, res, next) => {
@@ -536,12 +518,7 @@ transactionsRouter.post('/refund', requireApiKey, validate(RefundSchema), async 
     }
 
     // On-chain from here — see /pay.
-    await recordPaymentSuccess(refundTx.id, stellarResult.hash, { userId })
-    await incrementTotalSpent(userId, refundAmount).catch((e: unknown) =>
-      logger.error('Refund sent but totalSpent was not incremented — reconcile', {
-        userId, refundTxId: refundTx.id, amount: refundAmount, error: (e as Error).message,
-      }),
-    )
+    await recordLandedPayment({ transactionId: refundTx.id, stellarTxHash: stellarResult.hash, userId, incrementSpend: refundAmount })
     void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
 
     sendSuccess(res, {

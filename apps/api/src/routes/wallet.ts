@@ -20,8 +20,8 @@ import {
   inspectAccount,
   SPONSORED_RESERVE_PER_WALLET_XLM,
 } from '../services/sponsorship.js'
-import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment } from '../services/payment.js'
+import { checkPolicy } from '../services/policy.js'
+import { submitPayment, recordLandedPayment } from '../services/payment.js'
 import { getActiveCreditsBalance } from '../services/credits.js'
 import { decryptSecretKey } from '../lib/crypto.js'
 import { validate } from '../middleware/validate.js'
@@ -360,49 +360,14 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
       },
     })
 
+    let stellarResult: { hash: string }
     try {
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
+      stellarResult = await submitPayment({
         senderSecretKey: secretKey,
         recipientPublicKey: recipient,
         amount,
         memo: memo ?? null,
-      })
-
-      // Mark SUCCESS + record hash
-      await prisma.transaction.update({
-        where: { id: tx.id },
-        data: {
-          status: 'SUCCESS',
-          stellarTxHash: stellarResult.hash,
-        },
-      })
-
-      // Increment totalSpent
-      await incrementTotalSpent(userId, amount)
-
-      // Refresh balance cache + low-balance check (fire-and-forget)
-      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
-
-      sendSuccess(res, {
-        status: 'success',
-        transaction_id: tx.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount,
-        recipient,
-        timestamp: new Date().toISOString(),
-        policy_check: {
-          allowance:
-            policyResult.detail.allowance === 'not_set' ? 'not_configured' : policyResult.detail.allowance,
-          max_transaction:
-            policyResult.detail.max_transaction === 'not_set'
-              ? 'not_configured'
-              : policyResult.detail.max_transaction,
-          approval_threshold:
-            policyResult.detail.approval_threshold === 'not_set'
-              ? 'not_configured'
-              : policyResult.detail.approval_threshold,
-        },
       })
     } catch (stellarErr) {
       logger.error('Stellar payment failed (dashboard send)', {
@@ -423,7 +388,35 @@ walletRouter.post('/wallet/send', requireJwt, authLimiter, validate(SendSchema),
         error: (stellarErr as Error).message,
         transaction_id: tx.id,
       })
+      return
     }
+
+    // The payment is on-chain from here — never report failure (see recordLandedPayment).
+    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId, incrementSpend: amount })
+
+    // Refresh balance cache + low-balance check (fire-and-forget)
+    void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+    sendSuccess(res, {
+      status: 'success',
+      transaction_id: tx.id,
+      stellar_tx_hash: stellarResult.hash,
+      amount,
+      recipient,
+      timestamp: new Date().toISOString(),
+      policy_check: {
+        allowance:
+          policyResult.detail.allowance === 'not_set' ? 'not_configured' : policyResult.detail.allowance,
+        max_transaction:
+          policyResult.detail.max_transaction === 'not_set'
+            ? 'not_configured'
+            : policyResult.detail.max_transaction,
+        approval_threshold:
+          policyResult.detail.approval_threshold === 'not_set'
+            ? 'not_configured'
+            : policyResult.detail.approval_threshold,
+      },
+    })
   } catch (err) {
     next(err)
   }

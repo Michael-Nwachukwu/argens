@@ -30,8 +30,8 @@ import { sendSuccess, sendError } from '../lib/response.js'
 import { prisma } from '../lib/prisma.js'
 import { logger, logBackgroundFailure } from '../lib/logger.js'
 import { decryptSecretKey, generateSecureToken } from '../lib/crypto.js'
-import { checkPolicy, incrementTotalSpent } from '../services/policy.js'
-import { submitPayment } from '../services/payment.js'
+import { checkPolicy } from '../services/policy.js'
+import { submitPayment, recordLandedPayment } from '../services/payment.js'
 import { isStellarAddress, isEvmAddress } from '../services/stellar.js'
 import {
   sendBlockedEmail,
@@ -238,55 +238,14 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
       },
     })
 
+    let stellarResult: { hash: string }
     try {
       const secretKey = decryptSecretKey(wallet.stellarSecretKeyEnc)
-      const stellarResult = await submitPayment({
+      stellarResult = await submitPayment({
         senderSecretKey: secretKey,
         recipientPublicKey: payTo,
         amount: amountUsdc,
         memo: effectiveMemo,
-      })
-
-      await prisma.transaction.update({
-        where: { id: tx.id },
-        data: { status: 'SUCCESS', stellarTxHash: stellarResult.hash },
-      })
-
-      await incrementTotalSpent(userId, amountUsdc)
-
-      // Refresh balance + low-balance check
-      void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
-
-      // Build the X-Payment proof header for the agent to use in its retry request
-      const paymentProof = buildX402PaymentProof({
-        network: normalizeNetworkName(network),
-        txHash: stellarResult.hash,
-        amount: amountUsdc,
-        payTo,
-      })
-
-      logger.info('x402 payment executed', {
-        userId,
-        transactionId: tx.id,
-        txHash: stellarResult.hash,
-        resource: normalized.resource,
-      })
-
-      sendSuccess(res, {
-        status: 'success',
-        transaction_id: tx.id,
-        stellar_tx_hash: stellarResult.hash,
-        amount: amountUsdc,
-        recipient: payTo,
-        network: normalizeNetworkName(network),
-        resource: normalized.resource,
-        timestamp: new Date().toISOString(),
-        /**
-         * Include this header value in your retry request to the paywall:
-         *   X-Payment: <payment_header>
-         */
-        payment_header: paymentProof,
-        policy_check: buildPolicyCheck(policyResult.detail),
       })
     } catch (stellarErr) {
       logger.error('x402 Stellar payment failed', {
@@ -302,7 +261,46 @@ x402Router.post('/pay/x402', requireApiKey, validate(X402Schema), async (req, re
         error: (stellarErr as Error).message,
         transaction_id: tx.id,
       })
+      return
     }
+
+    // The payment is on-chain from here — never report failure (see recordLandedPayment).
+    await recordLandedPayment({ transactionId: tx.id, stellarTxHash: stellarResult.hash, userId, incrementSpend: amountUsdc })
+
+    // Refresh balance + low-balance check
+    void refreshBalanceAndWarn(userId, wallet.id, wallet.stellarPublicKey).catch(logBackgroundFailure('refresh balance + low-balance check', { userId }))
+
+    // Build the X-Payment proof header for the agent to use in its retry request
+    const paymentProof = buildX402PaymentProof({
+      network: normalizeNetworkName(network),
+      txHash: stellarResult.hash,
+      amount: amountUsdc,
+      payTo,
+    })
+
+    logger.info('x402 payment executed', {
+      userId,
+      transactionId: tx.id,
+      txHash: stellarResult.hash,
+      resource: normalized.resource,
+    })
+
+    sendSuccess(res, {
+      status: 'success',
+      transaction_id: tx.id,
+      stellar_tx_hash: stellarResult.hash,
+      amount: amountUsdc,
+      recipient: payTo,
+      network: normalizeNetworkName(network),
+      resource: normalized.resource,
+      timestamp: new Date().toISOString(),
+      /**
+       * Include this header value in your retry request to the paywall:
+       *   X-Payment: <payment_header>
+       */
+      payment_header: paymentProof,
+      policy_check: buildPolicyCheck(policyResult.detail),
+    })
   } catch (err) {
     next(err)
   }

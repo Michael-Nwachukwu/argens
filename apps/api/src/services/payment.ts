@@ -29,6 +29,8 @@ import { NETWORK_PASSPHRASE, USDC_ASSET, server } from './stellar.js'
 import { submitClassic } from './sponsorship.js'
 import { StellarError } from '../lib/errors.js'
 import { logger } from '../lib/logger.js'
+import { prisma } from '../lib/prisma.js'
+import { incrementTotalSpent } from './policy.js'
 
 // ─── Payment submission ──────────────────────────────────────────────────────
 
@@ -126,4 +128,38 @@ function extractStellarError(err: unknown): string {
     if ('message' in e) return String(e['message'])
   }
   return String(err)
+}
+
+/**
+ * Records a payment that has already landed on-chain: marks the row SUCCESS with its hash
+ * and, for paths that did not reserve spend at check time, increments totalSpent.
+ *
+ * Never throws. Once the money has moved, the caller must report success — an agent told
+ * "failed" retries and pays twice. A failed write is logged with the hash for reconciliation.
+ */
+export async function recordLandedPayment(params: {
+  transactionId: string
+  stellarTxHash: string
+  userId: string
+  /** Amount to add to totalSpent; omit when checkPolicyAndReserve already reserved it. */
+  incrementSpend?: string
+}): Promise<void> {
+  const { transactionId, stellarTxHash, userId, incrementSpend } = params
+  try {
+    await prisma.transaction.update({
+      where: { id: transactionId },
+      data: { status: 'SUCCESS', stellarTxHash },
+    })
+  } catch (e) {
+    logger.error('Payment landed on-chain but recording SUCCESS failed — reconcile manually', {
+      userId, transactionId, stellarTxHash, error: (e as Error).message,
+    })
+  }
+  if (incrementSpend) {
+    await incrementTotalSpent(userId, incrementSpend).catch((e: unknown) =>
+      logger.error('Payment landed on-chain but totalSpent was not incremented — reconcile manually', {
+        userId, transactionId, stellarTxHash, amount: incrementSpend, error: (e as Error).message,
+      }),
+    )
+  }
 }
