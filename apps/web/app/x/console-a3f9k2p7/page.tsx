@@ -67,6 +67,42 @@ interface UserRow {
   _count: { transactions: number }
 }
 
+interface UserDetail {
+  id: string
+  email: string
+  emailVerified: boolean
+  accessCodeId: string | null
+  createdAt: string
+  transfer_pin_set: boolean
+  wallet: { stellarPublicKey: string; status: string; balanceCache: string; balanceCachedAt: string | null; creditsGranted: string; createdAt: string } | null
+  policies: { allowanceLimit: string | null; maxTransactionLimit: string | null; approvalThreshold: string | null; totalSpent: string; updatedAt: string } | null
+  apiKeys: Array<{ id: string; keyPrefix: string; isActive: boolean; lastUsedAt: string | null; createdAt: string }>
+  creditGrants: Array<{ id: string; amount: string; amountRemaining: string; reason: string | null; expiresAt: string | null; createdAt: string }>
+  _count: { transactions: number }
+  usdc_live: string | null
+  active_credits_balance: string
+  tx_by_status: Array<{ status: string; count: number }>
+  spend_by_type: Array<{ type: string; count: number; total: string }>
+  activity: Array<{ id: string; eventType: string; eventData: unknown; createdAt: string }>
+}
+
+interface UserTxRow {
+  id: string
+  type: string
+  status: string
+  amount: string
+  costPaid: string | null
+  recipientAddress: string
+  serviceId: string | null
+  memo: string | null
+  stellarTxHash: string | null
+  crossChain: boolean
+  destinationChain: string | null
+  destinationTxHash: string | null
+  blockedReason: string | null
+  createdAt: string
+}
+
 interface CodeRow {
   id: string
   code: string
@@ -308,7 +344,7 @@ function Console({ onLogout }: { onLogout: () => void }) {
           ))}
         </div>
 
-        {tab === 'users'    && <UsersPanel />}
+        {tab === 'users'    && <UsersPanel network={balances?.network ?? 'mainnet'} />}
         {tab === 'codes'    && <CodesPanel onChanged={loadOverview} />}
         {tab === 'credits'  && <CreditsPanel onChanged={loadOverview} />}
         {tab === 'failed'   && <FailedPanel />}
@@ -401,7 +437,8 @@ function RelayerCard({ r }: { r: BalancesReport['base_relayer'] }) {
 }
 
 // ─── Users panel ─────────────────────────────────────────────────────────────
-function UsersPanel() {
+function UsersPanel({ network }: { network: 'mainnet' | 'testnet' }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [users, setUsers] = useState<UserRow[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -450,7 +487,17 @@ function UsersPanel() {
             {loading && <tr><td colSpan={7} style={{ padding: 18, textAlign: 'center', color: t.faint }}>Loading…</td></tr>}
             {!loading && users.length === 0 && <tr><td colSpan={7} style={{ padding: 18, textAlign: 'center', color: t.faint }}>No users.</td></tr>}
             {users.map(u => (
-              <tr key={u.id} style={{ borderBottom: `1px solid ${t.border}` }}>
+              <tr
+                key={u.id}
+                onClick={() => setSelectedId(u.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(u.id) } }}
+                tabIndex={0}
+                role="button"
+                aria-label={`Open ${u.email}`}
+                style={{ borderBottom: `1px solid ${t.border}`, cursor: 'pointer', background: selectedId === u.id ? t.bg3 : undefined }}
+                onMouseEnter={(e) => { if (selectedId !== u.id) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                onMouseLeave={(e) => { if (selectedId !== u.id) e.currentTarget.style.background = '' }}
+              >
                 <td style={{ padding: '10px 14px', color: t.text }}>{u.email}</td>
                 <td style={{ padding: '10px 14px', color: u.emailVerified ? t.success : t.muted, fontFamily: 'JetBrains Mono, monospace' }}>{u.emailVerified ? '✓' : '—'}</td>
                 <td style={{ padding: '10px 14px', color: u.accessCodeId ? t.success : t.muted, fontFamily: 'JetBrains Mono, monospace' }}>{u.accessCodeId ? '✓' : '—'}</td>
@@ -463,7 +510,237 @@ function UsersPanel() {
           </tbody>
         </table>
       </div>
+      {selectedId && <UserDetailSheet userId={selectedId} network={network} onClose={() => setSelectedId(null)} />}
     </Section>
+  )
+}
+
+// ─── User detail sheet ───────────────────────────────────────────────────────
+const mono: React.CSSProperties = { fontFamily: 'JetBrains Mono, monospace' }
+const usd = (v: string | null | undefined) => (v == null ? '—' : `$${parseFloat(v).toFixed(2)}`)
+const when = (d: string | null | undefined) => (d ? new Date(d).toLocaleString() : '—')
+const short = (s: string, head = 6, tail = 4) => (s.length > head + tail + 1 ? `${s.slice(0, head)}…${s.slice(-tail)}` : s)
+
+const TX_STATUS_COLOR: Record<string, string> = {
+  SUCCESS: t.success, FAILED: t.error, BLOCKED: t.error, REJECTED: t.muted,
+  PENDING_APPROVAL: t.warning, APPROVED: t.pending,
+}
+
+function SheetBlock({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ ...mono, fontSize: 10, color: t.faint, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{title}</div>
+        {action}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function KV({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderBottom: `1px solid ${t.border}`, fontSize: 12 }}>
+      <span style={{ color: t.muted }}>{k}</span>
+      <span style={{ ...mono, color: t.text2, textAlign: 'right', wordBreak: 'break-all' }}>{v}</span>
+    </div>
+  )
+}
+
+function UserDetailSheet({ userId, network, onClose }: { userId: string; network: 'mainnet' | 'testnet'; onClose: () => void }) {
+  const [user, setUser] = useState<UserDetail | null>(null)
+  const [error, setError] = useState('')
+  const [txs, setTxs] = useState<UserTxRow[]>([])
+  const [txPage, setTxPage] = useState(1)
+  const [txPages, setTxPages] = useState(1)
+  const [txTotal, setTxTotal] = useState(0)
+  const [txStatus, setTxStatus] = useState('')
+  const [txLoading, setTxLoading] = useState(false)
+
+  const explorer = `https://stellar.expert/explorer/${network === 'mainnet' ? 'public' : 'testnet'}`
+
+  useEffect(() => {
+    setUser(null); setError('')
+    adminFetch<UserDetail>(`/admin/users/${encodeURIComponent(userId)}`).then((r) => {
+      if (isErr(r)) setError(r.error)
+      else setUser(r)
+    })
+  }, [userId])
+
+  // Paginated list keeps the meta, so it bypasses adminFetch's data unwrapping.
+  const loadTxs = useCallback(async (page: number, status: string) => {
+    setTxLoading(true)
+    const qs = `page=${page}&limit=25${status ? `&status=${status}` : ''}`
+    const r = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/transactions?${qs}`, {
+      headers: { 'x-admin-secret': sessionStorage.getItem(SECRET_KEY) ?? '' },
+    }).then((x) => x.json()).catch(() => null)
+    setTxLoading(false)
+    if (r?.data) {
+      setTxs((prev) => (page === 1 ? r.data : [...prev, ...r.data]))
+      setTxPage(page)
+      setTxPages(r.meta?.pages ?? 1)
+      setTxTotal(r.meta?.total ?? r.data.length)
+    }
+  }, [userId])
+
+  useEffect(() => { loadTxs(1, txStatus) }, [loadTxs, txStatus])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prevOverflow }
+  }, [onClose])
+
+  const spent = user?.spend_by_type.reduce((sum, r) => sum + parseFloat(r.total), 0) ?? 0
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'flex-end' }}>
+      <aside
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="User details"
+        style={{ width: 'min(640px, 100vw)', height: '100%', overflowY: 'auto', background: t.bg2, borderLeft: `1px solid ${t.border2}`, padding: '20px 24px 48px', boxSizing: 'border-box' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 18, color: t.text, wordBreak: 'break-all' }}>{user?.email ?? (error ? 'User' : 'Loading…')}</div>
+            <div style={{ ...mono, fontSize: 11, color: t.faint, marginTop: 4 }}>{userId}</div>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ fontSize: 12, padding: '6px 10px', background: 'transparent', border: `1px solid ${t.border2}`, color: t.muted, borderRadius: 6, cursor: 'pointer', ...mono }}>esc ✕</button>
+        </div>
+
+        {error && (
+          <div style={{ marginTop: 16, padding: '10px 14px', background: t.errorLow, border: '1px solid rgba(160,72,72,0.3)', borderRadius: 7, color: t.error, fontSize: 13, ...mono }}>{error}</div>
+        )}
+
+        {user && (
+          <>
+            {/* Balances */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginTop: 18 }}>
+              <StatCard label="USDC (live)" value={user.wallet ? usd(user.usdc_live ?? user.wallet.balanceCache) : '—'} sub={user.wallet ? (user.usdc_live === null ? 'live read failed · cached' : `cached ${usd(user.wallet.balanceCache)}`) : 'no wallet'} />
+              <StatCard label="Credits" value={usd(user.active_credits_balance)} sub={`${usd(user.wallet?.creditsGranted)} granted total`} accent={t.accent} />
+              <StatCard label="Spent" value={`$${spent.toFixed(2)}`} sub={user.spend_by_type.map((r) => `${r.count} ${r.type}`).join(' · ') || 'no successful txns'} />
+              <StatCard label="Transactions" value={user._count.transactions} sub={user.tx_by_status.map((r) => `${r.count} ${r.status.toLowerCase().replace('_', ' ')}`).join(' · ') || 'none'} />
+            </div>
+
+            {/* Account */}
+            <SheetBlock title="Account">
+              <KV k="Email verified" v={user.emailVerified ? <span style={{ color: t.success }}>yes</span> : <span style={{ color: t.warning }}>no</span>} />
+              <KV k="Joined" v={when(user.createdAt)} />
+              <KV k="Transfer PIN" v={user.transfer_pin_set ? 'set' : 'not set'} />
+              <KV k="Signed up with access code" v={user.accessCodeId ? 'yes' : 'no'} />
+            </SheetBlock>
+
+            {/* Wallet */}
+            <SheetBlock title="Wallet">
+              {user.wallet ? (
+                <>
+                  <KV k="Address" v={<a href={`${explorer}/account/${user.wallet.stellarPublicKey}`} target="_blank" rel="noopener noreferrer" style={{ color: t.accent, textDecoration: 'none' }}>{short(user.wallet.stellarPublicKey, 8, 6)} ↗</a>} />
+                  <KV k="Status" v={<span style={{ color: user.wallet.status === 'READY' ? t.success : t.warning }}>{user.wallet.status}</span>} />
+                  <KV k="Balance cached at" v={when(user.wallet.balanceCachedAt)} />
+                  <KV k="Created" v={when(user.wallet.createdAt)} />
+                </>
+              ) : <div style={{ fontSize: 12, color: t.muted }}>No wallet yet (email not verified).</div>}
+            </SheetBlock>
+
+            {/* Policy */}
+            <SheetBlock title="Policy">
+              {user.policies ? (
+                <>
+                  <KV k="Allowance" v={user.policies.allowanceLimit ? `${usd(user.policies.totalSpent)} spent of ${usd(user.policies.allowanceLimit)}` : `not set · ${usd(user.policies.totalSpent)} spent`} />
+                  <KV k="Max per transaction" v={user.policies.maxTransactionLimit ? usd(user.policies.maxTransactionLimit) : 'not set'} />
+                  <KV k="Approval threshold" v={user.policies.approvalThreshold ? usd(user.policies.approvalThreshold) : 'not set'} />
+                  <KV k="Last changed" v={when(user.policies.updatedAt)} />
+                </>
+              ) : <div style={{ fontSize: 12, color: t.muted }}>No policy row.</div>}
+            </SheetBlock>
+
+            {/* API keys */}
+            <SheetBlock title={`API keys (${user.apiKeys.length})`}>
+              {user.apiKeys.length === 0 && <div style={{ fontSize: 12, color: t.muted }}>No keys generated.</div>}
+              {user.apiKeys.map((k) => (
+                <KV key={k.id} k={`${k.keyPrefix}…`} v={<><span style={{ color: k.isActive ? t.success : t.muted }}>{k.isActive ? 'active' : 'revoked'}</span>{' · last used '}{when(k.lastUsedAt)}</>} />
+              ))}
+            </SheetBlock>
+          </>
+        )}
+
+        {/* Transactions */}
+        <SheetBlock
+          title={`Transactions (${txTotal})`}
+          action={
+            <select value={txStatus} onChange={(e) => setTxStatus(e.target.value)} style={{ background: t.bg, border: `1px solid ${t.border2}`, borderRadius: 6, padding: '4px 8px', fontSize: 11, color: t.text2, ...mono }}>
+              <option value="">all statuses</option>
+              {Object.keys(TX_STATUS_COLOR).map((s) => <option key={s} value={s}>{s.toLowerCase().replace('_', ' ')}</option>)}
+            </select>
+          }
+        >
+          <div style={{ border: `1px solid ${t.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            {txs.length === 0 && !txLoading && <div style={{ padding: 14, fontSize: 12, color: t.faint, textAlign: 'center' }}>No transactions.</div>}
+            {txs.map((x) => {
+              const charged = x.type === 'marketplace' && x.costPaid ? x.costPaid : x.amount
+              return (
+                <div key={x.id} style={{ padding: '10px 12px', borderBottom: `1px solid ${t.border}`, fontSize: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span style={{ color: t.text }}>
+                      {x.type === 'marketplace' ? (x.serviceId ?? 'marketplace') : `→ ${short(x.recipientAddress, 6, 4)}`}
+                      {x.crossChain && <span style={{ ...mono, fontSize: 10, color: t.pending, marginLeft: 6 }}>{x.destinationChain ?? 'cross-chain'}</span>}
+                    </span>
+                    <span style={{ ...mono, color: t.text2 }}>{usd(charged)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, ...mono, fontSize: 11 }}>
+                    <span style={{ color: TX_STATUS_COLOR[x.status] ?? t.muted }}>{x.status.toLowerCase().replace('_', ' ')}</span>
+                    <span style={{ color: t.faint }}>{when(x.createdAt)}</span>
+                  </div>
+                  {(x.stellarTxHash || x.blockedReason || x.memo) && (
+                    <div style={{ marginTop: 4, ...mono, fontSize: 11, color: t.muted, wordBreak: 'break-all' }}>
+                      {x.stellarTxHash && <a href={`${explorer}/tx/${x.stellarTxHash}`} target="_blank" rel="noopener noreferrer" style={{ color: t.accent, textDecoration: 'none', marginRight: 10 }}>tx {short(x.stellarTxHash)} ↗</a>}
+                      {x.memo && <span style={{ marginRight: 10 }}>memo: {x.memo}</span>}
+                      {x.blockedReason && <span style={{ color: t.error }}>{x.blockedReason}</span>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {txLoading && <div style={{ padding: 12, fontSize: 12, color: t.faint, textAlign: 'center' }}>Loading…</div>}
+          </div>
+          {txPage < txPages && !txLoading && (
+            <button onClick={() => loadTxs(txPage + 1, txStatus)} style={{ marginTop: 8, width: '100%', padding: 8, background: 'transparent', border: `1px solid ${t.border2}`, borderRadius: 6, color: t.muted, fontSize: 12, cursor: 'pointer', ...mono }}>load more</button>
+          )}
+        </SheetBlock>
+
+        {user && (
+          <>
+            {/* Credit grants */}
+            <SheetBlock title={`Credit grants (${user.creditGrants.length})`}>
+              {user.creditGrants.length === 0 && <div style={{ fontSize: 12, color: t.muted }}>No grants.</div>}
+              {user.creditGrants.map((g) => (
+                <KV key={g.id} k={`${usd(g.amountRemaining)} left of ${usd(g.amount)}`} v={`${g.reason ?? 'no reason'} · ${g.expiresAt ? `expires ${when(g.expiresAt)}` : 'no expiry'}`} />
+              ))}
+            </SheetBlock>
+
+            {/* Activity */}
+            <SheetBlock title="Activity">
+              {user.activity.length === 0 && <div style={{ fontSize: 12, color: t.muted }}>No audit events.</div>}
+              {user.activity.map((a) => (
+                <div key={a.id} style={{ padding: '7px 0', borderBottom: `1px solid ${t.border}`, fontSize: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span style={{ ...mono, color: t.text2 }}>{a.eventType}</span>
+                    <span style={{ ...mono, fontSize: 11, color: t.faint }}>{when(a.createdAt)}</span>
+                  </div>
+                  {a.eventData != null && (
+                    <div style={{ ...mono, fontSize: 11, color: t.muted, marginTop: 3, wordBreak: 'break-all' }}>{JSON.stringify(a.eventData)}</div>
+                  )}
+                </div>
+              ))}
+            </SheetBlock>
+          </>
+        )}
+      </aside>
+    </div>
   )
 }
 
