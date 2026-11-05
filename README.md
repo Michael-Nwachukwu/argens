@@ -413,7 +413,7 @@ transaction drawer (expand a FAILED marketplace row) and the Ops Console Failed 
 a `MARKETPLACE_REFUND_REQUIRED` audit log, emails ops, and shows a REFUND NEEDED badge in the
 console's Failed tab. Nothing refunds automatically.
 
-**Signup is gated** by an `AccessCode` during beta. Generate codes via `POST /admin/access-codes`.
+**Signup is open** — no access code is needed (the beta gate was removed 2026-11-05). The `AccessCode` table and `POST /admin/access-codes` remain for historical records and invite tracking, but signup no longer reads them.
 
 ---
 

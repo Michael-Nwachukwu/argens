@@ -71,10 +71,10 @@ export const auth = {
       body: JSON.stringify({ email, password }),
     }),
 
-  signup: (email: string, password: string, accessCode: string) =>
+  signup: (email: string, password: string) =>
     apiFetch<SignupResponse>('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ email, password, accessCode }),
+      body: JSON.stringify({ email, password }),
     }),
 
   verify: (token: string) =>

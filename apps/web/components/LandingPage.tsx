@@ -470,9 +470,6 @@ function Hero() {
               </a>
               <WaitlistButton size="lg" label="Join the waitlist" />
             </div>
-            <p style={{ marginTop: 14, fontSize: 12, color: t.faint, fontFamily: 'JetBrains Mono, monospace', animation: 'fadeInUp 0.6s 0.4s both ease-out' }}>
-              Have an access code? <a href="/signup" style={{ color: t.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>Sign up directly →</a>
-            </p>
             <div className="lp-hero-stats" style={{ marginTop: 40, display: 'flex', alignItems: 'center', gap: 28, animation: 'fadeInUp 0.6s 0.42s both ease-out' }}>
               {[
                 { v: '40+',        l: 'AI services on mainnet' },
