@@ -310,7 +310,6 @@ function Console({ onLogout }: { onLogout: () => void }) {
           <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 12 }}>System stats</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <StatCard label="Users" value={stats?.users.total ?? '—'} sub={`${stats?.users.verified ?? 0} verified`} />
-            <StatCard label="Access codes" value={stats?.access_codes.total ?? '—'} sub={`${stats?.access_codes.redeemed ?? 0} used / ${stats?.access_codes.unredeemed ?? 0} free`} />
             <StatCard label="Credits outstanding" value={`$${parseFloat(stats?.credits.outstanding_total ?? '0').toFixed(2)}`} sub={`${stats?.credits.active_grants ?? 0} active grants`} accent={t.accent} />
             <StatCard label="Transactions" value={stats?.transactions.total ?? '—'} sub={`${stats?.transactions.failed ?? 0} failed · ${stats?.transactions.pending_approval ?? 0} pending`} accent={(stats?.transactions.failed ?? 0) > 0 ? t.error : undefined} />
           </div>
