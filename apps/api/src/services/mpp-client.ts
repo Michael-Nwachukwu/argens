@@ -41,7 +41,12 @@ export interface MppRequestParams {
   method: string
   headers?: Record<string, string>
   body?: string
-  onChallenge: (challenge: MppChallengeSnapshot) => Promise<void>
+  /**
+   * Runs after the 402 challenge is parsed and BEFORE anything is signed. Throw to abort with
+   * no funds moved. Return `{ secretKey }` to sign with a different wallet than `secretKey`
+   * (the funder can only be chosen once the price is known).
+   */
+  onChallenge: (challenge: MppChallengeSnapshot) => Promise<void | { secretKey: string }>
 }
 
 export interface MppRequestResult {
@@ -94,13 +99,14 @@ export async function performMppRequest(params: MppRequestParams): Promise<MppRe
 
   const progress: Array<Record<string, unknown>> = []
 
-  // One signer per request — bound to this user's Stellar secret key only.
-  const signer = createEd25519Signer(params.secretKey, X402_NETWORK)
-  const scheme = new ExactStellarScheme(signer, { url: SOROBAN_RPC_URL })
-  const client = x402Client.fromConfig({
-    schemes: [{ network: X402_NETWORK, client: scheme, x402Version: 2 }],
-  })
-  const http = new x402HTTPClient(client)
+  // One signer per wallet — bound to exactly one Stellar secret key.
+  const httpFor = (secretKey: string) => {
+    const scheme = new ExactStellarScheme(createEd25519Signer(secretKey, X402_NETWORK), { url: SOROBAN_RPC_URL })
+    return new x402HTTPClient(
+      x402Client.fromConfig({ schemes: [{ network: X402_NETWORK, client: scheme, x402Version: 2 }] }),
+    )
+  }
+  const http = httpFor(params.secretKey)
 
   const baseHeaders = { ...(params.headers ?? {}) }
   // fetch() throws on a GET/HEAD with a body; MPP's GET routes take query params only.
@@ -133,10 +139,11 @@ export async function performMppRequest(params: MppRequestParams): Promise<MppRe
 
     // Enforce policy / credits / approval BEFORE signing or paying. Throws to abort
     // with no funds moved (the credential is signed AND submitted only after this).
-    await params.onChallenge(toChallengeSnapshot(paymentRequired))
+    const funding = await params.onChallenge(toChallengeSnapshot(paymentRequired))
+    const signingHttp = funding && funding.secretKey !== params.secretKey ? httpFor(funding.secretKey) : http
 
     progress.push({ type: 'signing' })
-    const payload = await http.createPaymentPayload(paymentRequired)
+    const payload = await signingHttp.createPaymentPayload(paymentRequired)
     progress.push({ type: 'signed' })
 
     const paymentHeaders = http.encodePaymentSignatureHeader(payload)

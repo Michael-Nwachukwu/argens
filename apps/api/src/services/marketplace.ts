@@ -489,34 +489,17 @@ async function executeMarketplaceCallInternal(
   const url = buildMppRouterUrl(service, input.query)
   const payload = input.payload ?? {}
 
-  // Credit path: if the user has any active credits AND the credit-pool wallet is configured,
-  // route the on-chain MPP Router payment through the pool wallet and decrement credits in DB.
-  // Falls back transparently to the USDC path if either condition fails.
-  //
-  // Applies to both immediately-approved calls and approval-execution. For approval-execution
-  // we know the exact cost (stored on the transaction at PENDING_APPROVAL time) and can
-  // pre-check that credits actually cover it before committing to the pool wallet as funder.
-  // If credits were used elsewhere between approval and execution, we transparently fall
-  // back to the user's USDC wallet.
-  const activeCredits = await getActiveCreditsBalance(userId)
+  // Credit path: when the user's active credits cover the WHOLE call and the credit-pool
+  // wallet is configured, the pool pays MPP Router and the credits are decremented. Otherwise
+  // the user's own wallet pays in full and credits are left untouched — credits and wallet are
+  // never split across one call. The choice is made in onChallenge, once the price is known;
+  // deciding earlier routed every call to the pool whenever any credit existed and refused it
+  // with INSUFFICIENT_CREDITS instead of falling back to the wallet.
   const creditPoolSecret = process.env['ARGENS_CREDIT_POOL_SECRET']
-  let creditPathEligible = activeCredits.greaterThan(0) && Boolean(creditPoolSecret)
-  if (creditPathEligible && options.approvedTransaction) {
-    const approvedCost = options.approvedTransaction.costPaid
-    if (!approvedCost || activeCredits.lessThan(approvedCost)) {
-      creditPathEligible = false
-      logger.info('Approval execution: credits insufficient for approved cost — falling back to USDC', {
-        userId,
-        transactionId: options.approvedTransaction.id,
-        activeCredits: activeCredits.toFixed(7),
-        approvedCost: approvedCost?.toFixed(7) ?? null,
-      })
-    }
-  }
+  const activeCredits = await getActiveCreditsBalance(userId)
   if (activeCredits.greaterThan(0) && !creditPoolSecret) {
     logger.warn('User has active credits but ARGENS_CREDIT_POOL_SECRET is not configured — falling back to USDC', { userId })
   }
-  const fundingSecret = creditPathEligible ? creditPoolSecret! : secretKey
 
   const state: {
     txId: string | null
@@ -540,10 +523,30 @@ async function executeMarketplaceCallInternal(
     )
   }
 
+  /** Consumes credits for the whole cost if they cover it; false means the wallet pays. */
+  const payWithCredits = async (cost: CostBreakdown): Promise<boolean> => {
+    if (!creditPoolSecret || activeCredits.lessThan(cost.total)) return false
+    try {
+      const consumption = await consumeCredits(userId, cost.totalString)
+      state.paidWithCredits = true
+      state.creditDeductions = consumption.grants
+      return true
+    } catch (e) {
+      // A concurrent call drained the credits between the balance read and now.
+      if (e instanceof AppError && e.code === 'INSUFFICIENT_CREDITS') {
+        logger.info('Credits no longer cover this marketplace call — paying from the wallet', {
+          userId, serviceId: service.id, cost: cost.totalString,
+        })
+        return false
+      }
+      throw e
+    }
+  }
+
   let mppResult: MppRequestResult
   try {
     mppResult = await performMppRequest({
-      secretKey: fundingSecret,
+      secretKey,
       url,
       method: service.method,
       ...(service.method === 'GET'
@@ -568,22 +571,15 @@ async function executeMarketplaceCallInternal(
             )
           }
 
-          // Approval execution: if we elected the credit path before performMppRequest,
-          // deduct credits now (before MPP commits payment from the pool wallet).
-          // The pre-check above confirmed sufficient credits, but a concurrent call
-          // could have depleted them — consumeCredits will throw if so.
-          if (creditPathEligible) {
-            const consumption = await consumeCredits(userId, challengeCost.totalString)
-            state.paidWithCredits = true
-            state.creditDeductions = consumption.grants
-          }
+          // Credits are deducted before MPP commits the payment from the pool wallet.
+          const useCredits = await payWithCredits(challengeCost)
 
           await prisma.transaction.update({
             where: { id: options.approvedTransaction.id },
             data: { status: 'APPROVED' },
           })
           state.txId = options.approvedTransaction.id
-          return
+          return useCredits ? { secretKey: creditPoolSecret! } : undefined
         }
 
         // Reserves the cost atomically when APPROVED, so concurrent calls cannot jointly
@@ -642,21 +638,8 @@ async function executeMarketplaceCallInternal(
           throw new MarketplacePendingApprovalError(tx.id)
         }
 
-        // If eligible, deduct credits BEFORE mpp commits the payment from the pool wallet.
-        // If credits no longer cover the cost (race) consumeCredits throws → mpp never pays.
-        if (creditPathEligible) {
-          if (activeCredits.lessThan(challengeCost.total)) {
-            throw new AppError(
-              'Insufficient credits for this marketplace call.',
-              'INSUFFICIENT_CREDITS',
-              402,
-              { requested: challengeCost.totalString, available: activeCredits.toFixed(7) },
-            )
-          }
-          const consumption = await consumeCredits(userId, challengeCost.totalString)
-          state.paidWithCredits = true
-          state.creditDeductions = consumption.grants
-        }
+        // Credits are deducted BEFORE MPP commits the payment from the pool wallet.
+        const useCredits = await payWithCredits(challengeCost)
 
         const tx = await createMarketplaceTransaction({
           userId,
@@ -670,14 +653,15 @@ async function executeMarketplaceCallInternal(
           challenge,
         })
         state.txId = tx.id
+        return useCredits ? { secretKey: creditPoolSecret! } : undefined
       },
     })
   } catch (e) {
     await releaseReservation()
     // If credits were deducted before MPP Router commit, refund them — the on-chain
     // payment didn't complete so the user should be made whole. AppError throws inside
-    // onChallenge (BLOCKED, PENDING_APPROVAL, INSUFFICIENT_CREDITS) happen before the
-    // deduction, so state.creditDeductions is undefined and refundCredits is a no-op.
+    // onChallenge (BLOCKED, PENDING_APPROVAL) happen before the deduction, so
+    // state.creditDeductions is undefined and refundCredits is a no-op.
     if (state.paidWithCredits && state.creditDeductions?.length) {
       await refundCredits(state.creditDeductions).catch((refundErr) =>
         logger.error('Credit refund failed after MPP Router failure — manual reconciliation needed', {
