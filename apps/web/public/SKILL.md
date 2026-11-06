@@ -1,4 +1,4 @@
-# Argens Skill — v8 — updated 2026-10-31
+# Argens Skill — v8 — updated 2026-11-06
 
 Argens is a programmable payment API for AI agents. It lets any agent spend USDC autonomously on Stellar, within human-defined spending policies set by the developer. Agents can also call paid AI services (LLMs, data APIs, tooling) from the Argens Marketplace and pay for them in a single API call — no separate wallet or billing setup required.
 
@@ -95,7 +95,7 @@ Health check. Call this first to confirm the key works and see current limits.
 
 `policies` is `null` if no policies have been configured — all transactions will pass.
 
-`credits_balance` is a non-withdrawable Argens-granted budget that covers marketplace service calls. If `wallet_balance` is `"0.0000000"` but `credits_balance` is non-zero, the account can still call marketplace services — credits are consumed first automatically. Credits do not apply to direct USDC transfers (`POST /pay` with a `G...` or `0x...` recipient).
+`credits_balance` is a non-withdrawable Argens-granted budget that covers marketplace service calls. If `wallet_balance` is `"0.0000000"` but `credits_balance` is non-zero, the account can still call marketplace services. Each call is paid by credits only when `credits_balance` covers the **whole** call; otherwise the wallet pays it in full and the credits stay untouched (one call is never split between the two). Credits do not apply to direct USDC transfers (`POST /pay` with a `G...` or `0x...` recipient).
 
 ---
 
@@ -409,7 +409,7 @@ POST /marketplace/call
 | `MARKETPLACE_GET_USES_QUERY` | **No** | `GET` endpoint called with a `payload` — move the fields into `query` and retry |
 | `MARKETPLACE_UPSTREAM_FAILED` | See `details.refund.outcome` | Upstream errored. `none` — nothing charged, safe to retry. `mpp_auto` — charged, and MPP Router is refunding the wallet automatically (track `details.refund.status_url`); do not ask the user to chase a refund. `direct_settlement` / `mpp_manual_review` / `unknown` — charged; Argens has flagged it for review. Credit-funded calls always restore the credits. Check `upstream_body` |
 
-**Direct-settlement endpoints** (`settlement: "direct"` in the catalog) pay a third-party operator directly. MPP Router does not auto-refund them when they fail — mention that to the user before calling one.
+**Settlement** in the catalog: `"router"` (the default) means MPP Router collects the payment and refunds it automatically if the call is not delivered. **Direct-settlement endpoints** (`settlement: "direct"`) pay a third-party operator directly. MPP Router does not auto-refund them when they fail — mention that to the user before calling one.
 
 ---
 
