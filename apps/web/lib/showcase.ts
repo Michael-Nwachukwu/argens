@@ -15,6 +15,31 @@ export interface ShowcaseProject {
 
 export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
   {
+    name: 'PagePax',
+    description: 'PagePax gives Nigerian businesses a web address and a ready-made page to sell products and services online. Its page-writing agent uses Argens to help users write and improve their pages.',
+    thumbnail: '',
+    logo: 'https://pagepax.com/icon.svg',
+    url: 'https://pagepax.com/',
+    tag: 'Business',
+    howUsed: [
+      'Powers the agent that writes and rewrites business pages.',
+      'Made over 200 payments through Argens since joining on October 27, 2026, as reported in November 2026.',
+      'PagePax has over 2,000 users.',
+    ],
+  },
+  {
+    name: 'Incantly',
+    description: 'Incantly is a notebook that helps people explore ideas and turn their notes into visual and interactive learning experiences. Its study agents use services through the Argens marketplace.',
+    thumbnail: 'https://www.incantly.xyz/opengraph-image?a5a49a60a5f32164',
+    logo: 'https://www.incantly.xyz/icon.svg',
+    url: 'https://www.incantly.xyz/',
+    tag: 'Education',
+    howUsed: [
+      'Study agents access DeepSeek, OpenAI, and email services through the Argens marketplace.',
+      'Made over 100 transactions through Argens while in private beta, as reported in November 2026.',
+    ],
+  },
+  {
     name: 'EVE × Argens Starter',
     description: 'A clone-and-run template wiring EVE (Vercel\'s durable agent framework) with Argens. The agent answers questions by discovering and paying for the right data source through the Argens marketplace — web search, LLMs, scrapers, and more. Two independent approval layers: EVE pauses in the chat before any spend, Argens enforces policy server-side after. Supports direct USDC transfers to Stellar and Base addresses via CCTP V2.',
     thumbnail: '/showcase/eve-argens-starter/thumb.png',
