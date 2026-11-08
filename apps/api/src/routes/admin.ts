@@ -271,7 +271,31 @@ adminRouter.post('/credits/grant-by-email', validate(grantByEmailSchema), async 
 
 // ─── Dashboard read endpoints ──────────────────────────────────────────────────
 
-// GET /admin/stats — top-level counts for the dashboard summary cards.
+/**
+ * USDC moved through Argens by SUCCESS transactions, split by type. Direct payments count the
+ * amount sent (Stellar, Base via CCTP, refunds); marketplace calls count what the user was
+ * charged (cost + markup, `costPaid`), whether paid from the wallet or from credits.
+ */
+async function successVolumeByType(since?: Date) {
+  const rows = await prisma.transaction.groupBy({
+    by: ['type'],
+    where: { status: 'SUCCESS', ...(since ? { createdAt: { gte: since } } : {}) },
+    _count: { _all: true },
+    _sum: { amount: true, costPaid: true },
+  })
+  let total = new Decimal(0)
+  let count = 0
+  const byType: Record<string, { count: number; total: string }> = {}
+  for (const r of rows) {
+    const sum = (r.type === 'marketplace' ? r._sum.costPaid : null) ?? r._sum.amount ?? new Decimal(0)
+    total = total.plus(sum)
+    count += r._count._all
+    byType[r.type] = { count: r._count._all, total: sum.toFixed(7) }
+  }
+  return { total: total.toFixed(7), count, by_type: byType }
+}
+
+// GET /admin/stats — top-level counts and volume for the dashboard summary cards.
 adminRouter.get('/stats', async (_req, res) => {
   try {
     const [
@@ -284,6 +308,8 @@ adminRouter.get('/stats', async (_req, res) => {
       txTotal,
       txFailed,
       txPendingApproval,
+      volumeAllTime,
+      volumeLast30d,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { emailVerified: true } }),
@@ -305,6 +331,8 @@ adminRouter.get('/stats', async (_req, res) => {
       prisma.transaction.count(),
       prisma.transaction.count({ where: { status: 'FAILED' } }),
       prisma.transaction.count({ where: { status: 'PENDING_APPROVAL' } }),
+      successVolumeByType(),
+      successVolumeByType(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
     ])
     sendSuccess(res, {
       users: { total: usersTotal, verified: usersVerified },
@@ -314,6 +342,7 @@ adminRouter.get('/stats', async (_req, res) => {
         outstanding_total: (grantsActiveSum._sum.amountRemaining ?? new Decimal(0)).toFixed(7),
       },
       transactions: { total: txTotal, failed: txFailed, pending_approval: txPendingApproval },
+      volume: { all_time: volumeAllTime, last_30d: volumeLast30d },
     })
   } catch (e) {
     logger.error('Admin stats failed', { error: (e as Error).message })
