@@ -53,6 +53,13 @@ interface Stats {
   access_codes: { total: number; redeemed: number; unredeemed: number }
   credits: { active_grants: number; outstanding_total: string }
   transactions: { total: number; failed: number; pending_approval: number }
+  volume: { all_time: VolumeSummary; last_30d: VolumeSummary }
+}
+
+interface VolumeSummary {
+  total: string
+  count: number
+  by_type: Record<string, { count: number; total: string }>
 }
 
 type Tab = 'users' | 'codes' | 'credits' | 'failed' | 'services'
@@ -309,6 +316,14 @@ function Console({ onLogout }: { onLogout: () => void }) {
         <section style={{ marginTop: 24 }}>
           <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 12 }}>System stats</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <StatCard
+              label="Total volume"
+              value={stats ? `$${parseFloat(stats.volume.all_time.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+              sub={stats
+                ? `$${parseFloat(stats.volume.all_time.by_type['payment']?.total ?? '0').toFixed(2)} direct · $${parseFloat(stats.volume.all_time.by_type['marketplace']?.total ?? '0').toFixed(2)} marketplace · $${parseFloat(stats.volume.last_30d.total).toFixed(2)} last 30d`
+                : undefined}
+              accent={t.success}
+            />
             <StatCard label="Users" value={stats?.users.total ?? '—'} sub={`${stats?.users.verified ?? 0} verified`} />
             <StatCard label="Credits outstanding" value={`$${parseFloat(stats?.credits.outstanding_total ?? '0').toFixed(2)}`} sub={`${stats?.credits.active_grants ?? 0} active grants`} accent={t.accent} />
             <StatCard label="Transactions" value={stats?.transactions.total ?? '—'} sub={`${stats?.transactions.failed ?? 0} failed · ${stats?.transactions.pending_approval ?? 0} pending`} accent={(stats?.transactions.failed ?? 0) > 0 ? t.error : undefined} />
